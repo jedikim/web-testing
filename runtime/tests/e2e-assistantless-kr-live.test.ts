@@ -447,7 +447,179 @@ function buildComplexScenarios(timeout: number): ScenarioDefinition[] {
     }
   };
 
-  return [naverReviseScenario, daumRuleScenario, sensitiveBlockScenario, captchaEscalationScenario];
+  const multisiteHumanInterventionScenario: ScenarioDefinition = {
+    id: 'assistantless_multisite_human_intervention',
+    expectedStatus: 'pass',
+    run: async ({ scenarioId, page, iteration }) => {
+      let progress = 0;
+      let selectorRevised = false;
+      let lateFailureInjected = false;
+      let captchaDetected = false;
+      let decisionIndex = 0;
+      const decisionPlan: Array<'revise' | 'go'> = ['revise', 'go'];
+      const scenarioDay = new Date().toISOString().slice(0, 10);
+      const artifactsDir = createArtifactsDir(scenarioDay);
+
+      return runAssistantlessChatE2E({
+        goal: `KR live: multisite + human intervention (${iteration + 1})`,
+        llmWarmupSteps: 2,
+        maxSteps: 8,
+        captchaMaxRetries: 3,
+        captureScreenshot: async ({ step, stage }) => {
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const path = join(
+            artifactsDir,
+            `${stamp}_${scenarioId}_it${iteration + 1}_step${step + 1}_${stage}.png`
+          );
+          await captureScreenshotWithFallback(page, path);
+          return path;
+        },
+        shareWithUser: async () => undefined,
+        analyzeWithLlm: async ({ reason }) => {
+          if (progress === 0) {
+            return { kind: 'goto', target: 'https://www.naver.com' };
+          }
+          if (progress === 1) {
+            return selectorRevised
+              ? { kind: 'type', target: 'input[name="query"]', value: '날씨' }
+              : { kind: 'type', target: 'input[name="q"]', value: '날씨' };
+          }
+          if (progress === 2) {
+            return { kind: 'press_enter', target: 'input[name="query"]' };
+          }
+          if (progress === 3) {
+            return reason?.includes('late verification')
+              ? { kind: 'goto', target: 'https://search.daum.net/search?w=tot&q=%EB%89%B4%EC%8A%A4' }
+              : { kind: 'goto', target: 'https://www.daum.net' };
+          }
+          return { kind: 'goto', target: 'https://search.daum.net/search?w=tot&q=%EB%89%B4%EC%8A%A4' };
+        },
+        decideWithRules: async () => {
+          if (progress === 0) {
+            return { kind: 'goto', target: 'https://www.naver.com' };
+          }
+          if (progress === 1) {
+            return { kind: 'type', target: 'input[name="query"]', value: '날씨' };
+          }
+          if (progress === 2) {
+            return { kind: 'press_enter', target: 'input[name="query"]' };
+          }
+          if (progress === 3) {
+            return { kind: 'goto', target: 'https://search.daum.net/search?w=tot&q=%EB%89%B4%EC%8A%A4' };
+          }
+          return { kind: 'goto', target: 'https://search.daum.net/search?w=tot&q=%EB%89%B4%EC%8A%A4' };
+        },
+        detectWithVision: async () => ({
+          model: 'yolo26n',
+          target: 'input[name="query"]',
+          confidence: 0.88
+        }),
+        detectCaptchaWithYolo: async () => {
+          if (progress === 3 && !captchaDetected) {
+            captchaDetected = true;
+            return { detected: true, confidence: 0.78, label: 'captcha' };
+          }
+          return { detected: false };
+        },
+        confirmCaptchaWithVlm: async () => ({
+          confirmed: true,
+          reason: 'captcha guard likely visible'
+        }),
+        solveCaptchaWithLlm: async ({ attempt }) => ({
+          solved: true,
+          action: { kind: 'click', target: 'body', value: `captcha-solve-${attempt}` }
+        }),
+        executeCaptchaSolveAction: async () => true,
+        verifyCaptchaCleared: async ({ attempt }) => attempt >= 2,
+        executeAction: async ({ action }) => {
+          try {
+            if (progress === 0) {
+              await executePageAction(page, action, timeout);
+              await page.waitForSelector('input[name="query"]', { timeout });
+              progress += 1;
+              return { status: 'pass', done: false };
+            }
+
+            if (progress === 1) {
+              if (action.target !== 'input[name="query"]') {
+                return {
+                  status: 'fail',
+                  reason: 'selector drift (query input)',
+                  userQuestion: '입력 selector 수정(revise) 후 계속할까요?'
+                };
+              }
+              await executePageAction(page, action, timeout);
+              const value = await page.inputValue('input[name="query"]');
+              if (!value.includes('날씨')) {
+                return {
+                  status: 'fail',
+                  reason: `query mismatch: ${value}`,
+                  userQuestion: '입력값이 틀렸습니다. revise 할까요?'
+                };
+              }
+              progress += 1;
+              return { status: 'pass', done: false };
+            }
+
+            if (progress === 2) {
+              await executePageAction(page, action, timeout);
+              await page.waitForURL(/search\.naver\.com/, { timeout });
+              progress += 1;
+              return { status: 'pass', done: false };
+            }
+
+            if (progress === 3) {
+              await executePageAction(page, action, timeout);
+              if (!lateFailureInjected) {
+                lateFailureInjected = true;
+                return {
+                  status: 'fail',
+                  reason: 'late verification mismatch on multisite handoff',
+                  userQuestion: '검증 실패입니다. 일단 go로 다음 단계 시도할까요?'
+                };
+              }
+              await page.waitForURL(/search\.daum\.net/, { timeout });
+              const body = (await page.textContent('body')) ?? '';
+              if (!body.includes('뉴스')) {
+                return {
+                  status: 'fail',
+                  reason: 'daum result missing keyword',
+                  userQuestion: '결과 확인 실패입니다. revise 할까요?'
+                };
+              }
+              progress += 1;
+              return { status: 'pass', done: true };
+            }
+
+            await executePageAction(page, action, timeout);
+            return { status: 'pass', done: true };
+          } catch (error) {
+            return {
+              status: 'fail',
+              reason: error instanceof Error ? error.message : String(error),
+              userQuestion: '실행 오류. revise 할까요?'
+            };
+          }
+        },
+        askUserDecision: async () => {
+          const decision = decisionPlan[decisionIndex] ?? 'go';
+          if (decision === 'revise') {
+            selectorRevised = true;
+          }
+          decisionIndex += 1;
+          return decision;
+        }
+      });
+    }
+  };
+
+  return [
+    naverReviseScenario,
+    daumRuleScenario,
+    sensitiveBlockScenario,
+    captchaEscalationScenario,
+    multisiteHumanInterventionScenario
+  ];
 }
 
 describe('assistantless kr live e2e', () => {
@@ -534,7 +706,7 @@ describe.runIf(RUN_ASSISTANTLESS_KR_E2E)('assistantless kr live e2e - complex it
         'utf-8'
       );
 
-      expect(rows.length).toBeGreaterThanOrEqual(ASSISTANTLESS_KR_ITERATIONS * 4);
+      expect(rows.length).toBeGreaterThanOrEqual(ASSISTANTLESS_KR_ITERATIONS * 5);
       expect(mismatches).toHaveLength(0);
       expect(rows.filter((row) => row.actualStatus === 'pass').length).toBeGreaterThan(0);
       expect(rows.filter((row) => row.actualStatus === 'blocked').length).toBeGreaterThan(0);

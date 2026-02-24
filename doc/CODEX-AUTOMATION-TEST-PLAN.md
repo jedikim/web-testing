@@ -148,6 +148,7 @@ npm run test:e2e:provider:live
 2. `assistantless_fail_revise_with_vision`: 실패 후 vision 힌트 + revise 재시도
 3. `assistantless_block_not_go`: 사용자 중단 결정
 4. `assistantless_captcha_escalation_retry`: 캡차 에스컬레이션 재시도
+5. `assistantless_multisite_human_intervention`: 멀티 사이트 전환 + 중간 인간 개입(revise/go) 복합 흐름
 
 ## 3. 합격 기준
 
