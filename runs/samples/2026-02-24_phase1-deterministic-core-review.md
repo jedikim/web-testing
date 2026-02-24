@@ -1,5 +1,5 @@
 ## Code Review Report
-- Scope: Phase 1 deterministic core bootstrap (workflow validator + retry policy + execution path builder + runtime test setup)
+- Scope: Phase 1 deterministic core bootstrap (workflow validator + retry policy + execution path builder + deterministic runner + basic extractor)
 - Reviewer: codex
 - Summary: Workflow validation and retry rules align with current AGENTS/RUNBOOK constraints.
 - Issues:
@@ -9,5 +9,5 @@
   - action: defer
 - Decision: approve
 - Evidence:
-  - runtime: npm test (12 passed)
+  - runtime: npm test (19 passed)
   - runtime: npm run typecheck (pass)
