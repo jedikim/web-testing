@@ -97,9 +97,13 @@ npm run test:e2e:autonomous:live
 
 대상:
 
-1. Gemini/OpenAI/Anthropic 멀티 모델 호출
-2. YOLO26 멀티 모델 호출
+1. Gemini/OpenAI 멀티 모델 호출
+2. YOLO26 기본 모델(`yolo26l`) 호출
 3. 모델별 실패/성공 집계 리포트
+4. 기본 모델 세트
+   - Gemini: `gemini-3.1-pro-preview,gemini-3.0-flash`
+   - OpenAI: `gpt-5.2-codex,gpt-5-mini`
+   - YOLO26: `yolo26l`
 
 명령:
 
@@ -166,8 +170,7 @@ npm run test:sdk
 
 1. `gemini` 2개 이상 모델
 2. `openai` 2개 이상 모델
-3. `anthropic` 2개 이상 모델
-4. `yolo26` 2개 이상 모델
+3. `yolo26` 기본 모델(`yolo26l`) 1개
 
 검증 코드:
 

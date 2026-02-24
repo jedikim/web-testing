@@ -38,9 +38,12 @@ Dual 모드 운용을 위한 환경변수 기준을 고정한다.
 ### 3.2 Provider/모델 매트릭스
 
 - `LLM_ENABLED`, `LLM_PROVIDER`, `LLM_MODEL`
-- `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
-- `GEMINI_MODELS`, `OPENAI_MODELS`, `ANTHROPIC_MODELS`
+- `GEMINI_API_KEY`, `OPENAI_API_KEY`
+- `GEMINI_MODELS`, `OPENAI_MODELS`
 - `LLM_VENDOR_ORDER`
+  - 기본 순서: `gemini,openai`
+  - 기본 Gemini 모델: `gemini-3.1-pro-preview,gemini-3.0-flash`
+  - 기본 OpenAI 모델: `gpt-5.2-codex,gpt-5-mini`
 
 ### 3.3 YOLO26
 
@@ -48,6 +51,7 @@ Dual 모드 운용을 위한 환경변수 기준을 고정한다.
 - `YOLO26_BASE_URL`
 - `YOLO26_MODELS`
 - `YOLO26_API_KEY` (로컬 OSS 엔드포인트면 선택)
+  - 권장 모델 세트: `yolo26l`
 
 ### 3.4 Evolution backend (자가개선)
 

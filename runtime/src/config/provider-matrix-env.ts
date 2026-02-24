@@ -3,7 +3,7 @@ import type { LlmProvider } from '../llm/model-registry';
 type EnvMap = Record<string, string | undefined>;
 
 export interface LlmProviderTarget {
-  provider: Exclude<LlmProvider, 'openai_compatible'>;
+  provider: LlmProvider;
   apiKey: string;
   baseUrl?: string;
   models: string[];
@@ -21,7 +21,7 @@ export interface ProviderMatrixEnv {
   visionTargets: VisionProviderTarget[];
 }
 
-const VALID_LLM_VENDORS = new Set(['gemini', 'openai', 'anthropic']);
+const VALID_LLM_VENDORS = new Set(['gemini', 'openai']);
 
 function trim(raw: string | undefined): string | undefined {
   if (!raw) {
@@ -46,30 +46,26 @@ function parseCsv(raw: string | undefined): string[] {
     .filter((part) => part.length > 0);
 }
 
-function vendorKey(provider: Exclude<LlmProvider, 'openai_compatible'>, env: EnvMap): string | undefined {
+function vendorKey(provider: LlmProvider, env: EnvMap): string | undefined {
   switch (provider) {
     case 'gemini':
       return trim(env.GEMINI_API_KEY);
     case 'openai':
       return trim(env.OPENAI_API_KEY);
-    case 'anthropic':
-      return trim(env.ANTHROPIC_API_KEY);
   }
 }
 
-function vendorModels(provider: Exclude<LlmProvider, 'openai_compatible'>, env: EnvMap): string[] {
+function vendorModels(provider: LlmProvider, env: EnvMap): string[] {
   switch (provider) {
     case 'gemini':
       return parseCsv(env.GEMINI_MODELS);
     case 'openai':
       return parseCsv(env.OPENAI_MODELS);
-    case 'anthropic':
-      return parseCsv(env.ANTHROPIC_MODELS);
   }
 }
 
 function vendorBaseUrl(
-  provider: Exclude<LlmProvider, 'openai_compatible'>,
+  provider: LlmProvider,
   env: EnvMap
 ): string | undefined {
   switch (provider) {
@@ -77,17 +73,15 @@ function vendorBaseUrl(
       return trim(env.GEMINI_BASE_URL);
     case 'openai':
       return trim(env.OPENAI_BASE_URL);
-    case 'anthropic':
-      return trim(env.ANTHROPIC_BASE_URL);
   }
 }
 
 export function loadProviderMatrixEnv(source: EnvMap = process.env): ProviderMatrixEnv {
   const order = parseCsv(source.LLM_VENDOR_ORDER);
-  const orderedVendors = (order.length > 0 ? order : ['gemini', 'openai', 'anthropic']).filter(
+  const orderedVendors = (order.length > 0 ? order : ['gemini', 'openai']).filter(
     (vendor, index, list) =>
       VALID_LLM_VENDORS.has(vendor) && list.findIndex((value) => value === vendor) === index
-  ) as Array<Exclude<LlmProvider, 'openai_compatible'>>;
+  ) as LlmProvider[];
 
   const llmTargets: LlmProviderTarget[] = [];
   for (const provider of orderedVendors) {

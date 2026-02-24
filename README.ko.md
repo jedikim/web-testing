@@ -95,6 +95,10 @@ npm run example:repeated-item
 
 ## 모델 정책
 
+- 지원 LLM provider: `gemini`, `openai` (2개만 지원)
+- 기본 Gemini 모델: `gemini-3.1-pro-preview`, `gemini-3.0-flash`
+- 기본 OpenAI 모델: `gpt-5.2-codex`, `gpt-5-mini`
+- 기본 YOLO26 모델: `yolo26l`
 - 코딩/자가개선 루프: `gemini-3.1-pro-preview`
 - 자동화 상호작용 루프: `gemini-3.0-flash`
 

@@ -56,12 +56,7 @@ function parseCsv(raw: string | undefined): string[] {
 
 function parseLlmProvider(raw: string | undefined): LlmProvider {
   const provider = (raw?.trim().toLowerCase() ?? 'openai') as LlmProvider;
-  if (
-    provider !== 'openai' &&
-    provider !== 'gemini' &&
-    provider !== 'anthropic' &&
-    provider !== 'openai_compatible'
-  ) {
+  if (provider !== 'openai' && provider !== 'gemini') {
     throw new Error(`unsupported LLM_PROVIDER: ${raw}`);
   }
   return provider;
@@ -73,10 +68,6 @@ function resolveLlmApiKey(provider: LlmProvider, source: EnvMap): string | undef
       return optionalTrim(source.GEMINI_API_KEY) ?? optionalTrim(source.LLM_API_KEY);
     case 'openai':
       return optionalTrim(source.OPENAI_API_KEY) ?? optionalTrim(source.LLM_API_KEY);
-    case 'anthropic':
-      return optionalTrim(source.ANTHROPIC_API_KEY) ?? optionalTrim(source.LLM_API_KEY);
-    case 'openai_compatible':
-      return optionalTrim(source.LLM_API_KEY);
   }
 }
 
@@ -86,10 +77,6 @@ function resolveLlmBaseUrl(provider: LlmProvider, source: EnvMap): string | unde
       return optionalTrim(source.GEMINI_BASE_URL) ?? optionalTrim(source.LLM_BASE_URL);
     case 'openai':
       return optionalTrim(source.OPENAI_BASE_URL) ?? optionalTrim(source.LLM_BASE_URL);
-    case 'anthropic':
-      return optionalTrim(source.ANTHROPIC_BASE_URL) ?? optionalTrim(source.LLM_BASE_URL);
-    case 'openai_compatible':
-      return optionalTrim(source.LLM_BASE_URL);
   }
 }
 
@@ -99,10 +86,6 @@ function resolveLlmModelOptions(provider: LlmProvider, source: EnvMap): string[]
       return parseCsv(source.GEMINI_MODELS).concat(parseCsv(source.LLM_MODEL_OPTIONS));
     case 'openai':
       return parseCsv(source.OPENAI_MODELS).concat(parseCsv(source.LLM_MODEL_OPTIONS));
-    case 'anthropic':
-      return parseCsv(source.ANTHROPIC_MODELS).concat(parseCsv(source.LLM_MODEL_OPTIONS));
-    case 'openai_compatible':
-      return parseCsv(source.LLM_MODEL_OPTIONS);
   }
 }
 
@@ -120,10 +103,6 @@ export function loadRuntimeEnv(source: EnvMap = process.env): RuntimeEnv {
 
   if (llmEnabled && !llmApiKey) {
     throw new Error(`API key is required for provider ${llmProvider} when LLM_ENABLED=true`);
-  }
-
-  if (llmEnabled && llmProvider === 'openai_compatible' && !llmBaseUrl) {
-    throw new Error('LLM_BASE_URL is required when LLM_PROVIDER=openai_compatible');
   }
 
   return {

@@ -38,9 +38,12 @@ Required root `.gitignore` patterns:
 ### 3.2 Provider and model matrix
 
 - `LLM_ENABLED`, `LLM_PROVIDER`, `LLM_MODEL`
-- `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
-- `GEMINI_MODELS`, `OPENAI_MODELS`, `ANTHROPIC_MODELS`
+- `GEMINI_API_KEY`, `OPENAI_API_KEY`
+- `GEMINI_MODELS`, `OPENAI_MODELS`
 - `LLM_VENDOR_ORDER`
+  - default order: `gemini,openai`
+  - default Gemini models: `gemini-3.1-pro-preview,gemini-3.0-flash`
+  - default OpenAI models: `gpt-5.2-codex,gpt-5-mini`
 
 ### 3.3 YOLO26
 
@@ -48,6 +51,7 @@ Required root `.gitignore` patterns:
 - `YOLO26_BASE_URL`
 - `YOLO26_MODELS`
 - `YOLO26_API_KEY` (optional for local OSS endpoint)
+  - recommended model set: `yolo26l`
 
 ### 3.4 Evolution backend (self-improvement)
 

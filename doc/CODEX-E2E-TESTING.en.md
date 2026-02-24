@@ -11,7 +11,7 @@ Provide reproducible E2E validation for real usage conditions.
 1. contract tests
 2. KR live smoke
 3. assistantless chat-loop simulation
-4. provider matrix (LLM + YOLO26)
+4. provider matrix (LLM + YOLO26; gemini/openai only)
 5. evolution backend loop
 6. SDK/backend contract tests
 7. external assistant integration (external project)

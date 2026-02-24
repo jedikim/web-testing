@@ -95,6 +95,10 @@ npm run example:repeated-item
 
 ## Model Policy
 
+- supported LLM providers: `gemini`, `openai` (only)
+- default Gemini models: `gemini-3.1-pro-preview`, `gemini-3.0-flash`
+- default OpenAI models: `gpt-5.2-codex`, `gpt-5-mini`
+- default YOLO26 model: `yolo26l`
 - coding/self-improvement loops: `gemini-3.1-pro-preview`
 - automation interaction loops: `gemini-3.0-flash`
 

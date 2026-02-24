@@ -83,24 +83,10 @@ export function createHttpProviderExecutors(options: HttpProviderExecutorOptions
         return { ok: true };
       }
 
-      const baseUrl = stripTrailingSlash(target.baseUrl ?? 'https://api.anthropic.com/v1');
-      const response = await fetch(`${baseUrl}/messages`, {
-        method: 'POST',
-        headers: {
-          'x-api-key': target.apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: target.model,
-          max_tokens: 128,
-          messages: [{ role: 'user', content: options.llmPrompt }]
-        })
-      });
-      if (!response.ok) {
-        return { ok: false, error: await parseError(response) };
-      }
-      return { ok: true };
+      return {
+        ok: false,
+        error: `unsupported llm provider: ${target.provider}`
+      };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }

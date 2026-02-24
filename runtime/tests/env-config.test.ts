@@ -12,7 +12,7 @@ describe('loadRuntimeEnv', () => {
     expect(env.humanLoopMaxTurns).toBe(8);
     expect(env.llmEnabled).toBe(false);
     expect(env.llmProvider).toBe('openai');
-    expect(env.llmModel).toBe('gpt-4.1-mini');
+    expect(env.llmModel).toBe('gpt-5-mini');
   });
 
   it('parses flags and numeric values', () => {
@@ -39,13 +39,13 @@ describe('loadRuntimeEnv', () => {
     const env = loadRuntimeEnv({
       LLM_ENABLED: 'true',
       LLM_API_KEY: 'sk-test',
-      LLM_MODEL: 'gpt-4.1-mini'
+      LLM_MODEL: 'gpt-5-mini'
     });
 
     expect(env.llmEnabled).toBe(true);
     expect(env.llmProvider).toBe('openai');
     expect(env.llmApiKey).toBe('sk-test');
-    expect(env.llmModel).toBe('gpt-4.1-mini');
+    expect(env.llmModel).toBe('gpt-5-mini');
   });
 
   it('supports gemini key and multiple model options', () => {
@@ -53,14 +53,14 @@ describe('loadRuntimeEnv', () => {
       LLM_ENABLED: 'true',
       LLM_PROVIDER: 'gemini',
       GEMINI_API_KEY: 'gm-test',
-      GEMINI_MODELS: 'gemini-3.0-flash,gemini-1.5-pro',
-      LLM_MODEL: 'gemini-1.5-pro'
+      GEMINI_MODELS: 'gemini-3.1-pro-preview,gemini-3.0-flash',
+      LLM_MODEL: 'gemini-3.1-pro-preview'
     });
 
     expect(env.llmEnabled).toBe(true);
     expect(env.llmProvider).toBe('gemini');
     expect(env.llmApiKey).toBe('gm-test');
     expect(env.llmModelOptions).toContain('gemini-3.0-flash');
-    expect(env.llmModel).toBe('gemini-1.5-pro');
+    expect(env.llmModel).toBe('gemini-3.1-pro-preview');
   });
 });

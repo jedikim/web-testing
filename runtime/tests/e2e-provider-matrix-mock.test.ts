@@ -40,7 +40,7 @@ describe('provider matrix e2e (mock server)', () => {
     }
   });
 
-  it('runs gemini/openai/anthropic + yolo26 multi-model matrix over http', async () => {
+  it('runs gemini/openai + yolo26 multi-model matrix over http', async () => {
     const calls: string[] = [];
     server = createServer(async (req, res) => {
       const url = req.url ?? '';
@@ -53,10 +53,6 @@ describe('provider matrix e2e (mock server)', () => {
       }
       if (url.includes('/gemini/models/') && url.includes(':generateContent')) {
         respondJson(res, { candidates: [{ content: { parts: [{ text: 'ok' }] } }] });
-        return;
-      }
-      if (url.includes('/anthropic/messages')) {
-        respondJson(res, { content: [{ type: 'text', text: 'ok' }] });
         return;
       }
       if (url.includes('/yolo26/detect')) {
@@ -75,20 +71,17 @@ describe('provider matrix e2e (mock server)', () => {
     const address = server.address() as AddressInfo;
     const root = `http://${address.address}:${address.port}`;
     const matrixEnv = loadProviderMatrixEnv({
-      LLM_VENDOR_ORDER: 'gemini,openai,anthropic',
+      LLM_VENDOR_ORDER: 'gemini,openai',
       GEMINI_API_KEY: 'gm-key',
       GEMINI_BASE_URL: `${root}/gemini`,
-      GEMINI_MODELS: 'gemini-2.0-flash,gemini-1.5-pro',
+      GEMINI_MODELS: 'gemini-3.1-pro-preview,gemini-3.0-flash',
       OPENAI_API_KEY: 'oa-key',
       OPENAI_BASE_URL: `${root}/openai`,
-      OPENAI_MODELS: 'gpt-4.1-mini,gpt-4o-mini',
-      ANTHROPIC_API_KEY: 'an-key',
-      ANTHROPIC_BASE_URL: `${root}/anthropic`,
-      ANTHROPIC_MODELS: 'claude-3-5-haiku-latest,claude-3-5-sonnet-latest',
+      OPENAI_MODELS: 'gpt-5.2-codex,gpt-5-mini',
       YOLO26_ENABLED: '1',
       YOLO26_API_KEY: 'yo-key',
       YOLO26_BASE_URL: `${root}/yolo26`,
-      YOLO26_MODELS: 'yolo26n,yolo26s'
+      YOLO26_MODELS: 'yolo26l'
     });
 
     const executors = createHttpProviderExecutors({
@@ -103,12 +96,11 @@ describe('provider matrix e2e (mock server)', () => {
       executeVision: executors.executeVision
     });
 
-    expect(report.summary.total).toBe(8);
-    expect(report.summary.passed).toBe(8);
+    expect(report.summary.total).toBe(5);
+    expect(report.summary.passed).toBe(5);
     expect(report.summary.failed).toBe(0);
     expect(calls.filter((url) => url.includes('/openai/chat/completions')).length).toBe(2);
     expect(calls.filter((url) => url.includes(':generateContent')).length).toBe(2);
-    expect(calls.filter((url) => url.includes('/anthropic/messages')).length).toBe(2);
-    expect(calls.filter((url) => url.includes('/yolo26/detect')).length).toBe(2);
+    expect(calls.filter((url) => url.includes('/yolo26/detect')).length).toBe(1);
   });
 });

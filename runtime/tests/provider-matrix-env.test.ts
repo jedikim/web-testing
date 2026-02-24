@@ -5,30 +5,27 @@ import { loadProviderMatrixEnv } from '../src/config/provider-matrix-env';
 describe('loadProviderMatrixEnv', () => {
   it('parses multi-vendor llm + yolo26 model matrix from env', () => {
     const config = loadProviderMatrixEnv({
-      LLM_VENDOR_ORDER: 'gemini,openai,anthropic',
+      LLM_VENDOR_ORDER: 'gemini,openai',
       GEMINI_API_KEY: 'gm-key',
-      GEMINI_MODELS: 'gemini-2.0-flash,gemini-1.5-pro',
+      GEMINI_MODELS: 'gemini-3.1-pro-preview,gemini-3.0-flash',
       OPENAI_API_KEY: 'oa-key',
-      OPENAI_MODELS: 'gpt-4.1-mini,gpt-4o-mini',
-      ANTHROPIC_API_KEY: 'an-key',
-      ANTHROPIC_MODELS: 'claude-3-5-sonnet-latest,claude-3-5-haiku-latest',
+      OPENAI_MODELS: 'gpt-5.2-codex,gpt-5-mini',
       YOLO26_ENABLED: '1',
       YOLO26_API_KEY: 'yo-key',
       YOLO26_BASE_URL: 'https://vision.example.local',
-      YOLO26_MODELS: 'yolo26n,yolo26s'
+      YOLO26_MODELS: 'yolo26l'
     });
 
-    expect(config.llmTargets).toHaveLength(3);
+    expect(config.llmTargets).toHaveLength(2);
     expect(config.llmTargets[0]?.provider).toBe('gemini');
     expect(config.llmTargets[1]?.provider).toBe('openai');
-    expect(config.llmTargets[2]?.provider).toBe('anthropic');
-    expect(config.llmTargets[0]?.models).toEqual(['gemini-2.0-flash', 'gemini-1.5-pro']);
+    expect(config.llmTargets[0]?.models).toEqual(['gemini-3.1-pro-preview', 'gemini-3.0-flash']);
     expect(config.visionTargets).toEqual([
       {
         provider: 'yolo26',
         apiKey: 'yo-key',
         baseUrl: 'https://vision.example.local',
-        models: ['yolo26n', 'yolo26s']
+        models: ['yolo26l']
       }
     ]);
   });
@@ -46,7 +43,7 @@ describe('loadProviderMatrixEnv', () => {
     const config = loadProviderMatrixEnv({
       YOLO26_ENABLED: '1',
       YOLO26_BASE_URL: 'http://127.0.0.1:8080',
-      YOLO26_MODELS: 'yolo26n'
+      YOLO26_MODELS: 'yolo26l'
     });
 
     expect(config.visionTargets).toEqual([
@@ -54,7 +51,7 @@ describe('loadProviderMatrixEnv', () => {
         provider: 'yolo26',
         apiKey: undefined,
         baseUrl: 'http://127.0.0.1:8080',
-        models: ['yolo26n']
+        models: ['yolo26l']
       }
     ]);
   });
@@ -65,7 +62,7 @@ describe('loadProviderMatrixEnv', () => {
       GEMINI_API_KEY: 'gm-key',
       GEMINI_MODELS: '',
       OPENAI_API_KEY: 'oa-key',
-      OPENAI_MODELS: 'gpt-4.1-mini'
+      OPENAI_MODELS: 'gpt-5-mini'
     });
 
     expect(config.llmTargets).toHaveLength(1);

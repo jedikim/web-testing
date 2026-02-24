@@ -11,7 +11,7 @@
 1. 계약 테스트(`contract`): 시나리오 정의 품질, 중복 ID, 최소 케이스 수 검증
 2. 라이브 스모크(`live smoke`): 실제 한국 사이트 접속/기본 상호작용/검증
 3. assistantless loop(`chat-like simulation`): AI 비서 없이 스크린샷 공유/의사결정 루프 시뮬레이션
-4. provider matrix(`llm+vision`): Gemini/OpenAI/Anthropic + YOLO26 모델 매트릭스 검증
+4. provider matrix(`llm+vision`): Gemini/OpenAI + YOLO26 모델 매트릭스 검증
 5. evolution backend(`bug/exception growth loop`): 격리 버전 진화 + 승인 전환 검증
 6. SDK/backend contract: 외부 프로젝트 임베딩 호출 계약 검증
 7. 통합 E2E(`assistant integration`): 외부 비서 프로젝트에서 webhook/메시징 연동 포함 검증

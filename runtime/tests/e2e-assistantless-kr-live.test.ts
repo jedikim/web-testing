@@ -171,7 +171,7 @@ function buildComplexScenarios(timeout: number): ScenarioDefinition[] {
           return { kind: 'press_enter', target: 'input[name="query"]' };
         },
         detectWithVision: async () => ({
-          model: 'yolo26n',
+          model: 'yolo26l',
           target: 'input[name="query"]',
           confidence: 0.9
         }),
@@ -510,7 +510,7 @@ function buildComplexScenarios(timeout: number): ScenarioDefinition[] {
           return { kind: 'goto', target: 'https://search.daum.net/search?w=tot&q=%EB%89%B4%EC%8A%A4' };
         },
         detectWithVision: async () => ({
-          model: 'yolo26n',
+          model: 'yolo26l',
           target: 'input[name="query"]',
           confidence: 0.88
         }),

@@ -554,7 +554,7 @@ function buildScenarios(timeout: number): BatchScenario[] {
           return { kind: 'goto', target: 'https://search.daum.net/search?w=tot&q=%EB%89%B4%EC%8A%A4' };
         },
         detectWithVision: async () => ({
-          model: 'yolo26n',
+          model: 'yolo26l',
           target: 'input[name="q"]',
           confidence: 0.86
         }),
@@ -967,7 +967,7 @@ function buildScenarios(timeout: number): BatchScenario[] {
         },
         decideWithRules: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         detectWithVision: async () => ({
-          model: 'yolo26n',
+          model: 'yolo26l',
           target: 'map.naver.com',
           confidence: 0.82
         }),
@@ -1127,7 +1127,7 @@ function buildScenarios(timeout: number): BatchScenario[] {
         analyzeWithLlm: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         decideWithRules: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         detectWithVision: async () => ({
-          model: 'yolo26s',
+          model: 'yolo26l',
           target: progress >= 9 ? 'map.kakao.com' : 'map.naver.com',
           confidence: 0.84
         }),
@@ -1470,7 +1470,7 @@ function buildScenarios(timeout: number): BatchScenario[] {
         analyzeWithLlm: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         decideWithRules: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         detectWithVision: async () => ({
-          model: 'yolo26m',
+          model: 'yolo26l',
           target: progress >= 8 ? 'map.kakao.com' : 'map.naver.com',
           confidence: 0.83
         }),

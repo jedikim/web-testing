@@ -12,12 +12,12 @@ describe('runProviderModelMatrix', () => {
         {
           provider: 'gemini',
           apiKey: 'gm-key',
-          models: ['gemini-2.0-flash', 'gemini-1.5-pro']
+          models: ['gemini-3.1-pro-preview', 'gemini-3.0-flash']
         },
         {
           provider: 'openai',
           apiKey: 'oa-key',
-          models: ['gpt-4.1-mini']
+          models: ['gpt-5.2-codex', 'gpt-5-mini']
         }
       ],
       visionTargets: [
@@ -25,7 +25,7 @@ describe('runProviderModelMatrix', () => {
           provider: 'yolo26',
           apiKey: 'yo-key',
           baseUrl: 'https://vision.local',
-          models: ['yolo26n', 'yolo26s']
+          models: ['yolo26l']
         }
       ],
       executeLlm: async (target) => {
@@ -42,30 +42,31 @@ describe('runProviderModelMatrix', () => {
     expect(report.summary.passed).toBe(5);
     expect(report.summary.failed).toBe(0);
     expect(llmCalls).toEqual([
-      'gemini:gemini-2.0-flash',
-      'gemini:gemini-1.5-pro',
-      'openai:gpt-4.1-mini'
+      'gemini:gemini-3.1-pro-preview',
+      'gemini:gemini-3.0-flash',
+      'openai:gpt-5.2-codex',
+      'openai:gpt-5-mini'
     ]);
-    expect(visionCalls).toEqual(['yolo26:yolo26n', 'yolo26:yolo26s']);
+    expect(visionCalls).toEqual(['yolo26:yolo26l']);
   });
 
   it('collects failure rows without aborting the full matrix', async () => {
     const report = await runProviderModelMatrix({
       llmTargets: [
         {
-          provider: 'anthropic',
-          apiKey: 'an-key',
-          models: ['claude-3-5-sonnet-latest']
+          provider: 'gemini',
+          apiKey: 'gm-key',
+          models: ['gemini-3.1-pro-preview']
         },
         {
           provider: 'openai',
           apiKey: 'oa-key',
-          models: ['gpt-4.1-mini']
+          models: ['gpt-5-mini']
         }
       ],
       visionTargets: [],
       executeLlm: async (target) => {
-        if (target.provider === 'anthropic') {
+        if (target.provider === 'gemini') {
           return { ok: false, error: 'quota exceeded' };
         }
         return { ok: true };
@@ -76,8 +77,8 @@ describe('runProviderModelMatrix', () => {
     expect(report.summary.total).toBe(2);
     expect(report.summary.passed).toBe(1);
     expect(report.summary.failed).toBe(1);
-    expect(report.rows.find((row) => row.provider === 'anthropic')?.status).toBe('fail');
-    expect(report.rows.find((row) => row.provider === 'anthropic')?.error).toMatch(
+    expect(report.rows.find((row) => row.provider === 'gemini')?.status).toBe('fail');
+    expect(report.rows.find((row) => row.provider === 'gemini')?.error).toMatch(
       /quota exceeded/
     );
   });

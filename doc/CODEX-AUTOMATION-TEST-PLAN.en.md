@@ -44,6 +44,12 @@ npm run test:e2e:autonomous:live
 Owned by external project.
 
 ### Layer F: Multi-Vendor LLM + YOLO26 Matrix
+
+Scope:
+1. LLM providers: `gemini`, `openai` only
+2. default model set: `gemini-3.1-pro-preview,gemini-3.0-flash` and `gpt-5.2-codex,gpt-5-mini`
+3. YOLO26 default model set: `yolo26l`
+
 ```bash
 cd runtime
 npm run test:provider:contract
