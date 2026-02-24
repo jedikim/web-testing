@@ -8,6 +8,7 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - `src/workflow`: DSL 타입/검증/경로 빌더
 - `src/engine`: 결정론 실행기
 - `src/extractor`: 기본 추출기(E_inputs/E_clickables/E_state)
+- `src/fallback`: 후보 축약/patch 검증/recipe 버전업
 - `tests`: 런타임 테스트
 
 ## 현재 상태
@@ -17,6 +18,7 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - Branch/Loop를 포함한 최소 실행 경로 빌더를 추가했다.
 - 결정론 실행기(`executeWorkflow`)를 추가해 고정 시나리오를 LLM 없이 실행한다.
 - 기본 Extractor(`extractInputs`, `extractClickables`, `extractState`)를 추가했다.
+- Controlled fallback 준비 단계로 patch-only 파이프라인 코어를 추가했다.
 
 ## 로컬 검증
 

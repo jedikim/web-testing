@@ -1,0 +1,13 @@
+## Code Review Report
+- Scope: Phase 2 controlled fallback core (context reducer + patch-only validation + recipe versioning)
+- Reviewer: codex
+- Summary: Patch-only constraints are enforced and selector recipe updates are versioned deterministically.
+- Issues:
+  - severity: Minor
+  - file: runtime/src/fallback/patch-validator.ts
+  - comment: current validator accepts only selector patch target; workflow-level patching is intentionally blocked in this phase.
+  - action: defer
+- Decision: approve
+- Evidence:
+  - runtime: npm test (28 passed)
+  - runtime: npm run typecheck (pass)

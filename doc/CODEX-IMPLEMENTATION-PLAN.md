@@ -56,6 +56,13 @@
 1. 셀렉터 변경 케이스 자동 복구
 2. 패치 적용 후 재실행 성공
 
+진행 현황(2026-02-24):
+
+1. `runtime/src/fallback/context-reducer.ts` 추가(후보 축약 컨텍스트 생성)
+2. `runtime/src/fallback/patch-validator.ts` 추가(patch-only 검증)
+3. `runtime/src/fallback/recipe-version.ts` 추가(레시피 버전업 + selector patch 적용)
+4. `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts` 통과
+
 ### Phase 3: Vision + Live Ops
 
 목표:
@@ -145,5 +152,6 @@ flowchart TD
 3. 실행 경로 빌더: `runtime/src/workflow/build-execution-path.ts`
 4. 결정론 실행기: `runtime/src/engine/deterministic-runner.ts`
 5. 기본 추출기: `runtime/src/extractor/basic-extractor.ts`
-6. 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`, `runtime/tests/deterministic-runner.test.ts`, `runtime/tests/basic-extractor.test.ts`
-7. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`
+6. Fallback 코어: `runtime/src/fallback/context-reducer.ts`, `runtime/src/fallback/patch-validator.ts`, `runtime/src/fallback/recipe-version.ts`
+7. 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`, `runtime/tests/deterministic-runner.test.ts`, `runtime/tests/basic-extractor.test.ts`, `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts`
+8. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`
