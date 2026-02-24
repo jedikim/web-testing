@@ -6,6 +6,7 @@ import { executeWithVisualRecovery } from '../src/vision/visual-recovery';
 import { AdaptiveController } from '../src/learning/adaptive-controller';
 import { ResilienceOrchestrator } from '../src/ops/resilience-orchestrator';
 import type { WorkflowDefinition } from '../src/workflow/types';
+import { runScreenshotChatLoop } from '../src/chat/screenshot-chat-loop';
 
 describe('phase acceptance', () => {
   it('phase1: deterministic scenario runs without llm', async () => {
@@ -54,7 +55,7 @@ describe('phase acceptance', () => {
     expect(result.recipe.version).toBe('v002');
   });
 
-  it('phase3: visual ambiguity is recovered and mode switching is available', async () => {
+  it('phase3: visual ambiguity is recovered and screenshot chat decision works', async () => {
     const initial = {
       workflowId: 'phase3',
       version: 'v001',
@@ -83,6 +84,27 @@ describe('phase acceptance', () => {
 
     expect(result.status).toBe('pass');
     expect(result.visionCalls).toBe(1);
+
+    let asked = false;
+    const chatResult = await runScreenshotChatLoop({
+      platform: 'telegram',
+      channelId: '300',
+      run: async () =>
+        asked
+          ? { status: 'pass' }
+          : {
+              status: 'need_user',
+              screenshotPath: 'runs/phase3.png',
+              question: '진행할까요?'
+            },
+      askUser: async () => {
+        asked = true;
+        return 'go';
+      },
+      maxTurns: 2
+    });
+
+    expect(chatResult.status).toBe('pass');
   });
 
   it('phase4: repeated runs lower llm call rate and auto-promote rules', async () => {

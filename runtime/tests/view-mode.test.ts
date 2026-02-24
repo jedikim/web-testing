@@ -1,21 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { pickViewMode } from '../src/live/view-mode';
+import { pickViewMode } from '../src/view/view-mode';
 
 describe('pickViewMode', () => {
-  it('prefers screencast when available and healthy', () => {
-    const mode = pickViewMode({
-      screencastAvailable: true,
-      screencastHealthy: true
-    });
+  it('returns screenshot mode by default', () => {
+    const mode = pickViewMode();
 
-    expect(mode).toBe('screencast');
+    expect(mode).toBe('screenshot');
   });
 
-  it('falls back to screenshot when screencast is unavailable', () => {
+  it('keeps screenshot mode when checkpoint is forced', () => {
     const mode = pickViewMode({
-      screencastAvailable: false,
-      screencastHealthy: false
+      forceCheckpoint: true
     });
 
     expect(mode).toBe('screenshot');

@@ -12,7 +12,7 @@ export type FailureCode =
   | 'Unknown';
 
 export interface RunContext {
-  mode: 'live' | 'screenshot';
+  mode: 'screenshot';
   browser: string;
   targetUrl: string;
 }

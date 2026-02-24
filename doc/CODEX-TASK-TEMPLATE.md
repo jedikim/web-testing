@@ -15,6 +15,8 @@
 - url:
 - credentials source:
 - target data:
+- chat channel: telegram/slack
+- user chat id:
 
 ### Done Criteria
 - [ ] 기능 완료 기준 1
@@ -82,6 +84,7 @@ flowchart LR
   - run_json:
   - log:
   - screenshot:
+  - chat_trace:
 
 ## Review
 - decision:

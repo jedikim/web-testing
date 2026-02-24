@@ -1,0 +1,14 @@
+## Code Review Report
+- Scope: screenshot-first pivot (view-mode policy + Telegram/Slack chat checkpoint loop)
+- Reviewer: codex
+- Summary: Live streaming is removed from default path, and screenshot question flow is now chat-native.
+- Issues:
+  - severity: Minor
+  - file: runtime/src/chat/platform-normalizer.ts
+  - comment: payload schemas are minimal; provider-specific edge fields can be expanded later.
+  - action: defer
+- Decision: approve
+- Evidence:
+  - runtime: npm test (64 passed)
+  - runtime: npm run test:acceptance (5 passed)
+  - runtime: npm run typecheck (pass)

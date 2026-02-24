@@ -11,7 +11,7 @@ function sampleRun(id: string, status: RunArtifact['status']): RunArtifact {
     startedAt: '2026-02-24T10:00:00Z',
     endedAt: '2026-02-24T10:00:10Z',
     durationMs: 10000,
-    context: { mode: 'live', browser: 'chromium', targetUrl: 'https://example.com' },
+    context: { mode: 'screenshot', browser: 'chromium', targetUrl: 'https://example.com' },
     steps: [],
     failures: [],
     review: { decision: 'approve', blockerMajorCount: 0, unresolvedMinorNit: 0 },
