@@ -12,6 +12,7 @@
     "test:e2e:kr:contract": "vitest run tests/kr-e2e-scenarios.test.ts tests/e2e-kr-live.test.ts",
     "test:e2e:assistantless:contract": "vitest run tests/assistantless-chat-e2e.test.ts",
     "test:e2e:assistantless:live": "RUN_ASSISTANTLESS_KR_E2E=1 PW_HEADLESS=0 vitest run tests/e2e-assistantless-kr-live.test.ts",
+    "test:e2e:chat-ui:headful": "PW_HEADLESS=0 vitest run tests/chat-automation-ui-e2e.test.ts",
     "test:e2e:autonomous:live": "RUN_AUTONOMOUS_BATCH_E2E=1 PW_HEADLESS=0 AUTONOMOUS_BATCH_ROOT=/home/jedi/code/web-agentic-codex/testing/autonomous-batch vitest run tests/e2e-autonomous-batch-kr-live.test.ts",
     "test:provider:contract": "vitest run tests/llm-model-registry.test.ts tests/load-env-file.test.ts tests/provider-matrix-env.test.ts tests/provider-model-matrix.test.ts tests/provider-http-executor.test.ts tests/e2e-provider-matrix-mock.test.ts",
     "test:e2e:provider:live": "RUN_PROVIDER_LIVE_E2E=1 vitest run tests/e2e-provider-live.test.ts",
