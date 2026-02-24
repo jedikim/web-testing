@@ -13,6 +13,7 @@
 3. `runtime/.env`
 4. `runtime/.env.*`
 5. `!runtime/.env.example`
+6. `testing/`
 
 즉 실제 키 파일은 무시하고, 예시 파일만 추적한다.
 
@@ -29,17 +30,20 @@
 2. `RUN_PROVIDER_LIVE_E2E`: 멀티 벤더 provider 라이브 E2E 실행 여부
 3. `RUN_ASSISTANTLESS_KR_E2E`: assistantless KR 라이브 E2E 실행 여부
 4. `ASSISTANTLESS_KR_ITERATIONS`: assistantless 반복 횟수(기본 1)
-5. `PW_HEADLESS`: Playwright headless 실행 (`1` 또는 `0`, 실전 점검은 `0` 권장)
-6. `PLAYWRIGHT_TIMEOUT_MS`: 기본 타임아웃(ms)
-7. `HUMAN_LOOP_MAX_TURNS`: human-loop 최대 반복 수
-8. `ARTIFACT_ROOT`: 아티팩트 루트 경로(기본 `runs/samples/artifacts`)
-9. `LLM_ENABLED`: 단일 provider LLM 경로 사용 여부
-10. `LLM_PROVIDER`: `openai|gemini|anthropic|openai_compatible`
-11. `LLM_MODEL`, `LLM_MODEL_OPTIONS`, `LLM_BASE_URL`: 단일 provider 모델/베이스URL 설정
-12. `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`: 회사별 키
-13. `GEMINI_MODELS`, `OPENAI_MODELS`, `ANTHROPIC_MODELS`: 회사별 모델 목록(csv)
-14. `LLM_VENDOR_ORDER`: 멀티 벤더 매트릭스 순서(csv)
-15. `YOLO26_ENABLED`, `YOLO26_API_KEY`, `YOLO26_BASE_URL`, `YOLO26_MODELS`: YOLO26 멀티 모델 설정(오픈소스 로컬 엔드포인트는 API 키 없이 가능)
+5. `RUN_AUTONOMOUS_BATCH_E2E`: 완전 자동 배치 라이브 E2E 실행 여부
+6. `AUTONOMOUS_BATCH_ITERATIONS`: 완전 자동 배치 반복 횟수
+7. `AUTONOMOUS_BATCH_ROOT`: 시나리오별 기록 루트 경로(기본 `/home/jedi/code/web-agentic-codex/testing/autonomous-batch`, 프로젝트 `testing/` 하위)
+8. `PW_HEADLESS`: Playwright headless 실행 (`1` 또는 `0`, 실전 점검은 `0` 권장)
+9. `PLAYWRIGHT_TIMEOUT_MS`: 기본 타임아웃(ms)
+10. `HUMAN_LOOP_MAX_TURNS`: human-loop 최대 반복 수
+11. `ARTIFACT_ROOT`: 아티팩트 루트 경로(기본 `runs/samples/artifacts`)
+12. `LLM_ENABLED`: 단일 provider LLM 경로 사용 여부
+13. `LLM_PROVIDER`: `openai|gemini|anthropic|openai_compatible`
+14. `LLM_MODEL`, `LLM_MODEL_OPTIONS`, `LLM_BASE_URL`: 단일 provider 모델/베이스URL 설정
+15. `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`: 회사별 키
+16. `GEMINI_MODELS`, `OPENAI_MODELS`, `ANTHROPIC_MODELS`: 회사별 모델 목록(csv)
+17. `LLM_VENDOR_ORDER`: 멀티 벤더 매트릭스 순서(csv)
+18. `YOLO26_ENABLED`, `YOLO26_API_KEY`, `YOLO26_BASE_URL`, `YOLO26_MODELS`: YOLO26 멀티 모델 설정(오픈소스 로컬 엔드포인트는 API 키 없이 가능)
 
 ## 4. 안전 규칙
 

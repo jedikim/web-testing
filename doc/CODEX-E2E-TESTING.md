@@ -34,6 +34,13 @@
 3. 실패 후 `not_go` 결정 시 즉시 중단
 4. 캡차 의심 시 `YOLO26 감지 -> VLM 확인 -> LLM 풀이 재시도` 체인 수행
 5. 멀티 사이트 전환 중 `revise/go`를 섞은 중간 인간 개입 시나리오 수행
+6. 완전 자동 배치 모드에서 시나리오별 폴더(`/home/jedi/code/web-agentic-codex/testing/autonomous-batch/<run>/<scenario>/iteration-*`)에 `process.md`, `result.json`, 스크린샷 기록
+7. 고복잡 목표형 시나리오 포함:
+   - `autonomous_weather_family_places_from_pangyo_map_naver` (오늘 날씨 -> 서울 근교/판교역 아이 동반 장소 탐색)
+   - `autonomous_weather_to_cross_site_family_route_plan` (날씨 -> 후기 탐색 -> map.naver 후보군 수집)
+   - `autonomous_weekend_family_trip_multisource_planning` (기상청/VisitSeoul/서울시/지도/검색 멀티소스 13+ 단계)
+   - `autonomous_public_info_transport_chain_with_captcha` (공공정보+교통 체인 + 캡차 이중 처리 13+ 단계)
+   - `autonomous_budget_route_selector_drift_double_revise` (가격/후기/지도 + 이중 revise 복구 14+ 단계)
 
 ## 3. 실행 방법
 
@@ -55,6 +62,7 @@ npm run test:e2e:kr
 npm run test:e2e:kr:headful
 npm run test:e2e:assistantless:contract
 npm run test:e2e:assistantless:live
+npm run test:e2e:autonomous:live
 npm run test:provider:contract
 # 실제 키/엔드포인트가 있으면
 npm run test:e2e:provider:live
@@ -63,13 +71,22 @@ npm run test:e2e:provider:live
 라이브 테스트는 실행 시 `runtime/.env`를 자동으로 읽는다.
 실제 브라우저 동작 점검은 `test:e2e:kr:headful` 경로를 기본으로 사용한다.
 assistantless 반복 라이브 테스트는 `RUN_ASSISTANTLESS_KR_E2E=1`, `ASSISTANTLESS_KR_ITERATIONS=N`으로 제어한다.
+완전 자동 배치 라이브 테스트는 `RUN_AUTONOMOUS_BATCH_E2E=1`, `AUTONOMOUS_BATCH_ITERATIONS=N`으로 제어한다.
 
 ## 4. 결과 아티팩트
 
-- 경로: `runs/samples/artifacts/e2e/YYYY-MM-DD/`
-- 파일:
-1. `*.png`: 시나리오 완료 시점 스크린샷
-2. `*.json`: 시나리오 ID/도메인/최종 URL/상태
+- KR 스모크 경로: `runs/samples/artifacts/e2e/YYYY-MM-DD/`
+- Autonomous 배치 경로: `/home/jedi/code/web-agentic-codex/testing/autonomous-batch/<run>/`
+- Autonomous 런 파일:
+1. `PLANNING.md`: 인터넷 기반 시나리오 설계/플랜
+2. `WORKFLOW.md`: 런 전체 워크플로우
+3. `summary.md`, `summary.json`: 전체 실행 요약
+4. `FINAL-OPTIMIZED-RESULT.md`: 최종 최적화 리포트
+- Autonomous 시나리오 폴더 파일:
+1. `iteration-*/process.md`: 단계별 과정 로그
+2. `iteration-*/result.json`: 단계별 집계 출력
+3. `iteration-*/step-*-before|after.png`: 단계별 스크린샷
+4. `PLAN.md`, `WORKFLOW.md`, `summary.md/json`, `FINAL-OPTIMIZED-RESULT.md`
 
 ## 5. 운영 규칙
 

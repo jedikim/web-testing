@@ -60,6 +60,7 @@
 7. 기본 사용자 인터랙션은 실시간 스트리밍이 아니라 스크린샷 질의(Telegram/Slack)로 처리한다.
 8. Telegram/Slack webhook/세션 라우팅/비서 프롬프트는 외부 AI 비서 프로젝트 범위이며, 이 저장소는 `assistantless e2e 시뮬레이션 + 코어 계약`까지만 구현한다.
 9. 캡차는 `YOLO26 감지 → VLM 확인 → LLM 풀이/재시도` 순서로만 시도하며, 실패 시 human handoff로 중단한다.
+10. 실전형 자동 배치 테스트는 `/home/jedi/code/web-agentic-codex/testing/autonomous-batch` 시나리오 폴더에 `process.md`, `result.json`, 스크린샷, `PLAN.md`, `WORKFLOW.md`, `FINAL-OPTIMIZED-RESULT.md`를 저장한다.
 
 ## 6) Directory Conventions
 

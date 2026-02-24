@@ -65,6 +65,8 @@ npm run typecheck
 - 라이브 스모크(옵트인): `tests/e2e-kr-live.test.ts`
 - 전체 플로우 시뮬레이션: `tests/automation-full-flow.test.ts`
 - 복잡 반복 라이브 시뮬레이션: `tests/e2e-assistantless-kr-live.test.ts`
+- 완전 자동 배치 라이브 시뮬레이션: `tests/e2e-autonomous-batch-kr-live.test.ts`
+  - 고복잡 목표형 포함: 날씨 확인 후 `map.naver.com`에서 판교역 기준 가족 장소 탐색/후보군 수집
 
 실행:
 
@@ -76,6 +78,7 @@ npm run test:e2e:kr
 npm run test:e2e:kr:headful
 npm run test:e2e:assistantless:contract
 npm run test:e2e:assistantless:live
+npm run test:e2e:autonomous:live
 npm run test:provider:contract
 # 실제 키/엔드포인트가 있으면
 npm run test:e2e:provider:live
@@ -84,3 +87,6 @@ npm run test:e2e:provider:live
 아티팩트:
 
 - 스크린샷/리포트 JSON은 `runs/samples/artifacts/e2e/YYYY-MM-DD/`에 저장된다.
+- 완전 자동 배치 기록은 `/home/jedi/code/web-agentic-codex/testing/autonomous-batch/<run-timestamp>/<scenario>/iteration-*/`에 `process.md`, `result.json`, 스크린샷으로 저장된다.
+- 런 루트에는 `PLANNING.md`, `WORKFLOW.md`, `FINAL-OPTIMIZED-RESULT.md`, `summary.md/json`도 함께 생성된다.
+- 각 시나리오 루트에는 `PLAN.md`, `WORKFLOW.md`, `FINAL-OPTIMIZED-RESULT.md`, `summary.md/json`가 생성된다.

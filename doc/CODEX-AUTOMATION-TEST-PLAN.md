@@ -70,6 +70,7 @@ npm run test:e2e:kr:headful
 2. 첫 단계 LLM 분석 후 rule-first 반복
 3. 실패 시 YOLO26 힌트 + LLM revise 재시도
 4. 캡차 감지 시 YOLO26 -> VLM -> LLM 재시도 체인
+5. 완전 자동 정책으로 사람 개입 없이 의사결정 자동화
 
 명령:
 
@@ -77,6 +78,7 @@ npm run test:e2e:kr:headful
 cd runtime
 npm run test:e2e:assistantless:contract
 npm run test:e2e:assistantless:live
+npm run test:e2e:autonomous:live
 ```
 
 ### Layer E: 외부 AI 비서 통합 (외부 프로젝트 담당)
@@ -149,6 +151,15 @@ npm run test:e2e:provider:live
 3. `assistantless_block_not_go`: 사용자 중단 결정
 4. `assistantless_captcha_escalation_retry`: 캡차 에스컬레이션 재시도
 5. `assistantless_multisite_human_intervention`: 멀티 사이트 전환 + 중간 인간 개입(revise/go) 복합 흐름
+6. `autonomous_naver_weather_news_finance`: 날씨/뉴스/금융 최소 흐름
+7. `autonomous_cross_site_selector_recovery`: 크로스 사이트 + selector drift 복구
+8. `autonomous_captcha_chain_with_retry`: 캡차 에스컬레이션(YOLO26->VLM->LLM) 재시도
+9. `autonomous_sensitive_gate_blocked_after_5_steps`: 민감 액션 차단(blocked)
+10. `autonomous_weather_family_places_from_pangyo_map_naver`: 날씨 확인 후 판교역 기준 가족 장소 탐색(map.naver)
+11. `autonomous_weather_to_cross_site_family_route_plan`: 날씨/후기/지도 후보군을 교차 사이트로 수집
+12. `autonomous_weekend_family_trip_multisource_planning`: 날씨/관광/지도/후기 멀티소스 교차 수집(13+ 단계)
+13. `autonomous_public_info_transport_chain_with_captcha`: 공공정보+교통 체인 + 이중 캡차 재시도(13+ 단계)
+14. `autonomous_budget_route_selector_drift_double_revise`: 비용/후기/지도 복합 경로 + 이중 revise 복구(14+ 단계)
 
 ## 3. 합격 기준
 
@@ -156,10 +167,11 @@ npm run test:e2e:provider:live
 2. Layer C는 6개 이상 시나리오 중 80% 이상 pass
 3. Layer D(contract)는 100% pass
 4. Layer D(live)는 expected status 기준 100% pass
-5. Layer F(contract)는 100% pass
-6. Layer F(live)는 matrix total의 80% 이상 pass
-7. Layer C/F 실패 시 screenshot/json 리포트가 남아야 함
-8. `scripts/validate-run-artifacts.sh` pass
+5. Layer D(autonomous live)는 expected status 기준 100% pass, `/home/jedi/code/web-agentic-codex/testing/...` 각 시나리오 폴더에 `process.md` + `result.json` + 스크린샷 + `PLAN.md` + `WORKFLOW.md` + `FINAL-OPTIMIZED-RESULT.md`가 저장되어야 함
+6. Layer F(contract)는 100% pass
+7. Layer F(live)는 matrix total의 80% 이상 pass
+8. Layer C/F 실패 시 screenshot/json 리포트가 남아야 함
+9. `scripts/validate-run-artifacts.sh` pass
 
 ## 4. 실패 대응
 
@@ -178,6 +190,7 @@ cp .env.example .env
 npm run test:automation:full
 npm run test:e2e:assistantless:contract
 npm run test:e2e:assistantless:live
+npm run test:e2e:autonomous:live
 npm run test:provider:contract
 npm run test:e2e:kr
 npm run test:e2e:kr:headful

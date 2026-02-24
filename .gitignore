@@ -3,6 +3,7 @@ runtime/node_modules/
 runs/samples/artifacts/e2e/
 runs/samples/artifacts/e2e-assistantless/
 runs/samples/artifacts/provider-matrix/
+/testing/
 .env
 .env.*
 !.env.example
