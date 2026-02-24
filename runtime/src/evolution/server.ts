@@ -45,7 +45,11 @@ async function parseBody(req: IncomingMessage): Promise<unknown> {
   if (raw.length === 0) {
     return undefined;
   }
-  return JSON.parse(raw) as unknown;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error('invalid json payload');
+  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -88,6 +92,33 @@ function asTriggerStatuses(raw: unknown): RunStatus[] | undefined {
     .filter((value): value is RunStatus => value === 'pass' || value === 'fail' || value === 'blocked');
 
   return statuses.length > 0 ? statuses : undefined;
+}
+
+function asOptionalNumber(raw: unknown): number | undefined {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+    return undefined;
+  }
+  return Math.floor(raw);
+}
+
+function statusCodeForError(error: Error): number {
+  if (error.message.includes('request body too large')) {
+    return 413;
+  }
+  if (
+    error.message.includes('required') ||
+    error.message.includes('invalid json') ||
+    error.message.includes('only allowed')
+  ) {
+    return 400;
+  }
+  if (error.message.includes('already active')) {
+    return 409;
+  }
+  if (error.message.includes('not found')) {
+    return 404;
+  }
+  return 500;
 }
 
 function contentType(path: string): string {
@@ -169,6 +200,25 @@ export function createEvolutionHttpServer(options: EvolutionHttpServerOptions) {
       if (method === 'GET' && versionsWorkflowMatch) {
         const workflowId = decodeURIComponent(versionsWorkflowMatch[1]!);
         const summary = await options.service.getVersionSummary(workflowId);
+        sendJson(res, 200, {
+          ok: true,
+          data: summary
+        });
+        return;
+      }
+
+      const versionsRollbackMatch = path.match(/^\/evolution\/versions\/([^/]+)\/rollback$/);
+      if (method === 'POST' && versionsRollbackMatch) {
+        const workflowId = decodeURIComponent(versionsRollbackMatch[1]!);
+        const body = asRecord(await parseBody(req));
+        const summary = await options.service.rollbackVersion({
+          workflowId,
+          targetVersion: asOptionalNumber(body.targetVersion),
+          targetJobId: body.targetJobId ? String(body.targetJobId) : undefined,
+          confirmedBy: String(body.confirmedBy ?? 'operator'),
+          note: body.note ? String(body.note) : undefined
+        });
+
         sendJson(res, 200, {
           ok: true,
           data: summary
@@ -329,6 +379,46 @@ export function createEvolutionHttpServer(options: EvolutionHttpServerOptions) {
         return;
       }
 
+      if (method === 'GET' && path === '/evolution/progress/stream') {
+        res.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-cache, no-transform',
+          connection: 'keep-alive'
+        });
+
+        const jobs = await options.service.listJobs();
+        for (const job of jobs) {
+          const snapshot = await options.service.getSnapshot(job.id);
+          res.write('event: progress\n');
+          res.write(
+            `data: ${JSON.stringify({
+              schemaVersion: 'evolution.progress.event.v1',
+              emittedAt: snapshot.emittedAt,
+              eventType: 'job_snapshot',
+              workflowId: snapshot.job.workflowId,
+              jobId: snapshot.job.id,
+              status: snapshot.job.status,
+              snapshot
+            })}\n\n`
+          );
+        }
+
+        const unsubscribe = options.service.onAnyProgress((event) => {
+          res.write('event: progress\n');
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        });
+
+        const keepAlive = setInterval(() => {
+          res.write(': keep-alive\n\n');
+        }, 20000);
+
+        req.on('close', () => {
+          clearInterval(keepAlive);
+          unsubscribe();
+        });
+        return;
+      }
+
       if (method === 'GET' && (path === '/evolution/ui' || path === '/evolution/ui/')) {
         const indexPath = resolve(uiDir, 'index.html');
         const content = await readFile(indexPath, 'utf-8');
@@ -355,9 +445,10 @@ export function createEvolutionHttpServer(options: EvolutionHttpServerOptions) {
         error: `route not found: ${method} ${path}`
       });
     } catch (error) {
-      sendJson(res, 500, {
+      const typed = error as Error;
+      sendJson(res, statusCodeForError(typed), {
         ok: false,
-        error: (error as Error).message
+        error: typed.message
       });
     }
   });

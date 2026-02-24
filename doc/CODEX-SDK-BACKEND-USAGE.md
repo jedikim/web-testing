@@ -97,7 +97,9 @@ npm run example:chat-backend
 10. `POST /example/chat/sessions/:id/cancel`
 11. `POST /example/chat/sessions/:id/captcha`
 12. `GET /example/chat/sessions/:id/stream` (SSE)
-13. `GET /example/chat/ui`
+13. `POST /example/chat/sessions/:id/handoffs/:handoffId/resolve`
+14. `GET /example/chat/progress/stream` (SSE progress)
+15. `GET /example/chat/ui`
 
 ### 3.3 동작 보장
 
@@ -106,6 +108,8 @@ npm run example:chat-backend
 3. 캡차/보안 챌린지는 우회하지 않고 사용자 입력 라우트로 처리한다.
 4. 같은 operator가 새 대화를 시작하면 이전 세션을 자동 일시정지할 수 있다.
 5. 메시지에 이미지 첨부(`attachments[]`)를 넣어 유사 이미지 검색 플로우를 실행할 수 있다.
+6. 운영 모니터 화면은 `GET /example/chat/progress/stream`으로 전 세션 진행 이벤트를 수집할 수 있다.
+7. captcha/security handoff는 `resolve` 엔드포인트로 개별 해결할 수 있다.
 
 ## 4. 모드 B: SDK Detailed
 
@@ -121,7 +125,8 @@ npm run example:chat-backend
 2. `getJobDiff`
 3. `listVersionSummaries`, `getVersionSummary`
 4. `getCurrentVersion`, `getVersionHistory`
-5. `approveJob`, `rejectJob`, `retryJob`, `waitForTerminal`
+5. `rollbackVersion`
+6. `approveJob`, `rejectJob`, `retryJob`, `waitForTerminal`
 
 ### 4.2 멀티턴 SDK 예시
 

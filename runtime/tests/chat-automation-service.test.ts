@@ -30,6 +30,7 @@ async function waitForSnapshot(
       const message = (error as Error).message;
       if (
         !message.includes('Unexpected end of JSON input') &&
+        !message.includes('Unterminated string in JSON') &&
         !message.includes('session not found:')
       ) {
         throw error;
@@ -288,6 +289,84 @@ describe('ChatAutomationService', () => {
           entry.message.includes('Prepare Naver similar-image search flow with attached reference')
         )
       ).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves waiting captcha handoff through generic resolve API and emits progress events', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'chat-automation-resolve-'));
+
+    try {
+      const store = new SessionStore({
+        rootDir: root
+      });
+      const service = new ChatAutomationService({
+        store,
+        stepDelayMs: 15
+      });
+      await service.init();
+
+      const progressEvents: Array<{ sessionId: string; runStatus: string }> = [];
+      const unsubscribe = service.onProgress((event) => {
+        progressEvents.push({
+          sessionId: event.sessionId,
+          runStatus: event.runStatus
+        });
+      });
+
+      const created = await service.createSession({
+        title: 'resolve handoff session',
+        operatorId: 'op-resolve'
+      });
+
+      await service.sendMessage({
+        sessionId: created.session.id,
+        content: '로그인 과정에서 captcha 가 필요해.',
+        browserMode: 'headful',
+        operatorId: 'op-resolve'
+      });
+
+      const waiting = await waitForSnapshot(
+        service,
+        created.session.id,
+        (snapshot) => snapshot.run.status === 'waiting_captcha'
+      );
+
+      const handoff = waiting.handoffs.find((entry) => entry.type === 'captcha' && entry.status === 'waiting');
+      expect(handoff?.id).toBeTruthy();
+
+      await service.resolveHandoff({
+        sessionId: created.session.id,
+        handoffId: handoff!.id,
+        actionTaken: 'submit_captcha',
+        value: 'QWER12',
+        resolvedBy: 'human-operator'
+      });
+
+      const done = await waitForSnapshot(
+        service,
+        created.session.id,
+        (snapshot) => snapshot.run.status === 'completed'
+      );
+
+      for (let index = 0; index < 50; index += 1) {
+        if (progressEvents.some((entry) => entry.runStatus === 'completed')) {
+          break;
+        }
+        await sleep(10);
+      }
+      unsubscribe();
+
+      expect(done.handoffs.some((entry) => entry.id === handoff!.id && entry.status === 'resolved')).toBe(
+        true
+      );
+      expect(done.logs.some((entry) => entry.message.includes('Handoff resolved by human-operator'))).toBe(
+        true
+      );
+      expect(progressEvents.some((entry) => entry.sessionId === created.session.id)).toBe(true);
+      expect(progressEvents.some((entry) => entry.runStatus === 'waiting_captcha')).toBe(true);
+      expect(progressEvents.some((entry) => entry.runStatus === 'completed')).toBe(true);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

@@ -24,6 +24,13 @@ export interface WaitForTerminalOptions {
   intervalMs?: number;
 }
 
+export interface RollbackVersionRequest {
+  confirmedBy: string;
+  targetVersion?: number;
+  targetJobId?: string;
+  note?: string;
+}
+
 function isTerminal(status: string): boolean {
   return status === 'promoted' || status === 'rejected' || status === 'failed';
 }
@@ -117,6 +124,16 @@ export class EvolutionApiClient {
         method: 'GET'
       }
     );
+  }
+
+  async rollbackVersion(
+    workflowId: string,
+    input: RollbackVersionRequest
+  ): Promise<EvolutionVersionSummary> {
+    return this.request(`/evolution/versions/${encodeURIComponent(workflowId)}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
   }
 
   async approveJob(jobId: string, input: ApproveEvolutionJobInput): Promise<JobProgressSnapshot> {

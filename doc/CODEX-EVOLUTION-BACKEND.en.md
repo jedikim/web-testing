@@ -71,6 +71,8 @@ Default mode: `pointer`
 - `GET /evolution/versions/:workflowId`
 - `GET /evolution/versions/:workflowId/current`
 - `GET /evolution/versions/:workflowId/history`
+- `POST /evolution/versions/:workflowId/rollback`
+- `GET /evolution/progress/stream` (SSE, global `evolution.progress.event.v1`)
 - `GET /evolution/ui`
 - `POST /evolution/auto-improve` (create/complete optional auto-approve from failed outcome)
 
@@ -100,3 +102,22 @@ Before approving an `awaiting_approval` job:
 2. inspect artifacts under `attempt-*.log`, `attempt-*-autofix.md`, `attempt-*.patch.diff`
 3. verify linked scenario evidence (screenshots/result JSON)
 4. provide approval audit fields (`confirmedBy`, `note`) when calling approve API
+
+## 9. Rollback Contract
+
+`POST /evolution/versions/:workflowId/rollback` restores a previously approved pointer as the active pointer.
+
+Request example:
+
+```json
+{
+  "targetVersion": 1,
+  "confirmedBy": "qa-rollback",
+  "note": "restore known-good pointer"
+}
+```
+
+Behavior:
+1. locate target pointer in `version-history`
+2. rewrite it as current active pointer with current timestamp/approver
+3. emit `version_rollback` event on global SSE (`/evolution/progress/stream`)

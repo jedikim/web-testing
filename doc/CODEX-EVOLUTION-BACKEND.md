@@ -86,8 +86,10 @@ testing/evolution/state/
 12. `GET /evolution/versions/:workflowId`
 13. `GET /evolution/versions/:workflowId/current`
 14. `GET /evolution/versions/:workflowId/history`
-15. `GET /evolution/ui`
-16. `POST /evolution/auto-improve` (실패 결과 입력으로 자동 job 생성/완료/선택적 auto-approve)
+15. `POST /evolution/versions/:workflowId/rollback`
+16. `GET /evolution/progress/stream` (SSE, 전역 진행 이벤트 `evolution.progress.event.v1`)
+17. `GET /evolution/ui`
+18. `POST /evolution/auto-improve` (실패 결과 입력으로 자동 job 생성/완료/선택적 auto-approve)
 
 ## 6. 실행 방법
 
@@ -138,3 +140,23 @@ npm test
 2. SSE(EventSource): https://developer.mozilla.org/en-US/docs/Web/API/EventSource
 3. Node child_process: https://nodejs.org/api/child_process.html
 4. Gemini Models API: https://ai.google.dev/api/models#method:-models.list
+
+## 11. 롤백 계약
+
+`POST /evolution/versions/:workflowId/rollback`는 승인된 과거 포인터를 다시 active 포인터로 복구한다.
+
+요청 예시:
+
+```json
+{
+  "targetVersion": 1,
+  "confirmedBy": "qa-rollback",
+  "note": "restore known-good pointer"
+}
+```
+
+동작:
+
+1. `version-history`에서 target을 찾는다.
+2. target 포인터를 현재 시각/승인자 정보로 재기록해 active로 전환한다.
+3. 전역 SSE(`/evolution/progress/stream`)에 `version_rollback` 이벤트를 발행한다.

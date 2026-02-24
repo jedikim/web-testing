@@ -29,15 +29,27 @@ function defaultId(now: Date): string {
 }
 
 async function readJsonFile<T>(path: string): Promise<T | undefined> {
-  try {
-    const raw = await readFile(path, 'utf-8');
-    return JSON.parse(raw) as T;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return undefined;
+  const maxRetries = 3;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const raw = await readFile(path, 'utf-8');
+      return JSON.parse(raw) as T;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return undefined;
+      }
+      if (error instanceof SyntaxError && attempt < maxRetries) {
+        await new Promise((resolvePromise) => {
+          setTimeout(resolvePromise, 10 * (attempt + 1));
+        });
+        continue;
+      }
+      throw error;
     }
-    throw error;
   }
+
+  return undefined;
 }
 
 export class SessionStore {

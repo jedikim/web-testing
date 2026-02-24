@@ -92,3 +92,54 @@ Additional endpoints:
 
 1. `GET /example/chat/sessions/:id/handoffs`
 2. `GET /example/chat/sessions/:id/screenshot`
+3. `POST /example/chat/sessions/:id/handoffs/:handoffId/resolve`
+4. `GET /example/chat/progress/stream` (SSE progress)
+
+`GET /example/chat/progress/stream` event schema:
+
+```json
+{
+  "schemaVersion": "chat.progress.event.v1",
+  "eventType": "session_snapshot",
+  "emittedAt": "2026-02-24T12:00:00.000Z",
+  "sessionId": "sess-...",
+  "operatorId": "default-operator",
+  "runStatus": "running",
+  "snapshot": {
+    "schemaVersion": "chat.session.snapshot.v1"
+  }
+}
+```
+
+### 5.3 Evolution (`/evolution/*`)
+
+Additional ops/recovery endpoints:
+
+1. `POST /evolution/versions/:workflowId/rollback`
+2. `GET /evolution/progress/stream` (SSE progress)
+
+`POST /evolution/versions/:workflowId/rollback` request example:
+
+```json
+{
+  "targetVersion": 1,
+  "confirmedBy": "operator",
+  "note": "restore stable pointer"
+}
+```
+
+`GET /evolution/progress/stream` event schema:
+
+```json
+{
+  "schemaVersion": "evolution.progress.event.v1",
+  "eventType": "job_snapshot",
+  "emittedAt": "2026-02-24T12:00:00.000Z",
+  "workflowId": "kr-scenario-001",
+  "jobId": "evo-...",
+  "status": "testing",
+  "snapshot": {
+    "schemaVersion": "evolution.job.snapshot.v1"
+  }
+}
+```

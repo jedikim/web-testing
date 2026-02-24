@@ -17,11 +17,13 @@ import type {
   ApproveEvolutionJobInput,
   CreateEvolutionJobInput,
   EvolutionChangeCategory,
+  EvolutionProgressEvent,
   EvolutionJobDiffSnapshot,
   EvolutionEvent,
   EvolutionJob,
   EvolutionVersionSummary,
   JobProgressSnapshot,
+  RollbackVersionInput,
   RejectEvolutionJobInput
 } from './types';
 
@@ -40,6 +42,7 @@ export interface EvolutionServiceOptions {
 }
 
 export type EvolutionProgressListener = (snapshot: JobProgressSnapshot) => void;
+export type EvolutionAnyProgressListener = (event: EvolutionProgressEvent) => void;
 
 function optionalTrim(raw: string | undefined): string | undefined {
   if (!raw) {
@@ -190,13 +193,39 @@ export class EvolutionService {
     return `snapshot:${jobId}`;
   }
 
+  private progressEvent(): string {
+    return 'progress:any';
+  }
+
+  private toProgressEvent(snapshot: JobProgressSnapshot): EvolutionProgressEvent {
+    return {
+      schemaVersion: 'evolution.progress.event.v1',
+      emittedAt: this.now(),
+      eventType: 'job_snapshot',
+      workflowId: snapshot.job.workflowId,
+      jobId: snapshot.job.id,
+      status: snapshot.job.status,
+      snapshot
+    };
+  }
+
   private async publish(jobId: string): Promise<void> {
     const snapshot = await this.getSnapshot(jobId);
+    const progressEvent = this.toProgressEvent(snapshot);
     this.emitter.emit(this.snapshotEvent(jobId), snapshot);
+    this.emitter.emit(this.progressEvent(), progressEvent);
   }
 
   onProgress(jobId: string, listener: EvolutionProgressListener): () => void {
     const event = this.snapshotEvent(jobId);
+    this.emitter.on(event, listener);
+    return () => {
+      this.emitter.off(event, listener);
+    };
+  }
+
+  onAnyProgress(listener: EvolutionAnyProgressListener): () => void {
+    const event = this.progressEvent();
     this.emitter.on(event, listener);
     return () => {
       this.emitter.off(event, listener);
@@ -249,6 +278,103 @@ export class EvolutionService {
       current,
       history
     };
+  }
+
+  async rollbackVersion(input: RollbackVersionInput): Promise<EvolutionVersionSummary> {
+    const workflowId = optionalTrim(input.workflowId);
+    const confirmedBy = optionalTrim(input.confirmedBy);
+    if (!workflowId) {
+      throw new Error('workflowId is required');
+    }
+    if (!confirmedBy) {
+      throw new Error('confirmedBy is required');
+    }
+
+    const summary = await this.getVersionSummary(workflowId);
+    const history = [...summary.history];
+    if (history.length === 0) {
+      throw new Error(`version history not found: ${workflowId}`);
+    }
+    const current = summary.current;
+
+    const isSamePointer = (
+      left: Pick<ActiveVersionPointer, 'workflowId' | 'jobId' | 'version' | 'branchName'> | undefined,
+      right: Pick<ActiveVersionPointer, 'workflowId' | 'jobId' | 'version' | 'branchName'> | undefined
+    ): boolean =>
+      !!left &&
+      !!right &&
+      left.workflowId === right.workflowId &&
+      left.jobId === right.jobId &&
+      left.version === right.version &&
+      left.branchName === right.branchName;
+
+    const findFromEnd = (predicate: (entry: ActiveVersionPointer) => boolean) => {
+      for (let index = history.length - 1; index >= 0; index -= 1) {
+        const entry = history[index];
+        if (entry && predicate(entry)) {
+          return entry;
+        }
+      }
+      return undefined;
+    };
+
+    const targetVersion =
+      typeof input.targetVersion === 'number' && Number.isFinite(input.targetVersion)
+        ? Math.floor(input.targetVersion)
+        : undefined;
+    const targetByVersion =
+      targetVersion !== undefined
+        ? findFromEnd((entry) => entry.version === targetVersion && !isSamePointer(entry, current))
+        : undefined;
+
+    const targetJobId = optionalTrim(input.targetJobId);
+    const targetByJob = targetJobId
+      ? findFromEnd((entry) => entry.jobId === targetJobId && !isSamePointer(entry, current))
+      : undefined;
+
+    const fallbackTarget =
+      targetByVersion ??
+      targetByJob ??
+      (history.length >= 2 ? history[history.length - 2] : undefined);
+
+    if (!fallbackTarget) {
+      throw new Error('rollback target is missing');
+    }
+
+    if (
+      current &&
+      current.workflowId === fallbackTarget.workflowId &&
+      current.jobId === fallbackTarget.jobId &&
+      current.version === fallbackTarget.version &&
+      current.branchName === fallbackTarget.branchName
+    ) {
+      throw new Error('target version is already active');
+    }
+
+    const promotedAt = this.now();
+    const rollbackPointer: ActiveVersionPointer = {
+      ...fallbackTarget,
+      promotedAt,
+      confirmedBy
+    };
+
+    await this.storage.setActiveVersion(rollbackPointer);
+    this.emitter.emit(this.progressEvent(), {
+      schemaVersion: 'evolution.progress.event.v1',
+      emittedAt: promotedAt,
+      eventType: 'version_rollback',
+      workflowId,
+      jobId: rollbackPointer.jobId,
+      status: 'promoted',
+      rollback: {
+        targetVersion: input.targetVersion,
+        targetJobId: input.targetJobId,
+        note: input.note,
+        current: rollbackPointer
+      }
+    } satisfies EvolutionProgressEvent);
+
+    return this.getVersionSummary(workflowId);
   }
 
   async getJobDiff(jobId: string): Promise<EvolutionJobDiffSnapshot> {

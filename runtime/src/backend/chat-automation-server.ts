@@ -80,7 +80,11 @@ async function parseBody(req: IncomingMessage): Promise<unknown> {
     return undefined;
   }
 
-  return JSON.parse(raw) as unknown;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error('invalid json payload');
+  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -245,6 +249,10 @@ function statusCodeForError(error: Error): number {
     return 404;
   }
 
+  if (error.message.startsWith('handoff not found:')) {
+    return 404;
+  }
+
   if (error.message.includes('must not be empty')) {
     return 400;
   }
@@ -259,6 +267,14 @@ function statusCodeForError(error: Error): number {
 
   if (error.message.includes('attachment')) {
     return 400;
+  }
+
+  if (error.message.includes('requires value')) {
+    return 400;
+  }
+
+  if (error.message.includes('is not waiting')) {
+    return 409;
   }
 
   return 500;
@@ -328,6 +344,26 @@ export function createChatAutomationHttpServer(options: ChatAutomationHttpServer
         sendJson(res, 200, {
           ok: true,
           data: handoffs
+        });
+        return;
+      }
+
+      const resolveHandoffRoute = path.match(
+        /^\/example\/chat\/sessions\/([^/]+)\/handoffs\/([^/]+)\/resolve$/
+      );
+      if (method === 'POST' && resolveHandoffRoute) {
+        const body = asRecord(await parseBody(req));
+        const snapshot = await options.service.resolveHandoff({
+          sessionId: resolveHandoffRoute[1]!,
+          handoffId: decodeURIComponent(resolveHandoffRoute[2]!),
+          actionTaken: String(body.actionTaken ?? ''),
+          value: body.value ? String(body.value) : undefined,
+          resolvedBy: body.resolvedBy ? String(body.resolvedBy) : undefined,
+          metadata: asRecord(body.metadata)
+        });
+        sendJson(res, 200, {
+          ok: true,
+          data: snapshot
         });
         return;
       }
@@ -431,6 +467,45 @@ export function createChatAutomationHttpServer(options: ChatAutomationHttpServer
         return;
       }
 
+      if (method === 'GET' && path === '/example/chat/progress/stream') {
+        res.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-cache, no-transform',
+          connection: 'keep-alive'
+        });
+
+        const sessions = await options.service.listSessions();
+        for (const session of sessions) {
+          const snapshot = await options.service.getSnapshot(session.sessionId);
+          res.write('event: progress\n');
+          res.write(
+            `data: ${JSON.stringify({
+              schemaVersion: 'chat.progress.event.v1',
+              eventType: 'session_snapshot',
+              emittedAt: snapshot.emittedAt,
+              sessionId: session.sessionId,
+              operatorId: session.operatorId,
+              runStatus: snapshot.run.status,
+              snapshot
+            })}\n\n`
+          );
+        }
+
+        const unsubscribe = options.service.onProgress((event) => {
+          res.write('event: progress\n');
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        });
+        const keepAlive = setInterval(() => {
+          res.write(': keep-alive\n\n');
+        }, 20000);
+
+        req.on('close', () => {
+          clearInterval(keepAlive);
+          unsubscribe();
+        });
+        return;
+      }
+
       if (method === 'GET' && (path === '/example/chat/ui' || path === '/example/chat/ui/')) {
         const indexPath = resolve(uiDir, 'index.html');
         const content = await readFile(indexPath);
@@ -465,8 +540,7 @@ export function createChatAutomationHttpServer(options: ChatAutomationHttpServer
         error: `route not found: ${method} ${path}`
       });
     } catch (error) {
-      const typed =
-        error instanceof SyntaxError ? new Error('invalid json payload') : (error as Error);
+      const typed = error as Error;
       sendJson(res, statusCodeForError(typed), {
         ok: false,
         error: typed.message

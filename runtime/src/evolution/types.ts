@@ -110,6 +110,14 @@ export interface EvolutionVersionSummary {
   history: ActiveVersionPointer[];
 }
 
+export interface RollbackVersionInput {
+  workflowId: string;
+  confirmedBy: string;
+  targetVersion?: number;
+  targetJobId?: string;
+  note?: string;
+}
+
 export interface EvolutionAttemptDiff {
   attempt: number;
   ok: boolean;
@@ -140,4 +148,20 @@ export interface JobProgressSnapshot {
   job: EvolutionJob;
   events: EvolutionEvent[];
   activeVersion?: ActiveVersionPointer;
+}
+
+export interface EvolutionProgressEvent {
+  schemaVersion: 'evolution.progress.event.v1';
+  emittedAt: string;
+  eventType: 'job_snapshot' | 'version_rollback';
+  workflowId: string;
+  jobId?: string;
+  status?: EvolutionStatus;
+  snapshot?: JobProgressSnapshot;
+  rollback?: {
+    targetVersion?: number;
+    targetJobId?: string;
+    note?: string;
+    current?: ActiveVersionPointer;
+  };
 }

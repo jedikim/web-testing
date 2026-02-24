@@ -46,6 +46,12 @@ class StaticSandbox implements EvolutionSandbox {
 
 const serverRefs: Array<{ close: () => Promise<void> }> = [];
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolvePromise) => {
+    setTimeout(resolvePromise, ms);
+  });
+}
+
 afterEach(async () => {
   while (serverRefs.length > 0) {
     const ref = serverRefs.pop();
@@ -214,6 +220,109 @@ describe('evolution server', () => {
     const html = await uiResponse.text();
     expect(uiResponse.status).toBe(200);
     expect(html).toContain('<!doctype html>');
+  });
+
+  it('supports version rollback and global progress SSE stream', async () => {
+    const { baseUrl, service } = await startServer();
+
+    const firstResponse = await fetch(`${baseUrl}/evolution/jobs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'rollback v1',
+        trigger: 'bug',
+        workflowId: 'wf-rollback-http'
+      })
+    });
+    const firstPayload = (await firstResponse.json()) as {
+      data: { job: { id: string } };
+    };
+    await service.waitForCompletion(firstPayload.data.job.id);
+    await fetch(`${baseUrl}/evolution/jobs/${firstPayload.data.job.id}/approve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ confirmedBy: 'http-test-v1' })
+    });
+
+    const secondResponse = await fetch(`${baseUrl}/evolution/jobs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'rollback v2',
+        trigger: 'bug',
+        workflowId: 'wf-rollback-http'
+      })
+    });
+    const secondPayload = (await secondResponse.json()) as {
+      data: { job: { id: string } };
+    };
+    await service.waitForCompletion(secondPayload.data.job.id);
+    await fetch(`${baseUrl}/evolution/jobs/${secondPayload.data.job.id}/approve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ confirmedBy: 'http-test-v2' })
+    });
+
+    const rollbackResponse = await fetch(`${baseUrl}/evolution/versions/wf-rollback-http/rollback`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetVersion: 1,
+        confirmedBy: 'http-rollback'
+      })
+    });
+    expect(rollbackResponse.status).toBe(200);
+    const rollbackPayload = (await rollbackResponse.json()) as {
+      ok: boolean;
+      data: { current?: { version: number; confirmedBy: string } };
+    };
+    expect(rollbackPayload.ok).toBe(true);
+    expect(rollbackPayload.data.current?.version).toBe(1);
+    expect(rollbackPayload.data.current?.confirmedBy).toBe('http-rollback');
+
+    const abortController = new AbortController();
+    const streamResponse = await fetch(`${baseUrl}/evolution/progress/stream`, {
+      signal: abortController.signal
+    });
+    expect(streamResponse.status).toBe(200);
+    expect(streamResponse.headers.get('content-type')).toContain('text/event-stream');
+
+    const reader = streamResponse.body?.getReader();
+    expect(reader).toBeTruthy();
+
+    const triggerResponse = await fetch(`${baseUrl}/evolution/jobs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'progress stream test',
+        trigger: 'exception',
+        workflowId: 'wf-stream-http'
+      })
+    });
+    expect(triggerResponse.status).toBe(201);
+    const triggerPayload = (await triggerResponse.json()) as {
+      data: { job: { id: string } };
+    };
+
+    const decoder = new TextDecoder();
+    let chunkText = '';
+
+    for (let index = 0; index < 30; index += 1) {
+      const readPromise = reader!.read();
+      const timer = sleep(2000).then(() => ({ done: true, value: new Uint8Array() }));
+      const chunk = await Promise.race([readPromise, timer]);
+      chunkText += decoder.decode(chunk.value ?? new Uint8Array());
+      if (chunkText.includes('"schemaVersion":"evolution.progress.event.v1"')) {
+        break;
+      }
+    }
+
+    expect(chunkText).toContain('event: progress');
+    expect(chunkText).toContain('"schemaVersion":"evolution.progress.event.v1"');
+    expect(chunkText).toContain('"workflowId":"wf-stream-http"');
+
+    abortController.abort();
+    await service.waitForCompletion(triggerPayload.data.job.id);
   });
 
   it('triggers auto-improvement endpoint and can auto-approve', async () => {

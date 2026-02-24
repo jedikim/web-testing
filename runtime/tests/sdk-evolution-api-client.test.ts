@@ -187,6 +187,38 @@ describe('EvolutionApiClient', () => {
         return;
       }
 
+      if (req.url === '/evolution/versions/wf-1/rollback' && req.method === 'POST') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          json({
+            ok: true,
+            data: {
+              workflowId: 'wf-1',
+              current: {
+                workflowId: 'wf-1',
+                jobId: 'job-1',
+                version: 1,
+                confirmedBy: 'rollback-user'
+              },
+              history: [
+                {
+                  workflowId: 'wf-1',
+                  jobId: 'job-2',
+                  version: 2
+                },
+                {
+                  workflowId: 'wf-1',
+                  jobId: 'job-1',
+                  version: 1,
+                  confirmedBy: 'rollback-user'
+                }
+              ]
+            }
+          })
+        );
+        return;
+      }
+
       if (req.url === '/evolution/jobs/job-1/approve' && req.method === 'POST') {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(
@@ -241,6 +273,13 @@ describe('EvolutionApiClient', () => {
 
     const versionHistory = await client.getVersionHistory('wf-1');
     expect(versionHistory.length).toBe(1);
+
+    const rollback = await client.rollbackVersion('wf-1', {
+      targetVersion: 1,
+      confirmedBy: 'rollback-user'
+    });
+    expect(rollback.current?.version).toBe(1);
+    expect(rollback.current?.confirmedBy).toBe('rollback-user');
 
     const approved = await client.approveJob('job-1', {
       confirmedBy: 'tester'

@@ -132,6 +132,57 @@ describe('EvolutionService', () => {
     await rm(stateRoot, { recursive: true, force: true });
   });
 
+  it('rolls back active pointer to a historical version and appends rollback history', async () => {
+    const stateRoot = await mkdtemp(resolve(tmpdir(), 'evo-service-rollback-'));
+
+    const service = new EvolutionService({
+      repoRoot: process.cwd(),
+      stateRoot,
+      autoStart: true,
+      sandbox: new SequenceSandbox([true, true]),
+      autoFixer: new AlwaysApplyFixer(),
+      defaultTestCommand: 'echo test',
+      maxAutoFixAttempts: 0
+    });
+
+    const first = await service.createJob({
+      title: 'rollback target v1',
+      trigger: 'bug',
+      workflowId: 'wf-rollback'
+    });
+    await service.waitForCompletion(first.job.id);
+    await service.approveJob(first.job.id, {
+      confirmedBy: 'qa-user-v1'
+    });
+
+    const second = await service.createJob({
+      title: 'rollback target v2',
+      trigger: 'bug',
+      workflowId: 'wf-rollback'
+    });
+    await service.waitForCompletion(second.job.id);
+    await service.approveJob(second.job.id, {
+      confirmedBy: 'qa-user-v2'
+    });
+
+    const rolledBack = await service.rollbackVersion({
+      workflowId: 'wf-rollback',
+      targetVersion: 1,
+      confirmedBy: 'qa-rollback',
+      note: 'restore known good version'
+    });
+
+    expect(rolledBack.current?.version).toBe(1);
+    expect(rolledBack.current?.confirmedBy).toBe('qa-rollback');
+
+    const summary = await service.getVersionSummary('wf-rollback');
+    expect(summary.current?.version).toBe(1);
+    expect(summary.history.length).toBeGreaterThanOrEqual(3);
+    expect(summary.history[summary.history.length - 1]?.confirmedBy).toBe('qa-rollback');
+
+    await rm(stateRoot, { recursive: true, force: true });
+  });
+
   it('fails after exhausting all auto-fix attempts', async () => {
     const stateRoot = await mkdtemp(resolve(tmpdir(), 'evo-service-fail-'));
 

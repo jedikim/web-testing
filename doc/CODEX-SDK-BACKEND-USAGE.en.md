@@ -97,7 +97,9 @@ Default endpoint: `http://127.0.0.1:4999`
 10. `POST /example/chat/sessions/:id/cancel`
 11. `POST /example/chat/sessions/:id/captcha`
 12. `GET /example/chat/sessions/:id/stream` (SSE)
-13. `GET /example/chat/ui`
+13. `POST /example/chat/sessions/:id/handoffs/:handoffId/resolve`
+14. `GET /example/chat/progress/stream` (SSE progress)
+15. `GET /example/chat/ui`
 
 ### 3.3 Behavior guarantees
 
@@ -106,6 +108,8 @@ Default endpoint: `http://127.0.0.1:4999`
 3. captcha/security challenge is handled by explicit user input route, not bypass logic
 4. new message can auto-pause older session when operator id is the same
 5. message accepts image attachments (`attachments[]`) for similar-search automation flows
+6. operator dashboard can consume cross-session progress from `GET /example/chat/progress/stream`
+7. captcha/security handoffs can be resolved per item via the `resolve` endpoint
 
 ## 4. Mode B: SDK Detailed
 
@@ -121,7 +125,8 @@ Major `createEvolutionApiClient` methods:
 2. `getJobDiff`
 3. `listVersionSummaries`, `getVersionSummary`
 4. `getCurrentVersion`, `getVersionHistory`
-5. `approveJob`, `rejectJob`, `retryJob`, `waitForTerminal`
+5. `rollbackVersion`
+6. `approveJob`, `rejectJob`, `retryJob`, `waitForTerminal`
 
 ### 4.2 Multi-turn SDK example
 

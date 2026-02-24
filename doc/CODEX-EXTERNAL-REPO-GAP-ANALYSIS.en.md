@@ -9,8 +9,8 @@ Compared repositories:
 - Current project: `/home/jedi/code/web-agentic-codex`
 - External repo: `/home/jedi/code/web-agentic-codex/temp/web-agentic` (origin: `https://github.com/jedikim/web-agentic`)
 
-Analysis date: 2026-02-24  
-Constraint: comparison/planning only, no runtime code changes
+Analysis date: 2026-02-24 (external commit `34360a7`)  
+Constraint: re-clone and compare first, then implement and verify prioritized adoption items
 
 ## 1. Executive Summary
 
@@ -152,6 +152,16 @@ Completed:
    - `runtime/tests/e2e-fixture-playwright-adapter.test.ts`
 5. `GAP-C2/C3` API contract/schema test reinforcement
    - expanded evolution/chat/backend server tests and SDK client tests
+6. `GAP-A2` rollback contract adoption
+   - `POST /evolution/versions/:workflowId/rollback`
+   - SDK: `rollbackVersion(workflowId, input)`
+7. `GAP-C3` global progress-event contracts
+   - `GET /evolution/progress/stream` (`evolution.progress.event.v1`)
+   - `GET /example/chat/progress/stream` (`chat.progress.event.v1`)
+8. `GAP-A1` per-handoff resolve contract
+   - `POST /example/chat/sessions/:id/handoffs/:handoffId/resolve`
+9. stability hardening
+   - `SessionStore` JSON read retry to reduce write/read race parse errors
 
 Remaining:
 

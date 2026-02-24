@@ -354,4 +354,101 @@ describe('chat automation server', () => {
     expect(screenshotPayload.data?.source).toBe('attachment');
     expect(screenshotPayload.data?.path).toContain('/uploads/');
   });
+
+  it('resolves captcha handoff via handoff endpoint and exposes global progress stream', async () => {
+    const { baseUrl } = await startServer();
+
+    const createdResponse = await fetch(`${baseUrl}/example/chat/sessions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: 'handoff resolve api',
+        operatorId: 'operator-progress'
+      })
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as {
+      data: { session: { id: string } };
+    };
+    const sessionId = created.data.session.id;
+
+    const abortController = new AbortController();
+    const progressStream = await fetch(`${baseUrl}/example/chat/progress/stream`, {
+      signal: abortController.signal
+    });
+    expect(progressStream.status).toBe(200);
+    expect(progressStream.headers.get('content-type')).toContain('text/event-stream');
+    const progressReader = progressStream.body?.getReader();
+    expect(progressReader).toBeTruthy();
+
+    const sendResponse = await fetch(
+      `${baseUrl}/example/chat/sessions/${encodeURIComponent(sessionId)}/message`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          content: 'captcha verification is required before submit',
+          browserMode: 'headful',
+          operatorId: 'operator-progress'
+        })
+      }
+    );
+    expect(sendResponse.status).toBe(200);
+
+    await waitForRunStatus(baseUrl, sessionId, ['waiting_captcha']);
+
+    const handoffResponse = await fetch(
+      `${baseUrl}/example/chat/sessions/${encodeURIComponent(sessionId)}/handoffs`
+    );
+    expect(handoffResponse.status).toBe(200);
+    const handoffPayload = (await handoffResponse.json()) as {
+      ok: boolean;
+      data: Array<{ id: string; status: string; type: string }>;
+    };
+    const waitingCaptcha = handoffPayload.data.find(
+      (entry) => entry.type === 'captcha' && entry.status === 'waiting'
+    );
+    expect(waitingCaptcha?.id).toBeTruthy();
+
+    const resolveResponse = await fetch(
+      `${baseUrl}/example/chat/sessions/${encodeURIComponent(sessionId)}/handoffs/${encodeURIComponent(waitingCaptcha!.id)}/resolve`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          actionTaken: 'submit_captcha',
+          value: 'ZXCV12',
+          resolvedBy: 'operator-progress'
+        })
+      }
+    );
+    expect(resolveResponse.status).toBe(200);
+
+    const completed = await waitForRunStatus(baseUrl, sessionId, ['completed']);
+    expect(completed.run.status).toBe('completed');
+
+    const decoder = new TextDecoder();
+    let streamText = '';
+
+    for (let index = 0; index < 20; index += 1) {
+      const chunk = await progressReader!.read();
+      streamText += decoder.decode(chunk.value ?? new Uint8Array());
+      if (streamText.includes('"schemaVersion":"chat.progress.event.v1"')) {
+        break;
+      }
+      await sleep(15);
+    }
+
+    expect(streamText).toContain('event: progress');
+    expect(streamText).toContain('"schemaVersion":"chat.progress.event.v1"');
+    expect(streamText).toContain(`"sessionId":"${sessionId}"`);
+
+    abortController.abort();
+  });
 });

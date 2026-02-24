@@ -9,8 +9,8 @@
 - 현재 프로젝트: `/home/jedi/code/web-agentic-codex`
 - 외부 레포: `/home/jedi/code/web-agentic-codex/temp/web-agentic` (origin: `https://github.com/jedikim/web-agentic`)
 
-분석 시점: 2026-02-24  
-원칙: 코드 변경 없이 비교/수용 검토만 수행
+분석 시점: 2026-02-24 (external commit `34360a7`)  
+원칙: 외부 레포 재클론 후 비교 분석 → 우선 수용 항목 구현/검증 반영
 
 ## 1. 핵심 결론
 
@@ -152,6 +152,16 @@
    - `runtime/tests/e2e-fixture-playwright-adapter.test.ts`
 5. `GAP-C2/C3` API 계약/스키마 테스트 강화
    - evolution/chat/backend server + sdk client 테스트 확장
+6. `GAP-A2` 롤백 계약 추가
+   - `POST /evolution/versions/:workflowId/rollback`
+   - SDK: `rollbackVersion(workflowId, input)`
+7. `GAP-C3` 전역 progress 이벤트 계약 추가
+   - `GET /evolution/progress/stream` (`evolution.progress.event.v1`)
+   - `GET /example/chat/progress/stream` (`chat.progress.event.v1`)
+8. `GAP-A1` handoff 개별 해결 계약 추가
+   - `POST /example/chat/sessions/:id/handoffs/:handoffId/resolve`
+9. 안정화 픽스
+   - `SessionStore` JSON read 재시도(쓰기/읽기 경합 시 SyntaxError 완화)
 
 잔여:
 

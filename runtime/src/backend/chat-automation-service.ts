@@ -57,6 +57,16 @@ export interface ChatAutomationSessionSnapshot {
   latestScreenshot?: ChatAutomationScreenshotRef;
 }
 
+export interface ChatAutomationProgressEvent {
+  schemaVersion: 'chat.progress.event.v1';
+  eventType: 'session_snapshot';
+  emittedAt: string;
+  sessionId: string;
+  operatorId: string;
+  runStatus: ChatAutomationRunStatus;
+  snapshot: ChatAutomationSessionSnapshot;
+}
+
 export interface ChatAutomationSessionSummary {
   sessionId: string;
   title?: string;
@@ -108,6 +118,15 @@ export interface CreateChatSessionInput {
 export interface SubmitCaptchaInput {
   sessionId: string;
   value: string;
+}
+
+export interface ResolveHandoffInput {
+  sessionId: string;
+  handoffId: string;
+  actionTaken: string;
+  value?: string;
+  resolvedBy?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ChatAutomationServiceOptions {
@@ -179,6 +198,11 @@ function ensureNonEmpty(value: string, name: string): string {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function isSessionMissingError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.startsWith('session not found:');
 }
 
 function buildRunState(now: string): ChatAutomationRunState {
@@ -311,6 +335,7 @@ function asCreateSessionInput(input: CreateChatSessionInput): CreateSessionInput
 export type ChatAutomationSessionUpdateListener = (
   snapshot: ChatAutomationSessionSnapshot
 ) => void;
+export type ChatAutomationProgressListener = (event: ChatAutomationProgressEvent) => void;
 
 export class ChatAutomationService {
   private readonly store: SessionStore;
@@ -346,6 +371,10 @@ export class ChatAutomationService {
 
   private stateEvent(sessionId: string): string {
     return `session:${sessionId}`;
+  }
+
+  private progressEvent(): string {
+    return 'progress:any';
   }
 
   private ensureRuntime(session: AutomationSession): SessionRuntimeState {
@@ -412,11 +441,30 @@ export class ChatAutomationService {
 
   private async emitSnapshot(sessionId: string): Promise<void> {
     const snapshot = await this.getSnapshot(sessionId);
+    const runtime = this.ensureRuntime(snapshot.session);
+    const progressEvent: ChatAutomationProgressEvent = {
+      schemaVersion: 'chat.progress.event.v1',
+      eventType: 'session_snapshot',
+      emittedAt: nowIso(),
+      sessionId: snapshot.session.id,
+      operatorId: runtime.operatorId,
+      runStatus: snapshot.run.status,
+      snapshot
+    };
     this.emitter.emit(this.stateEvent(sessionId), snapshot);
+    this.emitter.emit(this.progressEvent(), progressEvent);
   }
 
   onSessionUpdate(sessionId: string, listener: ChatAutomationSessionUpdateListener): () => void {
     const event = this.stateEvent(sessionId);
+    this.emitter.on(event, listener);
+    return () => {
+      this.emitter.off(event, listener);
+    };
+  }
+
+  onProgress(listener: ChatAutomationProgressListener): () => void {
+    const event = this.progressEvent();
     this.emitter.on(event, listener);
     return () => {
       this.emitter.off(event, listener);
@@ -668,7 +716,9 @@ export class ChatAutomationService {
           try {
             await this.runTask(sessionId, state, task);
           } catch (error) {
-            if ((error as Error).message === 'run canceled') {
+            const message = (error as Error).message;
+
+            if (message === 'run canceled') {
               state.run.status = 'canceled';
               state.run.updatedAt = nowIso();
               this.log(state, 'warn', 'Run canceled');
@@ -676,15 +726,28 @@ export class ChatAutomationService {
               continue;
             }
 
+            if (isSessionMissingError(error)) {
+              state.queue = [];
+              state.run.queueLength = 0;
+              state.workerRunning = false;
+              return;
+            }
+
             state.run.status = 'failed';
-            state.run.lastError = (error as Error).message;
+            state.run.lastError = message;
             state.run.updatedAt = nowIso();
-            this.log(state, 'error', `Run failed: ${(error as Error).message}`);
-            await this.appendTurn(sessionId, {
-              role: 'assistant',
-              content: `Run failed: ${(error as Error).message}`
-            });
-            await this.emitSnapshot(sessionId);
+            this.log(state, 'error', `Run failed: ${message}`);
+            try {
+              await this.appendTurn(sessionId, {
+                role: 'assistant',
+                content: `Run failed: ${message}`
+              });
+              await this.emitSnapshot(sessionId);
+            } catch (appendError) {
+              if (!isSessionMissingError(appendError)) {
+                throw appendError;
+              }
+            }
           }
         }
       } finally {
@@ -804,6 +867,54 @@ export class ChatAutomationService {
     this.log(state, 'warn', 'Session canceled by user');
     await this.emitSnapshot(sessionId);
     return this.getSnapshot(sessionId);
+  }
+
+  async resolveHandoff(input: ResolveHandoffInput): Promise<ChatAutomationSessionSnapshot> {
+    const session = await this.mustGetSession(input.sessionId);
+    const state = this.ensureRuntime(session);
+    const actionTaken = ensureNonEmpty(input.actionTaken, 'actionTaken');
+    const resolvedBy = input.resolvedBy?.trim() || 'operator';
+
+    const handoff = state.handoffs.find((entry) => entry.id === input.handoffId);
+    if (!handoff) {
+      throw new Error(`handoff not found: ${input.handoffId}`);
+    }
+    if (handoff.status !== 'waiting') {
+      throw new Error(`handoff is not waiting: ${input.handoffId}`);
+    }
+
+    handoff.status = 'resolved';
+    handoff.resolvedAt = nowIso();
+
+    const submittedValue = input.value?.trim();
+    if (submittedValue) {
+      handoff.valueLength = submittedValue.length;
+    }
+
+    if (handoff.type === 'captcha') {
+      if (!submittedValue) {
+        throw new Error('captcha handoff resolve requires value');
+      }
+      state.pendingCaptchaValue = submittedValue;
+      state.run.waitingCaptcha = false;
+      state.run.captchaPrompt = undefined;
+    }
+
+    this.log(
+      state,
+      'info',
+      `Handoff resolved by ${resolvedBy}: ${actionTaken}${submittedValue ? ` (value length=${submittedValue.length})` : ''}`
+    );
+    await this.appendTurn(input.sessionId, {
+      role: 'assistant',
+      content:
+        handoff.type === 'captcha'
+          ? 'Handoff resolved by user. Continuing captcha-required automation step.'
+          : `Handoff resolved by user with action: ${actionTaken}.`
+    });
+    state.run.updatedAt = nowIso();
+    await this.emitSnapshot(input.sessionId);
+    return this.getSnapshot(input.sessionId);
   }
 
   async submitCaptcha(input: SubmitCaptchaInput): Promise<ChatAutomationSessionSnapshot> {
