@@ -115,6 +115,13 @@
 1. 복수 시나리오 안정 운영
 2. 장애 시 빠른 복구 절차 확인
 
+진행 현황(2026-02-24):
+
+1. `runtime/src/ops/session-manager.ts` 추가(멀티 세션 동시성 제어)
+2. `runtime/src/ops/metrics-dashboard.ts` 추가(비용/지연/실패율 집계)
+3. `runtime/src/ops/rollback-log.ts` 추가(롤백 로그 추적)
+4. `runtime/tests/session-manager.test.ts`, `runtime/tests/metrics-dashboard.test.ts`, `runtime/tests/rollback-log.test.ts` 통과
+
 ## 2. 작업 우선순위
 
 ```mermaid
@@ -168,5 +175,6 @@ flowchart TD
 6. Fallback 코어: `runtime/src/fallback/context-reducer.ts`, `runtime/src/fallback/patch-validator.ts`, `runtime/src/fallback/recipe-version.ts`
 7. Vision/Live 코어: `runtime/src/vision/roi-batcher.ts`, `runtime/src/checkpoint/go-no-go.ts`, `runtime/src/live/view-mode.ts`
 8. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`
-9. 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`, `runtime/tests/deterministic-runner.test.ts`, `runtime/tests/basic-extractor.test.ts`, `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts`, `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`, `runtime/tests/replay-store.test.ts`, `runtime/tests/rule-promotion.test.ts`
-10. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-vision-liveops-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`
+9. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`
+10. 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`, `runtime/tests/deterministic-runner.test.ts`, `runtime/tests/basic-extractor.test.ts`, `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts`, `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`, `runtime/tests/replay-store.test.ts`, `runtime/tests/rule-promotion.test.ts`, `runtime/tests/session-manager.test.ts`, `runtime/tests/metrics-dashboard.test.ts`, `runtime/tests/rollback-log.test.ts`
+11. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-vision-liveops-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`
