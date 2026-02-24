@@ -4,6 +4,8 @@
 
 `Rule-first` 웹 자동화 런타임으로, LLM/Vision 폴백을 통제하고 스크린샷 체크포인트 및 버그/예외 기반 진화(evolution)를 지원합니다.
 
+법적 안전 기본값: 캡차/2FA/보안 챌린지 우회 자동화는 제공하지 않으며 human handoff를 사용합니다.
+
 ## Dual 사용 모드
 
 1. `backend_simple`: 멀티턴 세션 API를 제공하는 가장 단순한 HTTP 백엔드 모드
@@ -90,4 +92,5 @@ npm test
 
 - 문서 인덱스: [English](./doc/README.md) | [한국어](./doc/README.ko.md)
 - SDK + Backend 사용법: [English](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./doc/CODEX-SDK-BACKEND-USAGE.md)
+- 실사용 가이드: [English](./doc/CODEX-PRACTICAL-USAGE.en.md) | [한국어](./doc/CODEX-PRACTICAL-USAGE.md)
 - 환경설정: [English](./doc/CODEX-ENV-SETUP.en.md) | [한국어](./doc/CODEX-ENV-SETUP.md)

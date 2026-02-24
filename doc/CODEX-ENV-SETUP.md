@@ -103,5 +103,5 @@ GEMINI_API_KEY=your-key
 
 1. runtime `.env` 파일은 절대 커밋하지 않는다
 2. 실전형 브라우저 검증은 `PW_HEADLESS=0`을 사용한다
-3. 캡차 정책은 `YOLO26 -> VLM -> LLM 재시도 -> human handoff` 순서를 유지한다
+3. 캡차/2FA 우회 자동화는 하지 않고 즉시 human handoff로 전환한다
 4. 코딩 모델을 flash 계열로 낮추지 않는다

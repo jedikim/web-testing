@@ -11,6 +11,8 @@ Define one reinforced operating model:
 
 Both modes share the same session model and can trigger evolution only on bug/exception style failures.
 
+Legal-safe rule: do not automate captcha/2FA bypass; switch to human handoff.
+
 ## 1. Topology
 
 ```mermaid
@@ -96,6 +98,13 @@ Run example:
 ```bash
 cd runtime
 npm run example:sdk:multiturn
+```
+
+Human handoff example:
+
+```bash
+cd runtime
+npm run example:sdk:human-handoff
 ```
 
 ### 3.3 Attach automation run to a turn

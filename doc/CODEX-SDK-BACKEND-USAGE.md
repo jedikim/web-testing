@@ -11,6 +11,8 @@
 
 두 모드는 동일한 세션 모델을 공유하고, bug/exception 실패 경로에서만 진화를 트리거한다.
 
+법적 안전 원칙: 캡차/2FA 우회 자동화는 하지 않고 human handoff로 전환한다.
+
 ## 1. 토폴로지
 
 ```mermaid
@@ -96,6 +98,13 @@ console.log(turn.assistantTurn.content);
 ```bash
 cd runtime
 npm run example:sdk:multiturn
+```
+
+Human handoff 예시:
+
+```bash
+cd runtime
+npm run example:sdk:human-handoff
 ```
 
 ### 3.3 자동화 실행 결과를 턴에 연결

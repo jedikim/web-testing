@@ -22,6 +22,7 @@
     "example:sdk:basic": "tsx examples/sdk-basic.ts",
     "example:sdk:auto-improve": "tsx examples/sdk-auto-improvement.ts",
     "example:sdk:multiturn": "tsx examples/sdk-multiturn.ts",
+    "example:sdk:human-handoff": "tsx examples/sdk-human-handoff.ts",
     "test:automation": "npm run test:full-flow && npm run test:e2e:kr:contract",
     "test:automation:full": "npm run test:automation && npm run test:provider:contract",
     "test:watch": "vitest",

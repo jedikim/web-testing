@@ -103,5 +103,5 @@ GEMINI_API_KEY=your-key
 
 1. never commit runtime `.env` files
 2. use headful (`PW_HEADLESS=0`) for practical browser validation
-3. keep captcha policy: `YOLO26 -> VLM -> LLM retry -> human handoff`
+3. do not automate captcha/2FA bypass; stop and switch to human handoff
 4. do not downgrade coding model to flash tier

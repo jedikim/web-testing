@@ -25,6 +25,7 @@ Each document includes a language switch link at the top.
 - Run Artifacts: [English](./CODEX-RUN-ARTIFACTS.en.md) | [한국어](./CODEX-RUN-ARTIFACTS.md)
 - Evolution Backend: [English](./CODEX-EVOLUTION-BACKEND.en.md) | [한국어](./CODEX-EVOLUTION-BACKEND.md)
 - SDK + Backend Usage: [English](./CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./CODEX-SDK-BACKEND-USAGE.md)
+- Practical Usage Guide: [English](./CODEX-PRACTICAL-USAGE.en.md) | [한국어](./CODEX-PRACTICAL-USAGE.md)
 - Task Template: [English](./CODEX-TASK-TEMPLATE.en.md) | [한국어](./CODEX-TASK-TEMPLATE.md)
 
 ## Plan Archive

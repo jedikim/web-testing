@@ -4,6 +4,8 @@
 
 Rule-first web automation runtime with controlled LLM fallback, screenshot checkpoints, and bug/exception-driven evolution.
 
+Legal-safe default: captcha/2FA/security challenge bypass automation is not provided; use human handoff.
+
 ## Dual Usage Modes
 
 1. `backend_simple`: easiest HTTP backend mode with multi-turn session APIs
@@ -90,4 +92,5 @@ npm test
 
 - Documentation index: [English](./doc/README.md) | [한국어](./doc/README.ko.md)
 - SDK + Backend usage: [English](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./doc/CODEX-SDK-BACKEND-USAGE.md)
+- Practical usage guide: [English](./doc/CODEX-PRACTICAL-USAGE.en.md) | [한국어](./doc/CODEX-PRACTICAL-USAGE.md)
 - Environment setup: [English](./doc/CODEX-ENV-SETUP.en.md) | [한국어](./doc/CODEX-ENV-SETUP.md)
