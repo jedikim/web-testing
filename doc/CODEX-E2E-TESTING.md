@@ -8,10 +8,11 @@
 
 1. 계약 테스트(`contract`): 시나리오 정의 품질, 중복 ID, 최소 케이스 수 검증
 2. 라이브 스모크(`live smoke`): 실제 한국 사이트 접속/기본 상호작용/검증
-3. provider matrix(`llm+vision`): Gemini/OpenAI/Anthropic + YOLO26 모델 매트릭스 검증
-4. 통합 E2E(`assistant integration`): 외부 비서 프로젝트에서 webhook/메시징 연동 포함 검증
+3. assistantless loop(`chat-like simulation`): AI 비서 없이 스크린샷 공유/의사결정 루프 시뮬레이션
+4. provider matrix(`llm+vision`): Gemini/OpenAI/Anthropic + YOLO26 모델 매트릭스 검증
+5. 통합 E2E(`assistant integration`): 외부 비서 프로젝트에서 webhook/메시징 연동 포함 검증
 
-이 저장소는 1~3을 담당하고, 4는 외부 AI 비서 프로젝트에서 담당한다.
+이 저장소는 1~4를 담당하고, 5는 외부 AI 비서 프로젝트에서 담당한다.
 
 ## 2. 한국 사이트 중심 스모크 시나리오
 
@@ -23,6 +24,14 @@
 4. `kr_daum_search_news`: 다음 검색(뉴스) 결과 핵심 키워드 확인
 5. `kr_naver_news_home`: 네이버 뉴스 메인 접근 + 뉴스 키워드 확인
 6. `kr_naver_finance_home`: 네이버 금융 메인 접근 + 증권/금융 키워드 확인
+
+## 2.1 Assistantless Chat-Loop 시나리오
+
+소스: `runtime/tests/assistantless-chat-e2e.test.ts`
+
+1. 초기 단계 LLM 분석 후 rule-first 경로로 반복
+2. 실패 시 YOLO26 힌트 + revise 재시도
+3. 실패 후 `not_go` 결정 시 즉시 중단
 
 ## 3. 실행 방법
 
@@ -41,12 +50,15 @@ cp .env.example .env
 cd runtime
 npm run test:e2e:kr:contract
 npm run test:e2e:kr
+npm run test:e2e:kr:headful
+npm run test:e2e:assistantless:contract
 npm run test:provider:contract
 # 실제 키/엔드포인트가 있으면
 npm run test:e2e:provider:live
 ```
 
 라이브 테스트는 실행 시 `runtime/.env`를 자동으로 읽는다.
+실제 브라우저 동작 점검은 `test:e2e:kr:headful` 경로를 기본으로 사용한다.
 
 ## 4. 결과 아티팩트
 

@@ -8,13 +8,20 @@ describe('createHttpProviderExecutors', () => {
   });
 
   it('calls provider specific endpoints for openai/gemini/anthropic/yolo26', async () => {
-    const calls: Array<{ url: string; method: string; body: unknown }> = [];
+    const calls: Array<{ url: string; method: string; body: unknown; headers: Record<string, string> }> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      const normalizedHeaders: Record<string, string> = {};
+      if (init?.headers) {
+        for (const [key, value] of Object.entries(init.headers as Record<string, string>)) {
+          normalizedHeaders[key.toLowerCase()] = String(value);
+        }
+      }
       calls.push({
         url,
         method: init?.method ?? 'GET',
-        body: init?.body ? JSON.parse(String(init.body)) : null
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+        headers: normalizedHeaders
       });
 
       if (url.includes('/chat/completions')) {
@@ -78,5 +85,36 @@ describe('createHttpProviderExecutors', () => {
     expect(calls.some((call) => call.url.includes(':generateContent'))).toBe(true);
     expect(calls.some((call) => call.url.includes('/messages'))).toBe(true);
     expect(calls.some((call) => call.url.includes('/detect'))).toBe(true);
+  });
+
+  it('supports yolo26 endpoint without authorization header', async () => {
+    const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const headers: Record<string, string> = {};
+      if (init?.headers) {
+        for (const [key, value] of Object.entries(init.headers as Record<string, string>)) {
+          headers[key.toLowerCase()] = String(value);
+        }
+      }
+      calls.push({ url: String(input), headers });
+      return new Response(JSON.stringify({ detections: [] }), { status: 200 });
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    const executors = createHttpProviderExecutors({
+      llmPrompt: 'ignored',
+      visionInput: 'runs/test.png'
+    });
+
+    const result = await executors.executeVision({
+      provider: 'yolo26',
+      baseUrl: 'http://127.0.0.1:8080',
+      model: 'yolo26n'
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toContain('/detect');
+    expect(calls[0]?.headers.authorization).toBeUndefined();
   });
 });

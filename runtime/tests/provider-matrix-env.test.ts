@@ -42,6 +42,23 @@ describe('loadProviderMatrixEnv', () => {
     ).toThrow(/YOLO26_BASE_URL is required/);
   });
 
+  it('allows yolo26 without api key for local open-source endpoint', () => {
+    const config = loadProviderMatrixEnv({
+      YOLO26_ENABLED: '1',
+      YOLO26_BASE_URL: 'http://127.0.0.1:8080',
+      YOLO26_MODELS: 'yolo26n'
+    });
+
+    expect(config.visionTargets).toEqual([
+      {
+        provider: 'yolo26',
+        apiKey: undefined,
+        baseUrl: 'http://127.0.0.1:8080',
+        models: ['yolo26n']
+      }
+    ]);
+  });
+
   it('skips vendors without key or models', () => {
     const config = loadProviderMatrixEnv({
       LLM_VENDOR_ORDER: 'gemini,openai',

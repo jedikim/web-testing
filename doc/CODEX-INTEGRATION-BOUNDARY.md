@@ -10,6 +10,7 @@
 2. 실패 복구(Selector/Vision patch-only 경로)
 3. 스크린샷 기반 승인 루프의 코어 로직(`runtime/src/integration/human-loop-runtime.ts`)
 4. 실행 아티팩트 타입/검증 규칙
+5. AI 비서 연동 없이 채팅형 루프를 재현하는 assistantless E2E 시뮬레이션(`runtime/src/testing/assistantless-chat-e2e.ts`)
 
 ## 2. 외부 AI 비서 프로젝트가 담당하는 것
 

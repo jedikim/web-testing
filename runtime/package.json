@@ -6,9 +6,11 @@
   "scripts": {
     "test": "vitest run",
     "test:acceptance": "vitest run tests/phase-acceptance.test.ts",
-    "test:full-flow": "vitest run tests/automation-full-flow.test.ts tests/phase-acceptance.test.ts",
+    "test:full-flow": "vitest run tests/automation-full-flow.test.ts tests/assistantless-chat-e2e.test.ts tests/phase-acceptance.test.ts",
     "test:e2e:kr": "RUN_KR_E2E=1 vitest run tests/e2e-kr-live.test.ts",
+    "test:e2e:kr:headful": "PW_HEADLESS=0 RUN_KR_E2E=1 vitest run tests/e2e-kr-live.test.ts",
     "test:e2e:kr:contract": "vitest run tests/kr-e2e-scenarios.test.ts tests/e2e-kr-live.test.ts",
+    "test:e2e:assistantless:contract": "vitest run tests/assistantless-chat-e2e.test.ts",
     "test:provider:contract": "vitest run tests/llm-model-registry.test.ts tests/load-env-file.test.ts tests/provider-matrix-env.test.ts tests/provider-model-matrix.test.ts tests/provider-http-executor.test.ts tests/e2e-provider-matrix-mock.test.ts",
     "test:e2e:provider:live": "RUN_PROVIDER_LIVE_E2E=1 vitest run tests/e2e-provider-live.test.ts",
     "test:automation": "npm run test:full-flow && npm run test:e2e:kr:contract",

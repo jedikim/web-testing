@@ -9,7 +9,7 @@ export interface LlmExecutionTarget {
 
 export interface VisionExecutionTarget {
   provider: 'yolo26';
-  apiKey: string;
+  apiKey?: string;
   baseUrl: string;
   model: string;
 }

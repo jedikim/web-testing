@@ -88,12 +88,15 @@ export function createHttpProviderExecutors(options: HttpProviderExecutorOptions
   const executeVision = async (target: VisionExecutionTarget): Promise<ExecutionResult> => {
     try {
       const baseUrl = stripTrailingSlash(target.baseUrl);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (target.apiKey) {
+        headers.Authorization = `Bearer ${target.apiKey}`;
+      }
       const response = await fetch(`${baseUrl}/detect`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${target.apiKey}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           model: target.model,
           input: options.visionInput

@@ -27,7 +27,7 @@
 
 1. `RUN_KR_E2E`: 한국 사이트 라이브 E2E 실행 여부 (`1` 또는 `0`)
 2. `RUN_PROVIDER_LIVE_E2E`: 멀티 벤더 provider 라이브 E2E 실행 여부
-3. `PW_HEADLESS`: Playwright headless 실행 (`1` 또는 `0`)
+3. `PW_HEADLESS`: Playwright headless 실행 (`1` 또는 `0`, 실전 점검은 `0` 권장)
 4. `PLAYWRIGHT_TIMEOUT_MS`: 기본 타임아웃(ms)
 5. `HUMAN_LOOP_MAX_TURNS`: human-loop 최대 반복 수
 6. `ARTIFACT_ROOT`: 아티팩트 루트 경로(기본 `runs/samples/artifacts`)
@@ -37,7 +37,7 @@
 10. `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`: 회사별 키
 11. `GEMINI_MODELS`, `OPENAI_MODELS`, `ANTHROPIC_MODELS`: 회사별 모델 목록(csv)
 12. `LLM_VENDOR_ORDER`: 멀티 벤더 매트릭스 순서(csv)
-13. `YOLO26_ENABLED`, `YOLO26_API_KEY`, `YOLO26_BASE_URL`, `YOLO26_MODELS`: YOLO26 멀티 모델 설정
+13. `YOLO26_ENABLED`, `YOLO26_API_KEY`, `YOLO26_BASE_URL`, `YOLO26_MODELS`: YOLO26 멀티 모델 설정(오픈소스 로컬 엔드포인트는 API 키 없이 가능)
 
 ## 4. 안전 규칙
 
@@ -46,6 +46,7 @@
 3. `RUN_PROVIDER_LIVE_E2E=1`이면 최소 1개 LLM vendor + 1개 YOLO26 target을 반드시 구성한다.
 4. 키 값은 `runtime/.env`나 OS secret store에만 저장한다.
 5. `git status` 전에 `.env` 파일이 추적 대상이 아닌지 확인한다.
+6. headful 브라우저 검증은 `PW_HEADLESS=0`으로 실행한다.
 
 ## 5. Gemini + Multi-Model 예시
 
@@ -53,8 +54,8 @@
 LLM_ENABLED=1
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=your-gemini-key
-GEMINI_MODELS=gemini-2.0-flash,gemini-1.5-pro
-LLM_MODEL=gemini-2.0-flash
+GEMINI_MODELS=gemini-3.0-flash,gemini-2.0-flash
+LLM_MODEL=gemini-3.0-flash
 ```
 
 ## 6. Multi-Vendor + YOLO26 Matrix 예시
@@ -63,13 +64,13 @@ LLM_MODEL=gemini-2.0-flash
 RUN_PROVIDER_LIVE_E2E=1
 LLM_VENDOR_ORDER=gemini,openai,anthropic
 GEMINI_API_KEY=...
-GEMINI_MODELS=gemini-2.0-flash,gemini-1.5-pro
+GEMINI_MODELS=gemini-3.0-flash,gemini-2.0-flash
 OPENAI_API_KEY=...
 OPENAI_MODELS=gpt-4.1-mini,gpt-4o-mini
 ANTHROPIC_API_KEY=...
 ANTHROPIC_MODELS=claude-3-5-haiku-latest,claude-3-5-sonnet-latest
 YOLO26_ENABLED=1
-YOLO26_API_KEY=...
-YOLO26_BASE_URL=https://your-yolo26-endpoint
+YOLO26_API_KEY=
+YOLO26_BASE_URL=http://127.0.0.1:8080
 YOLO26_MODELS=yolo26n,yolo26s
 ```

@@ -10,11 +10,11 @@ describe('llm model registry', () => {
   it('provides multiple gemini models', () => {
     const models = listSupportedModelIds('gemini');
     expect(models.length).toBeGreaterThanOrEqual(3);
-    expect(models).toContain('gemini-2.0-flash');
+    expect(models).toContain('gemini-3.0-flash');
   });
 
   it('returns provider default model when request is empty', () => {
-    expect(defaultModelFor('gemini')).toBe('gemini-2.0-flash');
+    expect(defaultModelFor('gemini')).toBe('gemini-3.0-flash');
     expect(defaultModelFor('openai')).toBe('gpt-4.1-mini');
   });
 

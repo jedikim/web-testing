@@ -53,14 +53,14 @@ describe('loadRuntimeEnv', () => {
       LLM_ENABLED: 'true',
       LLM_PROVIDER: 'gemini',
       GEMINI_API_KEY: 'gm-test',
-      GEMINI_MODELS: 'gemini-2.0-flash,gemini-1.5-pro',
+      GEMINI_MODELS: 'gemini-3.0-flash,gemini-1.5-pro',
       LLM_MODEL: 'gemini-1.5-pro'
     });
 
     expect(env.llmEnabled).toBe(true);
     expect(env.llmProvider).toBe('gemini');
     expect(env.llmApiKey).toBe('gm-test');
-    expect(env.llmModelOptions).toContain('gemini-2.0-flash');
+    expect(env.llmModelOptions).toContain('gemini-3.0-flash');
     expect(env.llmModel).toBe('gemini-1.5-pro');
   });
 });

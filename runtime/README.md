@@ -18,6 +18,7 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - `src/learning`: 리플레이 저장소/카나리 게이트/룰 승격
 - `src/ops`: 세션/비용·지연 지표/롤백 로그
 - `src/testing`: full-flow/multi-provider 테스트 러너
+- `src/testing/assistantless-chat-e2e.ts`: AI 비서 없이 채팅형 반복 자동화 루프 시뮬레이션
 - `tests`: 런타임 테스트
 
 ## 현재 상태
@@ -32,6 +33,7 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - Chat 경로로 Telegram/Slack 입력 정규화와 screenshot question 루프를 추가했다.
 - Chat과 분리된 integration 경로로 `runHumanLoop`를 추가해 외부 프로젝트가 채널 연동을 담당할 수 있게 했다.
 - Gemini/OpenAI/Anthropic + YOLO26 멀티 모델 매트릭스 테스트 경로를 추가했다.
+- AI 비서 없이도 `스크린샷 공유 → go/revise/not_go → LLM 최소화(rule-first)` 반복을 검증하는 assistantless e2e 경로를 추가했다.
 - Self-improvement 준비 단계로 replay store와 rule promotion 게이트를 추가했다.
 - Production hardening 준비 단계로 session manager, metrics dashboard, rollback log를 추가했다.
 - Playwright 액션 어댑터(`src/engine/playwright-executor.ts`)를 추가했다.
@@ -70,6 +72,8 @@ cd runtime
 npm run test:full-flow
 npm run test:e2e:kr:contract
 npm run test:e2e:kr
+npm run test:e2e:kr:headful
+npm run test:e2e:assistantless:contract
 npm run test:provider:contract
 # 실제 키/엔드포인트가 있으면
 npm run test:e2e:provider:live

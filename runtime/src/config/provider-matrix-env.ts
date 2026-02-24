@@ -11,7 +11,7 @@ export interface LlmProviderTarget {
 
 export interface VisionProviderTarget {
   provider: 'yolo26';
-  apiKey: string;
+  apiKey?: string;
   baseUrl: string;
   models: string[];
 }
@@ -108,9 +108,6 @@ export function loadProviderMatrixEnv(source: EnvMap = process.env): ProviderMat
   if (parseBoolean(source.YOLO26_ENABLED)) {
     const apiKey = trim(source.YOLO26_API_KEY);
     const baseUrl = trim(source.YOLO26_BASE_URL);
-    if (!apiKey) {
-      throw new Error('YOLO26_API_KEY is required when YOLO26_ENABLED=1');
-    }
     if (!baseUrl) {
       throw new Error('YOLO26_BASE_URL is required when YOLO26_ENABLED=1');
     }

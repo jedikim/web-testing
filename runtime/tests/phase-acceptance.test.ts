@@ -7,6 +7,7 @@ import { AdaptiveController } from '../src/learning/adaptive-controller';
 import { ResilienceOrchestrator } from '../src/ops/resilience-orchestrator';
 import type { WorkflowDefinition } from '../src/workflow/types';
 import { runScreenshotChatLoop } from '../src/chat/screenshot-chat-loop';
+import { runAssistantlessChatE2E } from '../src/testing/assistantless-chat-e2e';
 
 describe('phase acceptance', () => {
   it('phase1: deterministic scenario runs without llm', async () => {
@@ -105,6 +106,38 @@ describe('phase acceptance', () => {
     });
 
     expect(chatResult.status).toBe('pass');
+  });
+
+  it('phase3+: assistantless chat-loop e2e works with llm-first then rule-first iterations', async () => {
+    let executionCount = 0;
+    const result = await runAssistantlessChatE2E({
+      goal: '사용자 요청 기반 반복 웹 자동화',
+      llmWarmupSteps: 1,
+      maxSteps: 4,
+      captureScreenshot: async ({ step, stage }) => `runs/phase3plus-${step}-${stage}.png`,
+      shareWithUser: async () => undefined,
+      analyzeWithLlm: async () => ({ kind: 'type', target: 'input[name=q]', value: '뉴스' }),
+      decideWithRules: async () => ({ kind: 'click', target: 'button.search' }),
+      detectWithVision: async () => ({ model: 'yolo26n', target: '#search', confidence: 0.91 }),
+      executeAction: async () => {
+        executionCount += 1;
+        if (executionCount === 1) {
+          return {
+            status: 'fail',
+            reason: 'selector drift',
+            userQuestion: '수정 후 계속 진행할까요?'
+          };
+        }
+        return { status: 'pass', done: executionCount >= 2 };
+      },
+      askUserDecision: async () => 'revise'
+    });
+
+    expect(result.status).toBe('pass');
+    expect(result.revisions).toBe(1);
+    expect(result.llmCalls).toBe(2);
+    expect(result.ruleCalls).toBe(0);
+    expect(result.visionCalls).toBe(1);
   });
 
   it('phase4: repeated runs lower llm call rate and auto-promote rules', async () => {
