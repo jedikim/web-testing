@@ -2,52 +2,31 @@
 
 # Adaptive Web Automation Core
 
-`Rule-first` 웹 자동화 런타임으로, 실패 구간에만 LLM/Vision을 제한적으로 사용하고, 스크린샷 체크포인트와 예외 기반 버전 진화를 지원합니다.
+`Rule-first` 웹 자동화 런타임으로, LLM/Vision 폴백을 통제하고 스크린샷 체크포인트 및 버그/예외 기반 진화(evolution)를 지원합니다.
 
-## 이 저장소가 하는 일
+## Dual 사용 모드
 
-- 결정론 워크플로우를 우선 실행
-- 실패/모호 구간만 LLM/Vision으로 에스컬레이션
-- 실행 아티팩트/테스트 증적 저장
-- 외부 AI 비서 없이 assistantless E2E 시뮬레이션 수행
-- 버그/예외 대응용 진화 백엔드(worktree 격리 + 승인 전환) 제공
-
-## 이 저장소가 하지 않는 일
-
-- Telegram/Slack 운영 연동 자체 구현
-- 캡차/2FA/결제 우회
-- 외부 AI 비서 프로젝트 전체 대체
-
-## 아키텍처
+1. `backend_simple`: 멀티턴 세션 API를 제공하는 가장 단순한 HTTP 백엔드 모드
+2. `sdk_detailed`: 자체 서비스 코드에 임베딩하는 세밀 제어 SDK 모드
 
 ```mermaid
 flowchart LR
-    U[사용자 목표] --> W[워크플로우 + 룰 엔진]
-    W --> X[Playwright 실행기]
-    X --> V{검증 성공?}
-    V -->|yes| R[결과 + 아티팩트]
-    V -->|no| F[Fallback 라우터]
-    F --> L[LLM Patch-Only]
-    F --> Y[Vision/YOLO26]
-    F --> H[Human Handoff]
-    L --> W
-    Y --> W
+    U[운영자 / 외부 AI 비서] --> B[Backend Simple API]
+    B --> S[Session Store + Turn Engine]
+    S --> A[Automation Runtime]
+    A --> E[Evolution Backend]
+
+    X[내부 서비스 코드] --> D[SDK Detailed]
+    D --> S
+    D --> A
 ```
 
-## 진화 백엔드 흐름 (버그/예외 전용)
+## 이 저장소가 제공하는 것
 
-```mermaid
-flowchart TD
-    A[버그/예외 트리거] --> B[진화 Job 생성]
-    B --> C[격리 Git Worktree 생성]
-    C --> D[기본+예외 시나리오 팩 생성]
-    D --> E[테스트 실행]
-    E -->|실패| F[자동 수정 루프]
-    F --> E
-    E -->|성공| G[사용자 승인 대기]
-    G -->|승인| H[Active Version Pointer 전환]
-    G -->|거절| I[Rejected]
-```
+- 결정론 워크플로우 우선 실행 + 필요 구간만 폴백
+- 자동화 계획/실행을 위한 멀티턴 세션 상태 관리
+- Slack/Telegram 구현 없이 assistantless E2E 시뮬레이션
+- worktree 격리 + 테스트/수정 + 승인 기반 진화 백엔드
 
 ## 빠른 시작
 
@@ -60,74 +39,55 @@ npm run typecheck
 npm test
 ```
 
-## 테스트 방법
+## 모드 A: Backend Simple (HTTP + 샘플 UI)
 
-### 1) 코어 계약/단위/통합 테스트
-
-```bash
-cd runtime
-npm test
-npm run typecheck
-```
-
-### 2) 전체 자동화 플로우
+백엔드 실행:
 
 ```bash
 cd runtime
-npm run test:full-flow
-```
-
-### 3) 한국 사이트 라이브 E2E (Headful)
-
-```bash
-cd runtime
-PW_HEADLESS=0 RUN_KR_E2E=1 npm run test:e2e:kr
-```
-
-### 4) 복잡 시나리오 배치 E2E (Headful)
-
-```bash
-cd runtime
-PW_HEADLESS=0 RUN_AUTONOMOUS_BATCH_E2E=1 AUTONOMOUS_BATCH_ITERATIONS=1 npm run test:e2e:autonomous:live
-```
-
-### 5) 진화 백엔드 테스트
-
-```bash
-cd runtime
-npm run test:evolution
-```
-
-## 진화 백엔드 로컬 실행
-
-```bash
-cd runtime
-npm run evolution:server
+npm run backend:simple:server
 ```
 
 접속:
 
-- UI: `http://127.0.0.1:4777/evolution/ui`
-- Health: `http://127.0.0.1:4777/health`
+- API health: `http://127.0.0.1:4888/health`
+- 샘플 UI: `http://127.0.0.1:4888/backend/ui`
 
-## 아티팩트/기록 위치
+## 모드 B: SDK Detailed (임베딩)
+
+예제 실행:
+
+```bash
+cd runtime
+npm run example:sdk:basic
+npm run example:sdk:multiturn
+npm run example:sdk:auto-improve
+```
+
+## 모델 정책
+
+- 코딩/자가개선 루프: `gemini-3.1-pro-preview`
+- 자동화 상호작용 루프: `gemini-3.0-flash`
+
+## 검증 명령
+
+```bash
+cd runtime
+npm run typecheck
+npm run test:sdk
+npm run test:evolution
+npm test
+```
+
+## 아티팩트/상태 경로
 
 - 런타임 아티팩트: `runs/samples/artifacts/`
-- 복잡 배치 증적: `testing/autonomous-batch/<timestamp>/`
-- 진화 상태 저장: `testing/evolution/state/`
+- backend 세션 상태: `testing/backend/state/`
+- evolution 상태: `testing/evolution/state/`
+- autonomous E2E 증적: `testing/autonomous-batch/`
 
-## 이중언어 문서 인덱스
+## 이중언어 문서
 
-- English: [Documentation Index](./doc/README.md)
-- 한국어: [문서 인덱스](./doc/README.ko.md)
-
-## 핵심 문서
-
-- PRD: [English](./doc/PRD-v0.1.en.md) | [한국어](./doc/PRD-v0.1.md)
-- Runbook: [English](./doc/CODEX-RUNBOOK.en.md) | [한국어](./doc/CODEX-RUNBOOK.md)
-- 구현 계획: [English](./doc/CODEX-IMPLEMENTATION-PLAN.en.md) | [한국어](./doc/CODEX-IMPLEMENTATION-PLAN.md)
-- 테스트/수정 사이클: [English](./doc/CODEX-TEST-FIX-CYCLE.en.md) | [한국어](./doc/CODEX-TEST-FIX-CYCLE.md)
-- 진화 백엔드: [English](./doc/CODEX-EVOLUTION-BACKEND.en.md) | [한국어](./doc/CODEX-EVOLUTION-BACKEND.md)
-- SDK + 백엔드 사용법: [English](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./doc/CODEX-SDK-BACKEND-USAGE.md)
-- E2E 테스트: [English](./doc/CODEX-E2E-TESTING.en.md) | [한국어](./doc/CODEX-E2E-TESTING.md)
+- 문서 인덱스: [English](./doc/README.md) | [한국어](./doc/README.ko.md)
+- SDK + Backend 사용법: [English](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./doc/CODEX-SDK-BACKEND-USAGE.md)
 - 환경설정: [English](./doc/CODEX-ENV-SETUP.en.md) | [한국어](./doc/CODEX-ENV-SETUP.md)

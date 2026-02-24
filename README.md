@@ -2,52 +2,31 @@
 
 # Adaptive Web Automation Core
 
-Rule-first web automation runtime with controlled LLM fallback, screenshot-based checkpointing, and exception-driven version evolution.
+Rule-first web automation runtime with controlled LLM fallback, screenshot checkpoints, and bug/exception-driven evolution.
 
-## What This Repository Does
+## Dual Usage Modes
 
-- Runs deterministic browser workflows first.
-- Escalates only failed/ambiguous steps to LLM/Vision.
-- Stores replayable artifacts and test evidence.
-- Supports assistantless E2E simulation (chat-like automation without external assistant integration).
-- Provides an evolution backend to create isolated candidate versions for bug/exception recovery.
-
-## What This Repository Does Not Do
-
-- It does not implement Telegram/Slack bot integrations in production.
-- It does not bypass captcha/2FA/payment security gates.
-- It does not replace your external AI-assistant orchestration project.
-
-## Architecture
+1. `backend_simple`: easiest HTTP backend mode with multi-turn session APIs
+2. `sdk_detailed`: embeddable SDK mode for fine-grained orchestration in your own service
 
 ```mermaid
 flowchart LR
-    U[User Intent] --> W[Workflow + Rule Engine]
-    W --> X[Playwright Executor]
-    X --> V{Verified?}
-    V -->|yes| R[Result + Artifact]
-    V -->|no| F[Fallback Router]
-    F --> L[LLM Patch-Only]
-    F --> Y[Vision/YOLO26]
-    F --> H[Human Handoff]
-    L --> W
-    Y --> W
+    U[Operator / External Assistant] --> B[Backend Simple API]
+    B --> S[Session Store + Turn Engine]
+    S --> A[Automation Runtime]
+    A --> E[Evolution Backend]
+
+    X[Internal Service Code] --> D[SDK Detailed]
+    D --> S
+    D --> A
 ```
 
-## Evolution Backend (Bug/Exception-Driven)
+## What This Repository Does
 
-```mermaid
-flowchart TD
-    A[Bug/Exception Trigger] --> B[Create Evolution Job]
-    B --> C[Create Isolated Git Worktree]
-    C --> D[Generate Baseline + Exception Scenario Pack]
-    D --> E[Run Tests]
-    E -->|fail| F[Auto-Fix Loop]
-    F --> E
-    E -->|pass| G[Await User Approval]
-    G -->|approve| H[Promote Active Version Pointer]
-    G -->|reject| I[Rejected]
-```
+- deterministic workflow execution first, fallback only when needed
+- multi-turn chat-like session state for automation planning/execution
+- assistantless E2E simulation without implementing Slack/Telegram integration itself
+- evolution backend for isolated candidate versions (worktree + test/fix + approval)
 
 ## Quick Start
 
@@ -60,74 +39,55 @@ npm run typecheck
 npm test
 ```
 
-## Testing Guide
+## Mode A: Backend Simple (HTTP + Sample UI)
 
-### 1) Core Contract + Unit + Integration
-
-```bash
-cd runtime
-npm test
-npm run typecheck
-```
-
-### 2) Full Automation Flow
+Start backend:
 
 ```bash
 cd runtime
-npm run test:full-flow
-```
-
-### 3) Korea Live E2E (Headful)
-
-```bash
-cd runtime
-PW_HEADLESS=0 RUN_KR_E2E=1 npm run test:e2e:kr
-```
-
-### 4) Assistantless Complex Batch E2E (Headful)
-
-```bash
-cd runtime
-PW_HEADLESS=0 RUN_AUTONOMOUS_BATCH_E2E=1 AUTONOMOUS_BATCH_ITERATIONS=1 npm run test:e2e:autonomous:live
-```
-
-### 5) Evolution Backend Tests
-
-```bash
-cd runtime
-npm run test:evolution
-```
-
-## Run Evolution Backend Locally
-
-```bash
-cd runtime
-npm run evolution:server
+npm run backend:simple:server
 ```
 
 Open:
 
-- UI: `http://127.0.0.1:4777/evolution/ui`
-- Health: `http://127.0.0.1:4777/health`
+- API health: `http://127.0.0.1:4888/health`
+- sample UI: `http://127.0.0.1:4888/backend/ui`
 
-## Artifacts and Records
+## Mode B: SDK Detailed (Embedded)
 
-- Runtime artifacts: `runs/samples/artifacts/`
-- Autonomous batch evidence: `testing/autonomous-batch/<timestamp>/`
-- Evolution state store: `testing/evolution/state/`
+Run examples:
 
-## Bilingual Documentation Index
+```bash
+cd runtime
+npm run example:sdk:basic
+npm run example:sdk:multiturn
+npm run example:sdk:auto-improve
+```
 
-- English: [Documentation Index](./doc/README.md)
-- Korean: [문서 인덱스](./doc/README.ko.md)
+## Model Policy
 
-## Core Docs
+- coding/self-improvement loops: `gemini-3.1-pro-preview`
+- automation interaction loops: `gemini-3.0-flash`
 
-- PRD: [English](./doc/PRD-v0.1.en.md) | [한국어](./doc/PRD-v0.1.md)
-- Runbook: [English](./doc/CODEX-RUNBOOK.en.md) | [한국어](./doc/CODEX-RUNBOOK.md)
-- Implementation Plan: [English](./doc/CODEX-IMPLEMENTATION-PLAN.en.md) | [한국어](./doc/CODEX-IMPLEMENTATION-PLAN.md)
-- Test/Fix Cycle: [English](./doc/CODEX-TEST-FIX-CYCLE.en.md) | [한국어](./doc/CODEX-TEST-FIX-CYCLE.md)
-- Evolution Backend: [English](./doc/CODEX-EVOLUTION-BACKEND.en.md) | [한국어](./doc/CODEX-EVOLUTION-BACKEND.md)
-- SDK + Backend Usage: [English](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./doc/CODEX-SDK-BACKEND-USAGE.md)
-- E2E Testing: [English](./doc/CODEX-E2E-TESTING.en.md) | [한국어](./doc/CODEX-E2E-TESTING.md)
-- Env Setup: [English](./doc/CODEX-ENV-SETUP.en.md) | [한국어](./doc/CODEX-ENV-SETUP.md)
+## Verification Commands
+
+```bash
+cd runtime
+npm run typecheck
+npm run test:sdk
+npm run test:evolution
+npm test
+```
+
+## Artifacts and State Paths
+
+- runtime artifacts: `runs/samples/artifacts/`
+- backend sessions: `testing/backend/state/`
+- evolution state: `testing/evolution/state/`
+- autonomous E2E evidence: `testing/autonomous-batch/`
+
+## Bilingual Documentation
+
+- Documentation index: [English](./doc/README.md) | [한국어](./doc/README.ko.md)
+- SDK + Backend usage: [English](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./doc/CODEX-SDK-BACKEND-USAGE.md)
+- Environment setup: [English](./doc/CODEX-ENV-SETUP.en.md) | [한국어](./doc/CODEX-ENV-SETUP.md)

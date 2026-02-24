@@ -4,143 +4,119 @@
 
 ## 0. 목적
 
-이 저장소를 "외부 AI 비서 프로젝트에서 쉽게 재사용"할 수 있도록, 사용 형태를 `Backend-first + SDK-internal`로 표준화한다.
+강화된 운영 형태를 아래 두 모드로 표준화한다.
 
-핵심:
+1. `backend_simple`: HTTP 기반 단순 사용
+2. `sdk_detailed`: 임베딩 기반 상세 제어 사용
 
-1. 실행/상태/기록은 백엔드가 책임진다.
-2. SDK는 백엔드 내부 로직 조합 및 테스트/임베딩 용도로 사용한다.
-3. 실패 시 `bug/exception` 조건에서만 자가개선(evolution)을 트리거한다.
+두 모드는 동일한 세션 모델을 공유하고, bug/exception 실패 경로에서만 진화를 트리거한다.
 
-## 1. 권장 운영 형태
+## 1. 토폴로지
 
 ```mermaid
-flowchart LR
-    A[External Assistant Project\nSlack/Telegram] --> B[Automation Backend API]
-    B --> C[WebAutomationSdk]
-    C --> D[Deterministic + Recovery Runtime]
-    D --> E[Run Outcome]
-    E --> F[AutoImprovementOrchestrator]
-    F --> G[EvolutionService]
-    G --> H[Git Worktree Candidate]
-    H --> I[Test/Fix Loop]
-    I --> J[Await Approval]
-    J --> K[Promoted Active Pointer]
+flowchart TD
+    U[외부 AI 비서의 사용자 요청] --> B[Backend Simple API]
+    B --> S[SessionStore]
+    B --> T[TurnEngine Rule 또는 Gemini]
+    B --> R[Runtime Execution]
+    R --> E[Evolution Trigger]
+
+    I[내부 통합 서비스 코드] --> D[MultiTurnAutomationSdk]
+    D --> S
+    D --> T
+    D --> R
 ```
 
-## 2. 왜 Backend-first가 유리한가
+## 2. 모드 A: Backend Simple
 
-1. 세션/체크포인트/스크린샷/아티팩트 관리가 중앙화됨
-2. 모델 키/정책/리트라이/비용 통제가 쉬움
-3. 외부 프로젝트는 HTTP 계약만 맞추면 됨
-4. 진화 상태머신(승인/거절/재시도)을 표준 API로 노출 가능
-
-## 3. SDK 레이어 구성
-
-### 3.1 엔트리포인트
-
-1. `runtime/src/index.ts`
-2. `runtime/src/sdk/automation-sdk.ts`
-3. `runtime/src/sdk/evolution-api-client.ts`
-4. `runtime/src/evolution/auto-improvement-orchestrator.ts`
-
-### 3.2 제공 기능
-
-1. `createWebAutomationSdk(...)`
-: run / runWithImprovement 제공
-2. `AutoImprovementOrchestrator`
-: run outcome 기반 evolution 자동 트리거
-3. `EvolutionApiClient`
-: evolution backend HTTP API 클라이언트
-
-## 4. 기본 사용 시나리오
-
-### 4.1 임베딩(SDK 직접 호출)
-
-```ts
-import { createWebAutomationSdk } from '../src/index';
-
-const sdk = createWebAutomationSdk();
-const result = await sdk.run({ workflow, adapter });
-```
-
-실행 예시:
+### 2.1 서버 실행
 
 ```bash
 cd runtime
-npm run example:sdk:basic
+npm run backend:simple:server
 ```
 
-### 4.2 실패 시 자동 개선 트리거
+기본 주소: `http://127.0.0.1:4888`
 
-```ts
-import {
-  createWebAutomationSdk,
-  EvolutionService,
-  AutoImprovementOrchestrator
-} from '../src/index';
-
-const evolutionService = new EvolutionService({ ... });
-const orchestrator = AutoImprovementOrchestrator.fromEvolutionService(evolutionService, {
-  triggerStatuses: ['fail'],
-  autoApprove: false
-});
-
-const sdk = createWebAutomationSdk({ autoImprovement: orchestrator });
-const output = await sdk.runWithImprovement({ workflow, adapter });
-```
-
-실행 예시:
-
-```bash
-cd runtime
-npm run example:sdk:auto-improve
-```
-
-## 5. Evolution Backend API 사용
-
-### 5.1 서버 실행
-
-```bash
-cd runtime
-npm run evolution:server
-```
-
-### 5.2 주요 API
+### 2.2 핵심 API
 
 1. `GET /health`
-2. `POST /evolution/jobs`
-3. `GET /evolution/jobs/:id`
-4. `POST /evolution/jobs/:id/approve`
-5. `POST /evolution/jobs/:id/reject`
-6. `POST /evolution/jobs/:id/retry`
-7. `POST /evolution/auto-improve`
-8. `GET /evolution/jobs/:id/stream` (SSE)
+2. `GET /backend/sessions`
+3. `POST /backend/sessions`
+4. `GET /backend/sessions/:id`
+5. `POST /backend/sessions/:id/turns`
+6. `POST /backend/sessions/:id/close`
+7. `GET /backend/sessions/:id/stream` (SSE)
+8. `GET /backend/ui`
 
-### 5.3 자동개선 API 샘플
+### 2.3 최소 플로우 예시
 
-```json
-{
-  "workflowId": "wf-purchase-flow",
-  "status": "fail",
-  "failures": [
-    { "code": "SelectorNotFound", "message": "checkout button moved" }
-  ],
-  "requestedBy": "assistant-backend",
-  "autoApprove": false
-}
+세션 생성:
+
+```bash
+curl -s http://127.0.0.1:4888/backend/sessions \
+  -H 'content-type: application/json' \
+  -d '{"mode":"backend_simple","title":"naver assistant session"}'
 ```
 
-## 6. 자동 개선 정책 권장값
+턴 전송:
 
-1. trigger status: `fail` only
-2. blocked는 기본 미트리거(정책적으로 필요한 경우만 포함)
-3. autoApprove는 기본 `false`
-4. 테스트 명령은 회귀 세트 포함:
-: `EVOLUTION_TEST_COMMAND=npm run test:automation:full`
-5. 승인은 운영자(또는 승인 정책 엔진)에서 수행
+```bash
+curl -s http://127.0.0.1:4888/backend/sessions/<SESSION_ID>/turns \
+  -H 'content-type: application/json' \
+  -d '{"content":"판교 기준 오늘 날씨 확인 후 아이와 갈만한 서울 근교 장소 추천"}'
+```
 
-## 7. 실행/검증 체크리스트
+## 3. 모드 B: SDK Detailed
+
+### 3.1 SDK 엔트리포인트
+
+1. `createWebAutomationSdk` (full flow + auto-improvement 연계)
+2. `createMultiTurnAutomationSdk` (세션 중심 상세 API)
+3. `createEvolutionApiClient` (evolution HTTP 제어)
+
+### 3.2 멀티턴 SDK 예시
+
+```ts
+import { createMultiTurnAutomationSdk } from '../src/index';
+
+const sdk = createMultiTurnAutomationSdk();
+const session = await sdk.createSession({ mode: 'sdk_detailed', title: 'detailed-run' });
+
+const turn = await sdk.sendUserTurn({
+  sessionId: session.id,
+  content: 'deterministic 우선 실행, selector 실패 시 recovery 순서로 진행해.'
+});
+
+console.log(turn.assistantTurn.content);
+```
+
+예시 실행:
+
+```bash
+cd runtime
+npm run example:sdk:multiturn
+```
+
+### 3.3 자동화 실행 결과를 턴에 연결
+
+`sendUserTurn`(detailed 모드)에서 `automation` payload를 함께 주면,
+SDK가 `runWithImprovement`를 수행하고 사용자 turn metadata에 자동화 요약을 저장한다.
+
+## 4. 모델 정책
+
+1. `EVOLUTION_CODING_MODEL=gemini-3.1-pro-preview`
+2. `EVOLUTION_AUTOMATION_MODEL=gemini-3.0-flash`
+3. `BACKEND_AUTOMATION_MODEL=gemini-3.0-flash`
+4. `BACKEND_LLM_ENABLED=0|1`으로 rule-only 또는 Gemini hybrid 선택
+
+## 5. UI 보일러플레이트
+
+- 경로: `runtime/backend-ui/`
+- 접속: `GET /backend/ui`
+- 기능: 세션 생성, 세션 선택, 턴 전송, 세션 종료, 히스토리 조회
+
+## 6. 검증 체크리스트
 
 ```bash
 cd runtime
@@ -150,20 +126,7 @@ npm run test:evolution
 npm test
 ```
 
-## 8. 배포 토폴로지 (Mini PC / Mac mini)
+## 7. 연동 경계 재확인
 
-```mermaid
-flowchart TD
-    U[User in Chat App] --> AS[External Assistant Service]
-    AS --> WB[Web Automation Backend]
-    WB --> PW[Playwright Browser]
-    WB --> EV[Evolution Backend]
-    EV --> WT[Isolated Git Worktrees]
-    WB --> AR[Artifacts: runs/testing]
-```
-
-운영 팁:
-
-1. backend 프로세스와 브라우저는 동일 노드에 둔다.
-2. `testing/` 경로는 Git ignore 상태 유지.
-3. 승인/거절 액션은 운영 감사 로그로 남긴다.
+이 저장소는 운영용 Slack/Telegram 봇 라우팅 자체를 구현하지 않는다.
+외부 AI 비서 프로젝트는 여기서 제공하는 backend/simple 또는 SDK 계약을 호출해 연동한다.
