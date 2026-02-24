@@ -21,6 +21,8 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - `src/ops`: 세션/비용·지연 지표/롤백 로그
 - `src/testing`: full-flow/multi-provider 테스트 러너
 - `src/testing/assistantless-chat-e2e.ts`: AI 비서 없이 채팅형 반복 자동화 루프 시뮬레이션
+- `src/sdk`: 외부 프로젝트 임베딩용 SDK 진입점
+- `src/index.ts`: SDK/코어 통합 export 엔트리포인트
 - `tests`: 런타임 테스트
 
 ## 현재 상태
@@ -50,8 +52,21 @@ cd runtime
 npm install
 npm test
 npm run test:acceptance
+npm run test:sdk
 npm run typecheck
 ```
+
+## SDK 사용 예시
+
+```bash
+cd runtime
+npm run example:sdk:basic
+npm run example:sdk:auto-improve
+```
+
+자세한 사용법:
+
+- `../doc/CODEX-SDK-BACKEND-USAGE.md`
 
 ## 환경변수
 

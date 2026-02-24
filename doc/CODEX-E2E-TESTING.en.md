@@ -13,7 +13,8 @@ Provide reproducible E2E validation for real usage conditions.
 3. assistantless chat-loop simulation
 4. provider matrix (LLM + YOLO26)
 5. evolution backend loop
-6. external assistant integration (external project)
+6. SDK/backend contract tests
+7. external assistant integration (external project)
 
 ## 2. KR Live Scenarios
 
@@ -50,6 +51,7 @@ npm run test:e2e:assistantless:live
 npm run test:e2e:autonomous:live
 npm run test:provider:contract
 npm run test:evolution
+npm run test:sdk
 # optional with live credentials
 npm run test:e2e:provider:live
 ```

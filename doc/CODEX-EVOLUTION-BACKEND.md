@@ -25,7 +25,8 @@
 5. `runtime/src/evolution/gemini-autofix.ts`: Gemini 기반 패치 생성/적용(auto-fix)
 6. `runtime/src/evolution/service.ts`: 상태머신 오케스트레이션
 7. `runtime/src/evolution/server.ts`: HTTP API + SSE 진행 스트림
-8. `runtime/evolution-ui/*`: 백엔드 테스트용 경량 UI
+8. `runtime/src/evolution/auto-improvement-orchestrator.ts`: 실패 결과 기반 자동 진화 트리거
+9. `runtime/evolution-ui/*`: 백엔드 테스트용 경량 UI
 
 ## 2. 상태 전이
 
@@ -81,6 +82,7 @@ testing/evolution/state/
 8. `GET /evolution/jobs/:id/events`
 9. `GET /evolution/jobs/:id/stream` (SSE)
 10. `GET /evolution/ui`
+11. `POST /evolution/auto-improve` (실패 결과 입력으로 자동 job 생성/완료/선택적 auto-approve)
 
 ## 6. 실행 방법
 

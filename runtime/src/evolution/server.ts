@@ -4,7 +4,9 @@ import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadEnvFiles } from '../config/load-env-file';
+import type { RunFailure, RunStatus } from '../types';
 
+import { AutoImprovementOrchestrator } from './auto-improvement-orchestrator';
 import { EvolutionService } from './service';
 
 interface JsonResponse {
@@ -51,6 +53,41 @@ function asRecord(value: unknown): Record<string, unknown> {
     return {};
   }
   return value as Record<string, unknown>;
+}
+
+function asFailureList(raw: unknown): RunFailure[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map((value) => asRecord(value))
+    .map((row) => ({
+      code: String(row.code ?? 'Unknown') as RunFailure['code'],
+      message: String(row.message ?? 'unknown failure'),
+      stepId: row.stepId ? String(row.stepId) : undefined,
+      suggestedAction: row.suggestedAction ? String(row.suggestedAction) : undefined
+    }));
+}
+
+function asStatus(raw: unknown): RunStatus {
+  const value = String(raw ?? 'fail');
+  if (value === 'pass' || value === 'blocked' || value === 'fail') {
+    return value;
+  }
+  return 'fail';
+}
+
+function asTriggerStatuses(raw: unknown): RunStatus[] | undefined {
+  if (!Array.isArray(raw)) {
+    return undefined;
+  }
+
+  const statuses = raw
+    .map((value) => String(value))
+    .filter((value): value is RunStatus => value === 'pass' || value === 'fail' || value === 'blocked');
+
+  return statuses.length > 0 ? statuses : undefined;
 }
 
 function contentType(path: string): string {
@@ -117,6 +154,36 @@ export function createEvolutionHttpServer(options: EvolutionHttpServerOptions) {
         sendJson(res, 201, {
           ok: true,
           data: snapshot
+        });
+        return;
+      }
+
+      if (method === 'POST' && path === '/evolution/auto-improve') {
+        const body = asRecord(await parseBody(req));
+        const orchestrator = AutoImprovementOrchestrator.fromEvolutionService(options.service, {
+          autoApprove: typeof body.autoApprove === 'boolean' ? body.autoApprove : undefined,
+          autoApproveBy: body.autoApproveBy ? String(body.autoApproveBy) : undefined,
+          autoApproveNote: body.autoApproveNote ? String(body.autoApproveNote) : undefined,
+          triggerStatuses: asTriggerStatuses(body.triggerStatuses),
+          baseBranch: body.baseBranch ? String(body.baseBranch) : undefined,
+          testCommand: body.testCommand ? String(body.testCommand) : undefined,
+          maxAutoFixAttempts:
+            typeof body.maxAutoFixAttempts === 'number' ? body.maxAutoFixAttempts : undefined
+        });
+
+        const result = await orchestrator.handleOutcome({
+          workflowId: String(body.workflowId ?? 'default-workflow'),
+          status: asStatus(body.status),
+          failures: asFailureList(body.failures),
+          sourceRunPath: body.sourceRunPath ? String(body.sourceRunPath) : undefined,
+          notes: body.notes ? String(body.notes) : undefined,
+          title: body.title ? String(body.title) : undefined,
+          requestedBy: body.requestedBy ? String(body.requestedBy) : undefined
+        });
+
+        sendJson(res, 200, {
+          ok: true,
+          data: result
         });
         return;
       }

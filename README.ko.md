@@ -128,5 +128,6 @@ npm run evolution:server
 - 구현 계획: [English](./doc/CODEX-IMPLEMENTATION-PLAN.en.md) | [한국어](./doc/CODEX-IMPLEMENTATION-PLAN.md)
 - 테스트/수정 사이클: [English](./doc/CODEX-TEST-FIX-CYCLE.en.md) | [한국어](./doc/CODEX-TEST-FIX-CYCLE.md)
 - 진화 백엔드: [English](./doc/CODEX-EVOLUTION-BACKEND.en.md) | [한국어](./doc/CODEX-EVOLUTION-BACKEND.md)
+- SDK + 백엔드 사용법: [English](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./doc/CODEX-SDK-BACKEND-USAGE.md)
 - E2E 테스트: [English](./doc/CODEX-E2E-TESTING.en.md) | [한국어](./doc/CODEX-E2E-TESTING.md)
 - 환경설정: [English](./doc/CODEX-ENV-SETUP.en.md) | [한국어](./doc/CODEX-ENV-SETUP.md)

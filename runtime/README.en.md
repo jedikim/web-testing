@@ -15,6 +15,8 @@ TypeScript runtime for rule-first adaptive web automation.
 - `src/learning`: replay store and rule promotion
 - `src/ops`: session/metrics/rollback/resilience
 - `src/evolution`: bug/exception-driven version evolution backend
+- `src/sdk`: SDK entrypoints for external embedding
+- `src/index.ts`: consolidated export entrypoint
 - `tests`: contracts, integration, live-e2e suites
 
 ## Local Validation
@@ -24,9 +26,22 @@ cd runtime
 npm install
 npm test
 npm run test:acceptance
+npm run test:sdk
 npm run test:evolution
 npm run typecheck
 ```
+
+## SDK Examples
+
+```bash
+cd runtime
+npm run example:sdk:basic
+npm run example:sdk:auto-improve
+```
+
+Detailed guide:
+
+- `../doc/CODEX-SDK-BACKEND-USAGE.en.md`
 
 ## Live E2E
 

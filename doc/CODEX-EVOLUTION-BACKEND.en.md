@@ -23,6 +23,7 @@ Core policy:
 - `runtime/src/evolution/gemini-autofix.ts`
 - `runtime/src/evolution/service.ts`
 - `runtime/src/evolution/server.ts`
+- `runtime/src/evolution/auto-improvement-orchestrator.ts`
 - `runtime/evolution-ui/*`
 
 ## 2. State Machine
@@ -66,6 +67,7 @@ Default mode: `pointer`
 - `GET /evolution/jobs/:id/events`
 - `GET /evolution/jobs/:id/stream` (SSE)
 - `GET /evolution/ui`
+- `POST /evolution/auto-improve` (create/complete optional auto-approve from failed outcome)
 
 ## 6. Run
 

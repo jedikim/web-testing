@@ -126,6 +126,21 @@ cd runtime
 npm run test:evolution
 ```
 
+### Layer H: SDK + Backend Contract
+
+대상:
+
+1. SDK run/runWithImprovement 호출 계약
+2. 실패 결과 -> 자동개선 오케스트레이터 연결
+3. Evolution API 클라이언트 계약
+
+명령:
+
+```bash
+cd runtime
+npm run test:sdk
+```
+
 ## 2. 시나리오 매트릭스
 
 ### 2.1 시뮬레이션 플로우
@@ -191,6 +206,7 @@ npm run test:evolution
 8. Layer C/F 실패 시 screenshot/json 리포트가 남아야 함
 9. `scripts/validate-run-artifacts.sh` pass
 10. Layer G는 100% pass, 승인 전환 후 active pointer 파일 생성 확인
+11. Layer H는 100% pass
 
 ## 4. 실패 대응
 
@@ -216,6 +232,7 @@ npm run test:e2e:kr:headful
 # 실제 키/엔드포인트가 있으면:
 npm run test:e2e:provider:live
 npm run test:evolution
+npm run test:sdk
 cd ..
 ./scripts/validate-run-artifacts.sh
 ```

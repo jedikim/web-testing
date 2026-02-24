@@ -15,6 +15,7 @@
 4. `doc/CODEX-CODE-REVIEW.md`의 승인 기준 확인
 5. 이번 요청의 완료 조건(acceptance criteria) 3줄 이내로 명시
 6. bug/exception 대응 작업이면 `doc/CODEX-EVOLUTION-BACKEND.md` 절차 확인
+7. 외부 프로젝트 연동/사용성 작업이면 `doc/CODEX-SDK-BACKEND-USAGE.md` 절차 확인
 
 ## 2. 작업 모드
 

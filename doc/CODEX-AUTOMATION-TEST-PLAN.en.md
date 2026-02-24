@@ -56,6 +56,12 @@ cd runtime
 npm run test:evolution
 ```
 
+### Layer H: SDK + Backend Contract
+```bash
+cd runtime
+npm run test:sdk
+```
+
 ## 2. Complex Scenario Coverage
 
 The autonomous live batch includes multi-step KR-focused scenarios:
@@ -72,6 +78,7 @@ The autonomous live batch includes multi-step KR-focused scenarios:
 3. Layer D artifacts must include per-scenario evidence files
 4. Layer F live: >= 80% matrix pass
 5. artifact structure validator passes
+6. Layer H: 100% pass
 
 ## 4. Recommended Run Order
 
@@ -88,6 +95,7 @@ npm run test:provider:contract
 npm run test:e2e:kr
 npm run test:e2e:kr:headful
 npm run test:evolution
+npm run test:sdk
 # if live provider credentials exist:
 npm run test:e2e:provider:live
 cd ..

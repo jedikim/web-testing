@@ -88,6 +88,20 @@ Done criteria:
 2. active pointer is updated only after approval
 3. evolution test suite passes
 
+### Phase 7: Backend-first SDK Access Layer
+
+Goals:
+1. provide simple SDK entrypoints for external embedding
+2. connect failed outcomes to evolution automatically
+3. provide HTTP client for evolution backend APIs
+4. document backend-first operational usage with EN/KR guides
+
+Done criteria:
+1. `runtime/src/index.ts` exposes consolidated public surface
+2. SDK test suite passes (`npm run test:sdk`)
+3. `POST /evolution/auto-improve` endpoint is validated
+4. `CODEX-SDK-BACKEND-USAGE` documentation is synchronized
+
 ## 2. Dependency Order
 
 ```mermaid
@@ -98,6 +112,7 @@ flowchart TD
     P3 --> P4[Phase 4]
     P4 --> P5[Phase 5]
     P5 --> P6[Phase 6]
+    P6 --> P7[Phase 7]
 ```
 
 ## 3. Phase Exit Checklist

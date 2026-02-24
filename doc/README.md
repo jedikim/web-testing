@@ -24,6 +24,7 @@ Each document includes a language switch link at the top.
 - Environment Setup: [English](./CODEX-ENV-SETUP.en.md) | [한국어](./CODEX-ENV-SETUP.md)
 - Run Artifacts: [English](./CODEX-RUN-ARTIFACTS.en.md) | [한국어](./CODEX-RUN-ARTIFACTS.md)
 - Evolution Backend: [English](./CODEX-EVOLUTION-BACKEND.en.md) | [한국어](./CODEX-EVOLUTION-BACKEND.md)
+- SDK + Backend Usage: [English](./CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./CODEX-SDK-BACKEND-USAGE.md)
 - Task Template: [English](./CODEX-TASK-TEMPLATE.en.md) | [한국어](./CODEX-TASK-TEMPLATE.md)
 
 ## Plan Archive
@@ -31,3 +32,4 @@ Each document includes a language switch link at the top.
 - 2026-02-24 Assistantless Chat Loop E2E: [English](./plans/2026-02-24-assistantless-chat-loop-e2e-plan.en.md) | [한국어](./plans/2026-02-24-assistantless-chat-loop-e2e-plan.md)
 - 2026-02-24 Chat-Driven Web Automation MVP: [English](./plans/2026-02-24-chat-driven-web-automation-mvp.en.md) | [한국어](./plans/2026-02-24-chat-driven-web-automation-mvp.md)
 - 2026-02-24 Web Automation Core for Assistant: [English](./plans/2026-02-24-web-automation-core-for-assistant.en.md) | [한국어](./plans/2026-02-24-web-automation-core-for-assistant.md)
+- 2026-02-24 Backend-first SDK + Self-Improvement: [English](./plans/2026-02-24-backend-first-sdk-and-self-improvement-plan.en.md) | [한국어](./plans/2026-02-24-backend-first-sdk-and-self-improvement-plan.md)

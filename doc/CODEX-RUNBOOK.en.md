@@ -15,6 +15,7 @@ The priority is not speed alone, but auditable delivery: plan, build, verify, re
 4. Confirm review gate in `doc/CODEX-CODE-REVIEW.*`
 5. Define acceptance criteria in 3 lines max.
 6. If bug/exception handling is requested, follow `doc/CODEX-EVOLUTION-BACKEND.*`.
+7. If integration/usability work is requested, follow `doc/CODEX-SDK-BACKEND-USAGE.*`.
 
 ## 2. Execution Modes
 

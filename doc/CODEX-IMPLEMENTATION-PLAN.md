@@ -184,6 +184,33 @@
 9. `runtime/tests/evolution-model-policy.test.ts`, `runtime/tests/evolution-service.test.ts`, `runtime/tests/evolution-server.test.ts` 추가 및 통과
 10. `runtime/package.json` 스크립트 추가(`test:evolution`, `evolution:server`)
 
+### Phase 7: Backend-first SDK Access Layer
+
+목표:
+
+1. 외부 프로젝트가 쉽게 호출할 수 있는 SDK 엔트리포인트 제공
+2. 실패 결과를 evolution으로 자동 연결하는 오케스트레이터 제공
+3. evolution HTTP API를 코드에서 호출할 수 있는 클라이언트 제공
+4. Backend-first 사용법 문서(EN/KR)와 실행 예제 제공
+
+완료 기준:
+
+1. `runtime/src/index.ts` 단일 엔트리포인트로 핵심 타입/SDK 노출
+2. SDK 테스트(`npm run test:sdk`) 통과
+3. `POST /evolution/auto-improve` API 동작 검증
+4. `doc/CODEX-SDK-BACKEND-USAGE*` 문서 동기화
+
+진행 현황(2026-02-24):
+
+1. `runtime/src/sdk/automation-sdk.ts` 추가(`run`, `runWithImprovement`)
+2. `runtime/src/evolution/auto-improvement-orchestrator.ts` 추가(실패 결과 기반 자동 트리거)
+3. `runtime/src/sdk/evolution-api-client.ts` 추가(backend API 클라이언트)
+4. `runtime/src/index.ts`, `runtime/src/sdk/index.ts` 추가(통합 export)
+5. `runtime/examples/sdk-basic.ts`, `runtime/examples/sdk-auto-improvement.ts` 추가
+6. `runtime/tests/auto-improvement-orchestrator.test.ts`, `runtime/tests/sdk-automation.test.ts`, `runtime/tests/sdk-evolution-api-client.test.ts` 추가
+7. `runtime/src/evolution/server.ts`에 `POST /evolution/auto-improve` 추가
+8. `runtime/package.json` 스크립트 추가(`test:sdk`, `example:sdk:*`)
+
 ## 2. 작업 우선순위
 
 ```mermaid
@@ -193,6 +220,7 @@ flowchart TD
     C --> D["Phase 4"]
     D --> E["Phase 5"]
     E --> F["Phase 6"]
+    F --> G["Phase 7"]
 ```
 
 선행 Phase가 완료되지 않으면 다음 Phase 기능을 본선 반영하지 않는다.
@@ -249,3 +277,5 @@ flowchart TD
 17. 리뷰/검증 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-screenshot-chat-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_phase6-evolution-backend-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`, `runs/samples/2026-02-24_assistantless-chat-loop-review.md`, `runs/samples/2026-02-24_assistantless-live-e2e-report.md`, `runs/samples/2026-02-24_kr-live-e2e-report.md`
 18. 진화 백엔드 코어: `runtime/src/evolution/*`, `runtime/evolution-ui/*`
 19. 진화 테스트 코어: `runtime/tests/evolution-model-policy.test.ts`, `runtime/tests/evolution-service.test.ts`, `runtime/tests/evolution-server.test.ts`
+20. SDK 코어: `runtime/src/index.ts`, `runtime/src/sdk/*`, `runtime/src/evolution/auto-improvement-orchestrator.ts`
+21. SDK 테스트/예제: `runtime/tests/auto-improvement-orchestrator.test.ts`, `runtime/tests/sdk-automation.test.ts`, `runtime/tests/sdk-evolution-api-client.test.ts`, `runtime/examples/*`

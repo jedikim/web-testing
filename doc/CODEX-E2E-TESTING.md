@@ -13,9 +13,10 @@
 3. assistantless loop(`chat-like simulation`): AI 비서 없이 스크린샷 공유/의사결정 루프 시뮬레이션
 4. provider matrix(`llm+vision`): Gemini/OpenAI/Anthropic + YOLO26 모델 매트릭스 검증
 5. evolution backend(`bug/exception growth loop`): 격리 버전 진화 + 승인 전환 검증
-6. 통합 E2E(`assistant integration`): 외부 비서 프로젝트에서 webhook/메시징 연동 포함 검증
+6. SDK/backend contract: 외부 프로젝트 임베딩 호출 계약 검증
+7. 통합 E2E(`assistant integration`): 외부 비서 프로젝트에서 webhook/메시징 연동 포함 검증
 
-이 저장소는 1~5를 담당하고, 6은 외부 AI 비서 프로젝트에서 담당한다.
+이 저장소는 1~6을 담당하고, 통합 채널 운영은 외부 AI 비서 프로젝트에서 담당한다.
 
 ## 2. 한국 사이트 중심 스모크 시나리오
 
@@ -68,6 +69,7 @@ npm run test:e2e:assistantless:live
 npm run test:e2e:autonomous:live
 npm run test:provider:contract
 npm run test:evolution
+npm run test:sdk
 # 실제 키/엔드포인트가 있으면
 npm run test:e2e:provider:live
 ```

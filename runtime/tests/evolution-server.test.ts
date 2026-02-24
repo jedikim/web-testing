@@ -170,4 +170,40 @@ describe('evolution server', () => {
     expect(uiResponse.status).toBe(200);
     expect(html).toContain('<!doctype html>');
   });
+
+  it('triggers auto-improvement endpoint and can auto-approve', async () => {
+    const { baseUrl } = await startServer();
+
+    const response = await fetch(`${baseUrl}/evolution/auto-improve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        workflowId: 'wf-auto-1',
+        status: 'fail',
+        failures: [
+          {
+            code: 'SelectorNotFound',
+            message: 'selector drift'
+          }
+        ],
+        autoApprove: true,
+        requestedBy: 'http-auto-test'
+      })
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      ok: boolean;
+      data: {
+        triggered: boolean;
+        completed?: { job: { status: string } };
+        approved?: { job: { status: string } };
+      };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.data.triggered).toBe(true);
+    expect(payload.data.completed?.job.status).toBe('awaiting_approval');
+    expect(payload.data.approved?.job.status).toBe('promoted');
+  });
 });
