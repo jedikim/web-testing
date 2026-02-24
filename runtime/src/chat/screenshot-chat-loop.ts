@@ -1,5 +1,6 @@
-import type { ChatPlatform } from './types';
 import type { CheckpointDecision } from './screenshot-checkpoint';
+import { runHumanLoop } from '../integration/human-loop-runtime';
+import type { ChatPlatform } from './types';
 
 export interface ScreenshotChatRunResult {
   status: 'pass' | 'fail' | 'need_user';
@@ -32,42 +33,26 @@ export interface ScreenshotChatLoopOutput {
 export async function runScreenshotChatLoop(
   input: ScreenshotChatLoopInput
 ): Promise<ScreenshotChatLoopOutput> {
-  const maxTurns = input.maxTurns ?? 8;
-  let turns = 0;
-  let revisions = 0;
-  const decisions: CheckpointDecision[] = [];
+  const result = await runHumanLoop({
+    workflowId: `${input.platform}:${input.channelId}`,
+    run: input.run,
+    decisionPort: {
+      requestDecision: async (request): Promise<CheckpointDecision> =>
+        input.askUser({
+          platform: input.platform,
+          channelId: input.channelId,
+          screenshotPath: request.screenshotPath,
+          question: request.question
+        })
+    },
+    reviseWithLlm: input.reviseWithLlm,
+    maxTurns: input.maxTurns
+  });
 
-  while (turns < maxTurns) {
-    turns += 1;
-    const result = await input.run();
-
-    if (result.status === 'pass') {
-      return { status: 'pass', turns, revisions, decisions };
-    }
-    if (result.status === 'fail') {
-      return { status: 'fail', turns, revisions, decisions };
-    }
-
-    const decision = await input.askUser({
-      platform: input.platform,
-      channelId: input.channelId,
-      screenshotPath: result.screenshotPath,
-      question: result.question
-    });
-    decisions.push(decision);
-
-    if (decision === 'not_go' || decision === 'unknown') {
-      return { status: 'blocked', turns, revisions, decisions };
-    }
-
-    if (decision === 'revise') {
-      if (input.reviseWithLlm) {
-        await input.reviseWithLlm();
-      }
-      revisions += 1;
-      continue;
-    }
-  }
-
-  return { status: 'blocked', turns, revisions, decisions };
+  return {
+    status: result.status,
+    turns: result.turns,
+    revisions: result.revisions,
+    decisions: result.decisions
+  };
 }

@@ -14,8 +14,9 @@
 5. 실행 아티팩트: `doc/CODEX-RUN-ARTIFACTS.md`
 6. 코드 리뷰: `doc/CODEX-CODE-REVIEW.md`
 7. 태스크 템플릿: `doc/CODEX-TASK-TEMPLATE.md`
+8. 외부 연동 경계: `doc/CODEX-INTEGRATION-BOUNDARY.md`
 
-충돌 시 우선순위: `PRD > RUNBOOK > PLAN > TEST/FIX > ARTIFACTS > REVIEW > TEMPLATE`
+충돌 시 우선순위: `PRD > RUNBOOK > PLAN > INTEGRATION-BOUNDARY > TEST/FIX > ARTIFACTS > REVIEW > TEMPLATE`
 
 ## 3) Multi-Agent Roles (Logical)
 

@@ -94,12 +94,13 @@
 3. `runtime/src/view/view-mode.ts` 추가(스크린샷 우선 모드 정책)
 4. `runtime/src/vision/visual-recovery.ts` 추가(VisualAmbiguity 자동 복구)
 5. `runtime/src/chat/platform-normalizer.ts`, `runtime/src/chat/screenshot-checkpoint.ts`, `runtime/src/chat/screenshot-chat-loop.ts` 추가(텔레그램/슬랙 대화형 질의)
-6. `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`, `runtime/tests/visual-recovery.test.ts`, `runtime/tests/chat-platform.test.ts`, `runtime/tests/screenshot-checkpoint.test.ts`, `runtime/tests/screenshot-chat-loop.test.ts` 통과
+6. `runtime/src/integration/human-loop-runtime.ts` 추가(채널 비종속 human-loop 계약)
+7. `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`, `runtime/tests/visual-recovery.test.ts`, `runtime/tests/chat-platform.test.ts`, `runtime/tests/screenshot-checkpoint.test.ts`, `runtime/tests/screenshot-chat-loop.test.ts`, `runtime/tests/human-loop-runtime.test.ts` 통과
 
 완료 확인(2026-02-24):
 
 1. `runtime/tests/phase-acceptance.test.ts::phase3` 통과
-2. `runtime/tests/screenshot-chat-loop.test.ts` 통과
+2. `runtime/tests/screenshot-chat-loop.test.ts`, `runtime/tests/human-loop-runtime.test.ts` 통과
 
 ### Phase 4: Self-Improvement
 
@@ -203,7 +204,8 @@ flowchart TD
 6. Fallback 코어: `runtime/src/fallback/context-reducer.ts`, `runtime/src/fallback/patch-validator.ts`, `runtime/src/fallback/recipe-version.ts`
 7. Vision/Screenshot 코어: `runtime/src/vision/roi-batcher.ts`, `runtime/src/vision/visual-recovery.ts`, `runtime/src/checkpoint/go-no-go.ts`, `runtime/src/view/view-mode.ts`
 8. Chat 코어: `runtime/src/chat/platform-normalizer.ts`, `runtime/src/chat/screenshot-checkpoint.ts`, `runtime/src/chat/screenshot-chat-loop.ts`
-9. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`, `runtime/src/learning/adaptive-controller.ts`
-10. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`, `runtime/src/ops/resilience-orchestrator.ts`
-11. 테스트: `runtime/tests/*` 25개 파일, 총 64 테스트 통과(phase acceptance 포함)
-12. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-screenshot-chat-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`
+9. Integration 코어: `runtime/src/integration/human-loop-runtime.ts`
+10. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`, `runtime/src/learning/adaptive-controller.ts`
+11. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`, `runtime/src/ops/resilience-orchestrator.ts`
+12. 테스트: `runtime/tests/*` 26개 파일, 총 66 테스트 통과(phase acceptance 포함)
+13. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-screenshot-chat-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`
