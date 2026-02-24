@@ -76,6 +76,13 @@
 1. 시각 모호 케이스 1개 자동 복구
 2. 라이브 또는 스샷 질의 모드 전환 가능
 
+진행 현황(2026-02-24):
+
+1. `runtime/src/vision/roi-batcher.ts` 추가(ROI 배칭 + 좌표 역매핑)
+2. `runtime/src/checkpoint/go-no-go.ts` 추가(go/not-go 정책 평가)
+3. `runtime/src/live/view-mode.ts` 추가(라이브/스크린샷 모드 선택)
+4. `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts` 통과
+
 ### Phase 4: Self-Improvement
 
 목표:
@@ -153,5 +160,6 @@ flowchart TD
 4. 결정론 실행기: `runtime/src/engine/deterministic-runner.ts`
 5. 기본 추출기: `runtime/src/extractor/basic-extractor.ts`
 6. Fallback 코어: `runtime/src/fallback/context-reducer.ts`, `runtime/src/fallback/patch-validator.ts`, `runtime/src/fallback/recipe-version.ts`
-7. 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`, `runtime/tests/deterministic-runner.test.ts`, `runtime/tests/basic-extractor.test.ts`, `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts`
-8. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`
+7. Vision/Live 코어: `runtime/src/vision/roi-batcher.ts`, `runtime/src/checkpoint/go-no-go.ts`, `runtime/src/live/view-mode.ts`
+8. 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`, `runtime/tests/deterministic-runner.test.ts`, `runtime/tests/basic-extractor.test.ts`, `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts`, `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`
+9. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-vision-liveops-review.md`

@@ -1,0 +1,13 @@
+## Code Review Report
+- Scope: Phase 3 vision/live-ops foundations (ROI batching, go/not-go checkpoint, view mode policy)
+- Reviewer: codex
+- Summary: ROI remapping and safety-gated checkpoint policy are deterministic and test-covered.
+- Issues:
+  - severity: Minor
+  - file: runtime/src/live/view-mode.ts
+  - comment: health signal is currently boolean-only; detailed quality telemetry is deferred.
+  - action: defer
+- Decision: approve
+- Evidence:
+  - runtime: npm test (35 passed)
+  - runtime: npm run typecheck (pass)
