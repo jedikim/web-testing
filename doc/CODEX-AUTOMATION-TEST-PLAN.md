@@ -20,6 +20,7 @@
 2. fallback patch validator
 3. env parser
 4. KR 시나리오 정의 계약
+5. LLM model registry/provider env parser/provider matrix 계약
 
 명령:
 
@@ -70,6 +71,23 @@ npm run test:e2e:kr
 
 명령/도구는 외부 프로젝트에서 정의한다.
 
+### Layer E: Multi-Vendor LLM + YOLO26 Matrix
+
+대상:
+
+1. Gemini/OpenAI/Anthropic 멀티 모델 호출
+2. YOLO26 멀티 모델 호출
+3. 모델별 실패/성공 집계 리포트
+
+명령:
+
+```bash
+cd runtime
+npm run test:provider:contract
+# 실제 키/엔드포인트가 있으면:
+npm run test:e2e:provider:live
+```
+
 ## 2. 시나리오 매트릭스
 
 ### 2.1 시뮬레이션 플로우
@@ -91,18 +109,36 @@ npm run test:e2e:kr
 
 시나리오 소스: `runtime/src/e2e/kr-scenarios.ts`
 
+### 2.3 Provider Matrix 플로우
+
+1. `gemini` 2개 이상 모델
+2. `openai` 2개 이상 모델
+3. `anthropic` 2개 이상 모델
+4. `yolo26` 2개 이상 모델
+
+검증 코드:
+
+1. `runtime/tests/provider-matrix-env.test.ts`
+2. `runtime/tests/provider-model-matrix.test.ts`
+3. `runtime/tests/provider-http-executor.test.ts`
+4. `runtime/tests/e2e-provider-matrix-mock.test.ts`
+5. `runtime/tests/e2e-provider-live.test.ts`
+
 ## 3. 합격 기준
 
 1. Layer A/B는 항상 100% pass
 2. Layer C는 6개 이상 시나리오 중 80% 이상 pass
-3. Layer C 실패 시 screenshot/json 아티팩트가 남아야 함
-4. `scripts/validate-run-artifacts.sh` pass
+3. Layer E(contract)는 100% pass
+4. Layer E(live)는 matrix total의 80% 이상 pass
+5. Layer C/E 실패 시 screenshot/json 리포트가 남아야 함
+6. `scripts/validate-run-artifacts.sh` pass
 
 ## 4. 실패 대응
 
 1. selector 불안정: 시나리오 셀렉터 완화 + 회귀 테스트 추가
 2. 사이트 UI 변경: 키워드/URL 중심 검증으로 보수적 수정
 3. 일시적 네트워크 실패: 재시도 후 동일 실패 시 quarantine 기록
+4. 특정 provider 장애: 해당 모델만 fail로 기록하고 matrix 전체는 계속 실행
 
 ## 5. 권장 실행 순서 (로컬)
 
@@ -110,8 +146,14 @@ npm run test:e2e:kr
 cd runtime
 npm install
 npx playwright install chromium
-npm run test:automation
+cp .env.example .env
+npm run test:automation:full
+npm run test:provider:contract
 npm run test:e2e:kr
+# 실제 키/엔드포인트가 있으면:
+npm run test:e2e:provider:live
 cd ..
 ./scripts/validate-run-artifacts.sh
 ```
+
+참고: 라이브 테스트는 `runtime/.env`를 자동 로딩한다.

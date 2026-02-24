@@ -1,3 +1,5 @@
+import { resolveModelFromOptions, type LlmProvider } from '../llm/model-registry';
+
 export interface RuntimeEnv {
   nodeEnv: string;
   runKrE2E: boolean;
@@ -6,8 +8,10 @@ export interface RuntimeEnv {
   humanLoopMaxTurns: number;
   artifactRoot: string;
   llmEnabled: boolean;
+  llmProvider: LlmProvider;
   llmApiKey?: string;
-  llmModel?: string;
+  llmModel: string;
+  llmModelOptions: string[];
   llmBaseUrl?: string;
 }
 
@@ -40,14 +44,86 @@ function optionalTrim(raw: string | undefined): string | undefined {
   return value.length > 0 ? value : undefined;
 }
 
+function parseCsv(raw: string | undefined): string[] {
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+function parseLlmProvider(raw: string | undefined): LlmProvider {
+  const provider = (raw?.trim().toLowerCase() ?? 'openai') as LlmProvider;
+  if (
+    provider !== 'openai' &&
+    provider !== 'gemini' &&
+    provider !== 'anthropic' &&
+    provider !== 'openai_compatible'
+  ) {
+    throw new Error(`unsupported LLM_PROVIDER: ${raw}`);
+  }
+  return provider;
+}
+
+function resolveLlmApiKey(provider: LlmProvider, source: EnvMap): string | undefined {
+  switch (provider) {
+    case 'gemini':
+      return optionalTrim(source.GEMINI_API_KEY) ?? optionalTrim(source.LLM_API_KEY);
+    case 'openai':
+      return optionalTrim(source.OPENAI_API_KEY) ?? optionalTrim(source.LLM_API_KEY);
+    case 'anthropic':
+      return optionalTrim(source.ANTHROPIC_API_KEY) ?? optionalTrim(source.LLM_API_KEY);
+    case 'openai_compatible':
+      return optionalTrim(source.LLM_API_KEY);
+  }
+}
+
+function resolveLlmBaseUrl(provider: LlmProvider, source: EnvMap): string | undefined {
+  switch (provider) {
+    case 'gemini':
+      return optionalTrim(source.GEMINI_BASE_URL) ?? optionalTrim(source.LLM_BASE_URL);
+    case 'openai':
+      return optionalTrim(source.OPENAI_BASE_URL) ?? optionalTrim(source.LLM_BASE_URL);
+    case 'anthropic':
+      return optionalTrim(source.ANTHROPIC_BASE_URL) ?? optionalTrim(source.LLM_BASE_URL);
+    case 'openai_compatible':
+      return optionalTrim(source.LLM_BASE_URL);
+  }
+}
+
+function resolveLlmModelOptions(provider: LlmProvider, source: EnvMap): string[] {
+  switch (provider) {
+    case 'gemini':
+      return parseCsv(source.GEMINI_MODELS).concat(parseCsv(source.LLM_MODEL_OPTIONS));
+    case 'openai':
+      return parseCsv(source.OPENAI_MODELS).concat(parseCsv(source.LLM_MODEL_OPTIONS));
+    case 'anthropic':
+      return parseCsv(source.ANTHROPIC_MODELS).concat(parseCsv(source.LLM_MODEL_OPTIONS));
+    case 'openai_compatible':
+      return parseCsv(source.LLM_MODEL_OPTIONS);
+  }
+}
+
 export function loadRuntimeEnv(source: EnvMap = process.env): RuntimeEnv {
   const llmEnabled = parseBoolean(source.LLM_ENABLED, false);
-  const llmApiKey = optionalTrim(source.LLM_API_KEY);
-  const llmModel = optionalTrim(source.LLM_MODEL);
-  const llmBaseUrl = optionalTrim(source.LLM_BASE_URL);
+  const llmProvider = parseLlmProvider(source.LLM_PROVIDER);
+  const llmApiKey = resolveLlmApiKey(llmProvider, source);
+  const llmBaseUrl = resolveLlmBaseUrl(llmProvider, source);
+  const llmModelOptions = resolveLlmModelOptions(llmProvider, source);
+  const llmModel = resolveModelFromOptions({
+    provider: llmProvider,
+    requestedModel: optionalTrim(source.LLM_MODEL),
+    modelOptions: llmModelOptions
+  });
 
   if (llmEnabled && !llmApiKey) {
-    throw new Error('LLM_API_KEY is required when LLM_ENABLED=true');
+    throw new Error(`API key is required for provider ${llmProvider} when LLM_ENABLED=true`);
+  }
+
+  if (llmEnabled && llmProvider === 'openai_compatible' && !llmBaseUrl) {
+    throw new Error('LLM_BASE_URL is required when LLM_PROVIDER=openai_compatible');
   }
 
   return {
@@ -58,8 +134,10 @@ export function loadRuntimeEnv(source: EnvMap = process.env): RuntimeEnv {
     humanLoopMaxTurns: parsePositiveInt(source.HUMAN_LOOP_MAX_TURNS, 8, 'HUMAN_LOOP_MAX_TURNS'),
     artifactRoot: optionalTrim(source.ARTIFACT_ROOT) ?? 'runs/samples/artifacts',
     llmEnabled,
+    llmProvider,
     llmApiKey,
     llmModel,
+    llmModelOptions,
     llmBaseUrl
   };
 }

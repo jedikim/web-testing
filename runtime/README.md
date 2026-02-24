@@ -14,8 +14,10 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - `src/view`: 스크린샷 우선 모드 정책
 - `src/chat`: Telegram/Slack 메시지 정규화 + 스크린샷 질의 루프
 - `src/integration`: 외부 AI 비서가 붙일 수 있는 중립 human-loop 인터페이스
+- `src/llm`: provider/model 레지스트리
 - `src/learning`: 리플레이 저장소/카나리 게이트/룰 승격
 - `src/ops`: 세션/비용·지연 지표/롤백 로그
+- `src/testing`: full-flow/multi-provider 테스트 러너
 - `tests`: 런타임 테스트
 
 ## 현재 상태
@@ -29,6 +31,7 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - Vision/Screenshot 준비 단계로 ROI 배칭, 체크포인트 정책, view mode 선택기를 추가했다.
 - Chat 경로로 Telegram/Slack 입력 정규화와 screenshot question 루프를 추가했다.
 - Chat과 분리된 integration 경로로 `runHumanLoop`를 추가해 외부 프로젝트가 채널 연동을 담당할 수 있게 했다.
+- Gemini/OpenAI/Anthropic + YOLO26 멀티 모델 매트릭스 테스트 경로를 추가했다.
 - Self-improvement 준비 단계로 replay store와 rule promotion 게이트를 추가했다.
 - Production hardening 준비 단계로 session manager, metrics dashboard, rollback log를 추가했다.
 - Playwright 액션 어댑터(`src/engine/playwright-executor.ts`)를 추가했다.
@@ -51,6 +54,7 @@ npm run typecheck
 - 예시 파일: `.env.example`
 - 세팅 문서: `../doc/CODEX-ENV-SETUP.md`
 - 런타임 파서: `src/config/env.ts`
+- 라이브 E2E 테스트는 `runtime/.env`(없으면 루트 `.env`)를 자동 로드한다.
 
 ## 한국 사이트 E2E 스모크
 
@@ -66,6 +70,9 @@ cd runtime
 npm run test:full-flow
 npm run test:e2e:kr:contract
 npm run test:e2e:kr
+npm run test:provider:contract
+# 실제 키/엔드포인트가 있으면
+npm run test:e2e:provider:live
 ```
 
 아티팩트:

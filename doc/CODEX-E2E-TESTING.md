@@ -8,9 +8,10 @@
 
 1. 계약 테스트(`contract`): 시나리오 정의 품질, 중복 ID, 최소 케이스 수 검증
 2. 라이브 스모크(`live smoke`): 실제 한국 사이트 접속/기본 상호작용/검증
-3. 통합 E2E(`assistant integration`): 외부 비서 프로젝트에서 webhook/메시징 연동 포함 검증
+3. provider matrix(`llm+vision`): Gemini/OpenAI/Anthropic + YOLO26 모델 매트릭스 검증
+4. 통합 E2E(`assistant integration`): 외부 비서 프로젝트에서 webhook/메시징 연동 포함 검증
 
-이 저장소는 1~2를 담당하고, 3은 외부 AI 비서 프로젝트에서 담당한다.
+이 저장소는 1~3을 담당하고, 4는 외부 AI 비서 프로젝트에서 담당한다.
 
 ## 2. 한국 사이트 중심 스모크 시나리오
 
@@ -31,6 +32,7 @@
 cd runtime
 npm install
 npx playwright install chromium
+cp .env.example .env
 ```
 
 실행:
@@ -39,7 +41,12 @@ npx playwright install chromium
 cd runtime
 npm run test:e2e:kr:contract
 npm run test:e2e:kr
+npm run test:provider:contract
+# 실제 키/엔드포인트가 있으면
+npm run test:e2e:provider:live
 ```
+
+라이브 테스트는 실행 시 `runtime/.env`를 자동으로 읽는다.
 
 ## 4. 결과 아티팩트
 

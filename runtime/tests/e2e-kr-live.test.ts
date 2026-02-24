@@ -4,8 +4,13 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { loadEnvFiles } from '../src/config/load-env-file';
 import { loadRuntimeEnv } from '../src/config/env';
 import { KR_LIVE_SCENARIOS } from '../src/e2e/kr-scenarios';
+
+const TEST_DIR = fileURLToPath(new URL('.', import.meta.url));
+const REPO_ROOT = resolve(TEST_DIR, '..', '..');
+loadEnvFiles({ cwd: REPO_ROOT, filenames: ['runtime/.env', '.env'] });
 
 const runtimeEnv = loadRuntimeEnv({
   RUN_KR_E2E: process.env.RUN_KR_E2E,
@@ -15,8 +20,6 @@ const runtimeEnv = loadRuntimeEnv({
 });
 const RUN_KR_E2E = runtimeEnv.runKrE2E;
 const E2E_TIMEOUT_MS = Math.max(runtimeEnv.playwrightTimeoutMs * 4, 30000);
-const TEST_DIR = fileURLToPath(new URL('.', import.meta.url));
-const REPO_ROOT = resolve(TEST_DIR, '..', '..');
 
 describe('korean live smoke e2e', () => {
   it('is disabled unless RUN_KR_E2E=1', () => {

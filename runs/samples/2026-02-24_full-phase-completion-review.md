@@ -10,6 +10,6 @@
 - Decision: approve
 - Evidence:
   - scripts: ./scripts/validate-run-artifacts.sh (pass)
-  - runtime: npm test (76 passed, 6 skipped)
+  - runtime: npm test (91 passed, 7 skipped)
   - runtime: npm run test:acceptance (5 passed)
   - runtime: npm run typecheck (pass)
