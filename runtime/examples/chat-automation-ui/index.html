@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chat Automation Example</title>
+    <link rel="stylesheet" href="/example/chat/ui/style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sessions-panel">
+        <div class="panel-header">
+          <h1>Chat Automation</h1>
+          <button id="newSessionBtn">New Session</button>
+        </div>
+
+        <label class="field">
+          <span>Operator</span>
+          <input id="operatorInput" value="default-operator" />
+        </label>
+
+        <ul id="sessionList" class="session-list"></ul>
+      </aside>
+
+      <section class="chat-panel">
+        <header class="panel-header">
+          <div>
+            <h2 id="sessionTitle">No session selected</h2>
+            <p id="sessionMeta" class="muted">Create a session to start.</p>
+          </div>
+
+          <div class="run-controls">
+            <button id="pauseBtn" class="secondary">Pause</button>
+            <button id="resumeBtn" class="secondary">Resume</button>
+            <button id="cancelBtn" class="danger">Cancel</button>
+          </div>
+        </header>
+
+        <div class="status-row">
+          <span id="statusBadge" class="badge idle">idle</span>
+          <span id="progressText" class="muted">step 0/0</span>
+          <span id="queueText" class="muted">queue: 0</span>
+        </div>
+
+        <section class="split">
+          <div class="box">
+            <h3>Conversation</h3>
+            <div id="turns" class="scroll"></div>
+          </div>
+
+          <div class="box">
+            <h3>Execution Logs</h3>
+            <div id="logs" class="scroll logs"></div>
+          </div>
+        </section>
+
+        <section id="captchaBox" class="captcha hidden">
+          <h3>Captcha / Security Input</h3>
+          <p id="captchaPrompt" class="muted">Automation is waiting for captcha input.</p>
+          <div class="row">
+            <input id="captchaInput" placeholder="Enter captcha value" />
+            <button id="submitCaptchaBtn">Submit</button>
+          </div>
+        </section>
+
+        <section class="composer">
+          <div class="row">
+            <label class="field small">
+              <span>Browser mode</span>
+              <select id="browserModeSelect">
+                <option value="headful">headful</option>
+                <option value="headless" selected>headless</option>
+              </select>
+            </label>
+
+            <label class="field checkbox">
+              <input id="autoPauseCheckbox" type="checkbox" checked />
+              <span>Auto-pause other sessions</span>
+            </label>
+          </div>
+
+          <textarea id="messageInput" rows="4" placeholder="Describe the automation you want to build...&#10;If a captcha/security challenge appears, input it in the captcha section."></textarea>
+
+          <div class="row end">
+            <button id="sendBtn">Send And Run</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/example/chat/ui/app.js"></script>
+  </body>
+</html>

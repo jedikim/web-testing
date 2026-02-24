@@ -66,6 +66,12 @@ Required root `.gitignore` patterns:
 - `BACKEND_LLM_ENABLED` (`1` for Gemini turn engine, `0` for rule-only)
 - `BACKEND_AUTOMATION_MODEL` (recommended `gemini-3.0-flash`)
 
+### 3.6 Chat automation example backend
+
+- `CHAT_AUTOMATION_SERVER_HOST`, `CHAT_AUTOMATION_SERVER_PORT`
+- `CHAT_AUTOMATION_SESSION_ROOT`
+- start command: `npm run example:chat-backend`
+
 ## 4. Recommended Model Policy
 
 1. coding and patch generation: `gemini-3.1-pro-preview`
@@ -97,6 +103,14 @@ BACKEND_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/backend/state
 BACKEND_LLM_ENABLED=1
 BACKEND_AUTOMATION_MODEL=gemini-3.0-flash
 GEMINI_API_KEY=your-key
+```
+
+### 5.3 Chat automation example backend
+
+```bash
+CHAT_AUTOMATION_SERVER_HOST=127.0.0.1
+CHAT_AUTOMATION_SERVER_PORT=4999
+CHAT_AUTOMATION_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/chat-automation/state
 ```
 
 ## 6. Safety Rules

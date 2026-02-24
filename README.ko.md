@@ -29,6 +29,7 @@ flowchart LR
 - 자동화 계획/실행을 위한 멀티턴 세션 상태 관리
 - 반복 리스트 합성 판단(`이미지 합성 -> YOLO26 -> 동일 이미지 VLM fallback -> 역추적`)
 - Slack/Telegram 구현 없이 assistantless E2E 시뮬레이션
+- 채팅형 자동화 백엔드 샘플(`/example/chat/*`): 실시간 로그 스트림, headful/headless 선택, pause/resume/cancel, 캡차 handoff 입력
 - worktree 격리 + 테스트/수정 + 승인 기반 진화 백엔드
 
 ## 빠른 시작
@@ -42,7 +43,7 @@ npm run typecheck
 npm test
 ```
 
-## 모드 A: Backend Simple (HTTP + 샘플 UI)
+## 모드 A1: Backend Simple (HTTP + 샘플 UI)
 
 백엔드 실행:
 
@@ -55,6 +56,28 @@ npm run backend:simple:server
 
 - API health: `http://127.0.0.1:4888/health`
 - 샘플 UI: `http://127.0.0.1:4888/backend/ui`
+
+## 모드 A2: Chat Automation Backend (HTTP + 채팅 UI 예제)
+
+백엔드 + 채팅 UI 실행:
+
+```bash
+cd runtime
+npm run example:chat-backend
+```
+
+접속:
+
+- API health: `http://127.0.0.1:4999/example/chat/health`
+- 채팅 UI: `http://127.0.0.1:4999/example/chat/ui`
+
+핵심 기능:
+
+1. 메시지별 브라우저 모드 선택(`headful`/`headless`)
+2. SSE 기반 실행 상태/로그 실시간 표시
+3. 사용자 pause/resume/cancel 제어
+4. 캡차/보안 챌린지 handoff 입력 후 재개
+5. 같은 operator에서 새 대화 시작 시 이전 세션 자동 일시정지
 
 ## 모드 B: SDK Detailed (임베딩)
 

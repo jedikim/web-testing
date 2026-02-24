@@ -66,6 +66,12 @@ Dual 모드 운용을 위한 환경변수 기준을 고정한다.
 - `BACKEND_LLM_ENABLED` (`1`: Gemini turn engine, `0`: rule-only)
 - `BACKEND_AUTOMATION_MODEL` (권장 `gemini-3.0-flash`)
 
+### 3.6 Chat automation 예제 백엔드
+
+- `CHAT_AUTOMATION_SERVER_HOST`, `CHAT_AUTOMATION_SERVER_PORT`
+- `CHAT_AUTOMATION_SESSION_ROOT`
+- 실행 명령: `npm run example:chat-backend`
+
 ## 4. 권장 모델 정책
 
 1. 코딩/패치 생성: `gemini-3.1-pro-preview`
@@ -97,6 +103,14 @@ BACKEND_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/backend/state
 BACKEND_LLM_ENABLED=1
 BACKEND_AUTOMATION_MODEL=gemini-3.0-flash
 GEMINI_API_KEY=your-key
+```
+
+### 5.3 Chat automation 예제 백엔드
+
+```bash
+CHAT_AUTOMATION_SERVER_HOST=127.0.0.1
+CHAT_AUTOMATION_SERVER_PORT=4999
+CHAT_AUTOMATION_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/chat-automation/state
 ```
 
 ## 6. 안전 규칙

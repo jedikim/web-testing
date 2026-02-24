@@ -7,7 +7,8 @@
 Define one reinforced operating model:
 
 1. `backend_simple` for simple HTTP usage
-2. `sdk_detailed` for embedded advanced usage
+2. `chat_automation_example` for chat-style runtime control with progress logs and captcha handoff
+3. `sdk_detailed` for embedded advanced usage
 
 Both modes share the same session model and can trigger evolution only on bug/exception style failures.
 
@@ -69,15 +70,47 @@ curl -s http://127.0.0.1:4888/backend/sessions/<SESSION_ID>/turns \
   -d '{"content":"Check weather then suggest kid-friendly places near Pangyo"}'
 ```
 
-## 3. Mode B: SDK Detailed
+## 3. Mode A2: Chat Automation Example Backend
 
-### 3.1 SDK entrypoints
+### 3.1 Start backend + example UI
+
+```bash
+cd runtime
+npm run example:chat-backend
+```
+
+Default endpoint: `http://127.0.0.1:4999`
+
+### 3.2 Core APIs
+
+1. `GET /example/chat/health`
+2. `GET /example/chat/sessions`
+3. `POST /example/chat/sessions`
+4. `GET /example/chat/sessions/:id`
+5. `POST /example/chat/sessions/:id/message`
+6. `POST /example/chat/sessions/:id/pause`
+7. `POST /example/chat/sessions/:id/resume`
+8. `POST /example/chat/sessions/:id/cancel`
+9. `POST /example/chat/sessions/:id/captcha`
+10. `GET /example/chat/sessions/:id/stream` (SSE)
+11. `GET /example/chat/ui`
+
+### 3.3 Behavior guarantees
+
+1. browser mode is selectable per message (`headful` or `headless`)
+2. runtime logs and step progress stream to UI continuously
+3. captcha/security challenge is handled by explicit user input route, not bypass logic
+4. new message can auto-pause older session when operator id is the same
+
+## 4. Mode B: SDK Detailed
+
+### 4.1 SDK entrypoints
 
 1. `createWebAutomationSdk` (full flow + auto-improvement integration)
 2. `createMultiTurnAutomationSdk` (session-centric detailed API)
 3. `createEvolutionApiClient` (evolution HTTP control)
 
-### 3.2 Multi-turn SDK example
+### 4.2 Multi-turn SDK example
 
 ```ts
 import { createMultiTurnAutomationSdk } from '../src/index';
@@ -107,12 +140,12 @@ cd runtime
 npm run example:sdk:human-handoff
 ```
 
-### 3.3 Attach automation run to a turn
+### 4.3 Attach automation run to a turn
 
 `sendUserTurn` in detailed mode can include `automation` payload.
 The SDK runs `runWithImprovement`, then stores automation summary in the user turn metadata.
 
-### 3.4 Repeated-item composite judgement chain
+### 4.4 Repeated-item composite judgement chain
 
 For repeated listing images, use the composite chain:
 
@@ -134,20 +167,26 @@ cd runtime
 npm run example:repeated-item
 ```
 
-## 4. Model Policy
+## 5. Model Policy
 
 1. `EVOLUTION_CODING_MODEL=gemini-3.1-pro-preview`
 2. `EVOLUTION_AUTOMATION_MODEL=gemini-3.0-flash`
 3. `BACKEND_AUTOMATION_MODEL=gemini-3.0-flash`
 4. `BACKEND_LLM_ENABLED=0|1` to toggle rule-only vs Gemini hybrid
 
-## 5. UI Boilerplate
+## 6. UI Boilerplate
 
 - Path: `runtime/backend-ui/`
 - URL: `GET /backend/ui`
 - Features: create session, select session, send turns, close session, inspect history
 
-## 6. Verification Checklist
+Chat automation example UI:
+
+- Path: `runtime/examples/chat-automation-ui/`
+- URL: `GET /example/chat/ui`
+- Features: session list, browser mode select, live logs/status, pause/resume/cancel, captcha submit
+
+## 7. Verification Checklist
 
 ```bash
 cd runtime
@@ -157,7 +196,7 @@ npm run test:evolution
 npm test
 ```
 
-## 7. Integration Boundary Reminder
+## 8. Integration Boundary Reminder
 
 This repository does not implement production Slack/Telegram bot routing.
 External assistant projects should call backend/simple or SDK contracts provided here.

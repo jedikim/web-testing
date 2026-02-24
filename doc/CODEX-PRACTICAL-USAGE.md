@@ -7,7 +7,8 @@
 실제 운영에서 바로 쓸 수 있도록 아래 두 가지 사용 패턴을 정리한다.
 
 1. `backend_simple` (HTTP 서비스 형태)
-2. `sdk_detailed` (SDK 임베딩 형태)
+2. `chat_automation_example` (채팅형 제어 + 실시간 로그/진행 표시)
+3. `sdk_detailed` (SDK 임베딩 형태)
 
 법적 안전 원칙에 따라 캡차/2FA 우회 자동화는 제외한다.
 
@@ -66,9 +67,72 @@ curl -s -X POST http://127.0.0.1:4888/backend/sessions/<SESSION_ID>/close \
   -d '{}'
 ```
 
-## 3. SDK Detailed 실전 플로우
+## 3. Chat Automation Example Backend 실전 플로우
 
-### 3.1 기본 멀티턴 사용
+### 3.1 백엔드 + 채팅 UI 실행
+
+```bash
+cd runtime
+npm run example:chat-backend
+```
+
+기본 UI 주소: `http://127.0.0.1:4999/example/chat/ui`
+
+### 3.2 세션 생성 + 첫 목표 전송
+
+```bash
+curl -s http://127.0.0.1:4999/example/chat/sessions \
+  -H 'content-type: application/json' \
+  -d '{
+    "title": "판교 자동화 플래너",
+    "operatorId": "operator-main"
+  }'
+```
+
+```bash
+curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/message \
+  -H 'content-type: application/json' \
+  -d '{
+    "content": "naver.com 열고 날씨 확인 후 판교 기준 가족 나들이 후보를 정리해줘",
+    "browserMode": "headful",
+    "operatorId": "operator-main",
+    "autoPauseOthers": true
+  }'
+```
+
+### 3.3 진행상태/로그 연속 확인
+
+```bash
+curl -N http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/stream
+```
+
+이 스트림은 실행 스텝과 로그를 지속적으로 내보내며, 예제 UI가 실시간으로 표시한다.
+
+### 3.4 새 대화 시작 시 이전 세션 일시정지
+
+같은 `operatorId`에서 다른 세션으로 새 메시지를 보내고 `autoPauseOthers=true`면 이전 실행 세션이 `paused`로 전환된다.
+
+### 3.5 캡차/보안 챌린지 사용자 입력
+
+상태가 `waiting_captcha`가 되면 사용자 입력을 제출한다.
+
+```bash
+curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/captcha \
+  -H 'content-type: application/json' \
+  -d '{"value":"A1B2C3"}'
+```
+
+이후 재개:
+
+```bash
+curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/resume \
+  -H 'content-type: application/json' \
+  -d '{}'
+```
+
+## 4. SDK Detailed 실전 플로우
+
+### 4.1 기본 멀티턴 사용
 
 ```ts
 import { createMultiTurnAutomationSdk } from '../src/index';
@@ -96,7 +160,7 @@ cd runtime
 npm run example:sdk:multiturn
 ```
 
-### 3.2 Human handoff 예제
+### 4.2 Human handoff 예제
 
 ```bash
 cd runtime
@@ -105,7 +169,7 @@ npm run example:sdk:human-handoff
 
 이 예제는 민감/차단 상황에서 자동화가 `blocked` 상태로 멈추고 사람 결정을 기다리는 흐름을 보여준다.
 
-### 3.3 반복 리스트 이미지 합성 (YOLO -> VLM fallback)
+### 4.3 반복 리스트 이미지 합성 (YOLO -> VLM fallback)
 
 쇼핑몰 리스트처럼 아이템 이미지가 반복될 때 아래 체인을 사용한다.
 
@@ -141,7 +205,7 @@ cd runtime
 npm run example:repeated-item
 ```
 
-## 4. Human Handoff 계약
+## 5. Human Handoff 계약
 
 코어 계약:
 
@@ -155,7 +219,7 @@ npm run example:repeated-item
 2. `revise`: 수정 함수 실행 후 재시도
 3. `not_go` 또는 `unknown`: `blocked`로 중단
 
-## 5. 운영 체크리스트
+## 6. 운영 체크리스트
 
 1. 실전 검증은 `PW_HEADLESS=0`으로 실행한다.
 2. 불확실 단계마다 스크린샷을 남긴다.
@@ -163,7 +227,7 @@ npm run example:repeated-item
 4. 코딩 모델은 `gemini-3.1-pro-preview`를 유지한다.
 5. 자동화 상호작용 모델은 `gemini-3.0-flash`를 유지한다.
 
-## 6. 다음 문서
+## 7. 다음 문서
 
 - SDK + Backend 사용법: [CODEX-SDK-BACKEND-USAGE.md](./CODEX-SDK-BACKEND-USAGE.md)
 - 환경설정: [CODEX-ENV-SETUP.md](./CODEX-ENV-SETUP.md)

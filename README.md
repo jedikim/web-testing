@@ -29,6 +29,7 @@ flowchart LR
 - multi-turn chat-like session state for automation planning/execution
 - repeated-item composite judgement (`merge -> YOLO26 -> same-image VLM fallback -> reverse trace`)
 - assistantless E2E simulation without implementing Slack/Telegram integration itself
+- chat automation backend sample (`/example/chat/*`) with live log stream, headful/headless switch, pause/resume/cancel, captcha handoff input
 - evolution backend for isolated candidate versions (worktree + test/fix + approval)
 
 ## Quick Start
@@ -42,7 +43,7 @@ npm run typecheck
 npm test
 ```
 
-## Mode A: Backend Simple (HTTP + Sample UI)
+## Mode A1: Backend Simple (HTTP + Sample UI)
 
 Start backend:
 
@@ -55,6 +56,28 @@ Open:
 
 - API health: `http://127.0.0.1:4888/health`
 - sample UI: `http://127.0.0.1:4888/backend/ui`
+
+## Mode A2: Chat Automation Backend (HTTP + Chat UI Example)
+
+Start backend + chat UI:
+
+```bash
+cd runtime
+npm run example:chat-backend
+```
+
+Open:
+
+- API health: `http://127.0.0.1:4999/example/chat/health`
+- chat UI: `http://127.0.0.1:4999/example/chat/ui`
+
+Key features:
+
+1. per-message browser mode (`headful`/`headless`)
+2. live execution status/logs through SSE stream
+3. user pause/resume/cancel controls
+4. captcha/security handoff input + continue
+5. auto-pause older session when another conversation starts (same operator)
 
 ## Mode B: SDK Detailed (Embedded)
 
