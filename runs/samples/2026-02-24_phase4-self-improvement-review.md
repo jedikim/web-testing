@@ -1,0 +1,13 @@
+## Code Review Report
+- Scope: Phase 4 self-improvement foundations (replay store + canary gate + rule promotion)
+- Reviewer: codex
+- Summary: Replay-based learning primitives are deterministic and enforce regression-aware promotion gates.
+- Issues:
+  - severity: Minor
+  - file: runtime/src/learning/replay-store.ts
+  - comment: in-memory store is sufficient for baseline but persistent backend is needed for production.
+  - action: defer
+- Decision: approve
+- Evidence:
+  - runtime: npm test (40 passed)
+  - runtime: npm run typecheck (pass)

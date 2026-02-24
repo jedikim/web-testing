@@ -96,6 +96,12 @@
 1. 동일 시나리오 반복 실행에서 LLM 호출률 감소
 2. 리그레션 없는 룰 승격 자동 반영
 
+진행 현황(2026-02-24):
+
+1. `runtime/src/learning/replay-store.ts` 추가(오프라인 리플레이 큐 저장/조회)
+2. `runtime/src/learning/rule-promotion.ts` 추가(카나리 게이트 + rule version 승격)
+3. `runtime/tests/replay-store.test.ts`, `runtime/tests/rule-promotion.test.ts` 통과
+
 ### Phase 5: Production Hardening
 
 목표:
@@ -161,5 +167,6 @@ flowchart TD
 5. 기본 추출기: `runtime/src/extractor/basic-extractor.ts`
 6. Fallback 코어: `runtime/src/fallback/context-reducer.ts`, `runtime/src/fallback/patch-validator.ts`, `runtime/src/fallback/recipe-version.ts`
 7. Vision/Live 코어: `runtime/src/vision/roi-batcher.ts`, `runtime/src/checkpoint/go-no-go.ts`, `runtime/src/live/view-mode.ts`
-8. 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`, `runtime/tests/deterministic-runner.test.ts`, `runtime/tests/basic-extractor.test.ts`, `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts`, `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`
-9. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-vision-liveops-review.md`
+8. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`
+9. 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`, `runtime/tests/deterministic-runner.test.ts`, `runtime/tests/basic-extractor.test.ts`, `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts`, `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`, `runtime/tests/replay-store.test.ts`, `runtime/tests/rule-promotion.test.ts`
+10. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-vision-liveops-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`
