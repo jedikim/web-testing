@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+
+import Jimp from 'jimp';
 
 import { runAssistantlessChatE2E } from '../src/testing/assistantless-chat-e2e';
+
+async function makeImage(path: string, color: number): Promise<void> {
+  const image = await new Jimp(48, 48, color);
+  await image.writeAsync(path);
+}
 
 describe('runAssistantlessChatE2E', () => {
   it('runs first step with llm then minimizes llm calls via rule path', async () => {
@@ -41,6 +51,9 @@ describe('runAssistantlessChatE2E', () => {
     expect(result.ruleCalls).toBe(2);
     expect(result.visionCalls).toBe(0);
     expect(result.snapshotsShared).toBe(6);
+    expect(result.repeatedItemCompositeBuilds).toBe(0);
+    expect(result.repeatedItemCompositeYoloCalls).toBe(0);
+    expect(result.repeatedItemCompositeVlmCalls).toBe(0);
     expect(shared).toHaveLength(6);
     expect(llmCalls).toBe(1);
     expect(ruleCalls).toBe(2);
@@ -194,5 +207,61 @@ describe('runAssistantlessChatE2E', () => {
     expect(result.captchaRetries).toBe(2);
     expect(result.captchaSolved).toBe(0);
     expect(result.captchaFailed).toBe(1);
+  });
+
+  it('runs repeated-item composite chain and falls back yolo -> vlm on same image', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'assistantless-repeat-'));
+
+    try {
+      const listA = resolve(root, 'list-a.png');
+      const listB = resolve(root, 'list-b.png');
+      const listC = resolve(root, 'list-c.png');
+      await makeImage(listA, 0xff0000ff);
+      await makeImage(listB, 0x00ff00ff);
+      await makeImage(listC, 0x0000ffff);
+
+      let yoloCompositePath = '';
+      let vlmCompositePath = '';
+
+      const result = await runAssistantlessChatE2E({
+        goal: '반복 상품 리스트 합성 판단',
+        llmWarmupSteps: 1,
+        maxSteps: 1,
+        captureScreenshot: async ({ step, stage }) => resolve(root, `shot-${step}-${stage}.png`),
+        shareWithUser: async () => undefined,
+        shouldRunRepeatedItemComposite: async () => true,
+        collectRepeatedItemImages: async () => [
+          { id: 'item-a', imagePath: listA },
+          { id: 'item-b', imagePath: listB },
+          { id: 'item-c', imagePath: listC }
+        ],
+        judgeRepeatedItemsWithYolo: async ({ compositeImagePath }) => {
+          yoloCompositePath = compositeImagePath;
+          return {
+            detections: [{ bbox: [70, 10, 92, 26], confidence: 0.22, label: 'candidate' }]
+          };
+        },
+        judgeRepeatedItemsWithVlm: async ({ compositeImagePath }) => {
+          vlmCompositePath = compositeImagePath;
+          return {
+            accepted: true,
+            reason: 'vlm confirms target item'
+          };
+        },
+        analyzeWithLlm: async () => ({ kind: 'click', target: '#next' }),
+        decideWithRules: async () => ({ kind: 'click', target: '#next' }),
+        executeAction: async () => ({ status: 'pass', done: true }),
+        askUserDecision: async () => 'go'
+      });
+
+      expect(result.status).toBe('pass');
+      expect(result.repeatedItemCompositeBuilds).toBe(1);
+      expect(result.repeatedItemCompositeYoloCalls).toBe(1);
+      expect(result.repeatedItemCompositeVlmCalls).toBe(1);
+      expect(result.repeatedItemCompositeVlmFallbacks).toBe(1);
+      expect(yoloCompositePath).toBe(vlmCompositePath);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

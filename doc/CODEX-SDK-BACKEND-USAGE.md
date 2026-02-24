@@ -112,6 +112,28 @@ npm run example:sdk:human-handoff
 `sendUserTurn`(detailed 모드)에서 `automation` payload를 함께 주면,
 SDK가 `runWithImprovement`를 수행하고 사용자 turn metadata에 자동화 요약을 저장한다.
 
+### 3.4 반복 아이템 합성 판단 체인
+
+반복 리스트 이미지 상황에서는 아래 체인을 사용한다.
+
+1. 여러 아이템 이미지를 합성 이미지 1장으로 병합
+2. YOLO26 1차 판단
+3. YOLO 신뢰도가 낮으면 동일 합성 이미지로 VLM fallback
+4. 탐지 bbox를 원본 아이템 ID로 역매핑
+
+핵심 모듈:
+
+- `runtime/src/vision/composite-sheet.ts`
+- `runtime/src/vision/repeated-item-judgement.ts`
+- `runtime/src/testing/assistantless-chat-e2e.ts`
+
+실행 예제:
+
+```bash
+cd runtime
+npm run example:repeated-item
+```
+
 ## 4. 모델 정책
 
 1. `EVOLUTION_CODING_MODEL=gemini-3.1-pro-preview`

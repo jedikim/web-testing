@@ -105,6 +105,42 @@ npm run example:sdk:human-handoff
 
 이 예제는 민감/차단 상황에서 자동화가 `blocked` 상태로 멈추고 사람 결정을 기다리는 흐름을 보여준다.
 
+### 3.3 반복 리스트 이미지 합성 (YOLO -> VLM fallback)
+
+쇼핑몰 리스트처럼 아이템 이미지가 반복될 때 아래 체인을 사용한다.
+
+1. 아이템 이미지를 하나의 합성 이미지로 생성
+2. 합성 이미지 기준으로 YOLO26 1차 판단
+3. YOLO 판단이 약하면 동일 합성 이미지로 VLM 재판단
+4. 탐지 bbox를 원본 아이템 ID로 역추적
+
+```ts
+const result = await runAssistantlessChatE2E({
+  ...baseInput,
+  shouldRunRepeatedItemComposite: async () => true,
+  collectRepeatedItemImages: async () => itemImages,
+  judgeRepeatedItemsWithYolo: async ({ compositeImagePath, manifest }) => {
+    return yoloJudge(compositeImagePath, manifest);
+  },
+  judgeRepeatedItemsWithVlm: async ({ compositeImagePath, yolo, mappedDetections }) => {
+    return vlmJudge(compositeImagePath, yolo, mappedDetections);
+  }
+});
+```
+
+관련 코드:
+
+- `runtime/src/vision/composite-sheet.ts`
+- `runtime/src/vision/repeated-item-judgement.ts`
+- `runtime/src/testing/assistantless-chat-e2e.ts`
+
+실행 예제:
+
+```bash
+cd runtime
+npm run example:repeated-item
+```
+
 ## 4. Human Handoff 계약
 
 코어 계약:

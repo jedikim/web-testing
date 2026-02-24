@@ -117,4 +117,35 @@ describe('createHttpProviderExecutors', () => {
     expect(calls[0]?.url).toContain('/detect');
     expect(calls[0]?.headers.authorization).toBeUndefined();
   });
+
+  it('builds composite vision input when multiple images are provided', async () => {
+    const calls: Array<{ body: Record<string, unknown> }> = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {}
+      });
+      return new Response(JSON.stringify({ detections: [] }), { status: 200 });
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    const compositeCalls: string[][] = [];
+    const executors = createHttpProviderExecutors({
+      llmPrompt: 'ignored',
+      visionInput: ['runs/a.png', 'runs/b.png', 'runs/c.png'],
+      createCompositeVisionInput: async (inputPaths) => {
+        compositeCalls.push([...inputPaths]);
+        return 'runs/composite-items.png';
+      }
+    });
+
+    const result = await executors.executeVision({
+      provider: 'yolo26',
+      baseUrl: 'http://127.0.0.1:8080',
+      model: 'yolo26n'
+    });
+
+    expect(result.ok).toBe(true);
+    expect(compositeCalls).toEqual([['runs/a.png', 'runs/b.png', 'runs/c.png']]);
+    expect(calls[0]?.body.input).toBe('runs/composite-items.png');
+  });
 });

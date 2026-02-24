@@ -112,6 +112,28 @@ npm run example:sdk:human-handoff
 `sendUserTurn` in detailed mode can include `automation` payload.
 The SDK runs `runWithImprovement`, then stores automation summary in the user turn metadata.
 
+### 3.4 Repeated-item composite judgement chain
+
+For repeated listing images, use the composite chain:
+
+1. merge many item images into one composite image
+2. run YOLO26 first
+3. when YOLO confidence is insufficient, fallback to VLM with the same composite image
+4. reverse-map detection bbox to original item IDs
+
+Core modules:
+
+- `runtime/src/vision/composite-sheet.ts`
+- `runtime/src/vision/repeated-item-judgement.ts`
+- `runtime/src/testing/assistantless-chat-e2e.ts`
+
+Example:
+
+```bash
+cd runtime
+npm run example:repeated-item
+```
+
 ## 4. Model Policy
 
 1. `EVOLUTION_CODING_MODEL=gemini-3.1-pro-preview`

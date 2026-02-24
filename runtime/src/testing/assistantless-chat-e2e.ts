@@ -1,3 +1,12 @@
+import { dirname, resolve } from 'node:path';
+
+import type { CompositeSheetManifest, CompositeSourceImage, MappedCompositeDetection } from '../vision/composite-sheet';
+import {
+  executeRepeatedItemJudgement,
+  type RepeatedItemVlmJudgementResult,
+  type RepeatedItemYoloJudgementResult
+} from '../vision/repeated-item-judgement';
+
 export type LoopDecision = 'go' | 'not_go' | 'revise' | 'unknown';
 
 export interface StepAction {
@@ -121,16 +130,61 @@ export interface VerifyCaptchaClearedInput {
   attempt: number;
 }
 
+export interface RepeatedItemTriggerInput {
+  step: number;
+  goal: string;
+  screenshotPath: string;
+  reason?: string;
+}
+
+export interface RepeatedItemYoloInput {
+  step: number;
+  goal: string;
+  screenshotPath: string;
+  compositeImagePath: string;
+  manifest: CompositeSheetManifest;
+}
+
+export interface RepeatedItemVlmInput {
+  step: number;
+  goal: string;
+  screenshotPath: string;
+  compositeImagePath: string;
+  manifest: CompositeSheetManifest;
+  yolo: RepeatedItemYoloJudgementResult;
+  mappedDetections: MappedCompositeDetection[];
+}
+
+export interface RepeatedItemYoloAssessmentInput extends RepeatedItemVlmInput {
+  compositeImagePath: string;
+}
+
 export interface AssistantlessChatE2EInput {
   goal: string;
   maxSteps?: number;
   llmWarmupSteps?: number;
   captchaMaxRetries?: number;
+  repeatedItemCompositeRootDir?: string;
+  repeatedItemCompositeColumns?: number;
+  repeatedItemCompositeCellWidth?: number;
+  repeatedItemCompositeCellHeight?: number;
   captureScreenshot: (input: CaptureScreenshotInput) => Promise<string>;
   shareWithUser: (input: ShareSnapshotInput) => Promise<void>;
   analyzeWithLlm: (input: LlmAnalysisInput) => Promise<StepAction>;
   decideWithRules: (input: RuleDecisionInput) => Promise<StepAction>;
   detectWithVision?: (input: VisionHintInput) => Promise<VisionHint>;
+  shouldRunRepeatedItemComposite?: (input: RepeatedItemTriggerInput) => Promise<boolean>;
+  collectRepeatedItemImages?: (input: RepeatedItemTriggerInput) => Promise<CompositeSourceImage[]>;
+  judgeRepeatedItemsWithYolo?: (
+    input: RepeatedItemYoloInput
+  ) => Promise<RepeatedItemYoloJudgementResult>;
+  assessRepeatedItemYolo?: (input: RepeatedItemYoloAssessmentInput) => Promise<{
+    accepted: boolean;
+    reason?: string;
+  }>;
+  judgeRepeatedItemsWithVlm?: (
+    input: RepeatedItemVlmInput
+  ) => Promise<RepeatedItemVlmJudgementResult>;
   detectCaptchaWithYolo?: (
     input: CaptchaYoloDetectionInput
   ) => Promise<CaptchaYoloDetectionResult>;
@@ -159,6 +213,10 @@ export interface AssistantlessChatE2EOutput {
   captchaRetries: number;
   captchaSolved: number;
   captchaFailed: number;
+  repeatedItemCompositeBuilds: number;
+  repeatedItemCompositeYoloCalls: number;
+  repeatedItemCompositeVlmCalls: number;
+  repeatedItemCompositeVlmFallbacks: number;
 }
 
 function normalizeDecision(decision: LoopDecision): LoopDecision {
@@ -166,6 +224,14 @@ function normalizeDecision(decision: LoopDecision): LoopDecision {
     return decision;
   }
   return 'unknown';
+}
+
+function bestMappedDetection(
+  detections: MappedCompositeDetection[]
+): MappedCompositeDetection | undefined {
+  return detections
+    .filter((item) => item.matched && item.sourceId)
+    .sort((left, right) => (right.confidence ?? 0) - (left.confidence ?? 0))[0];
 }
 
 export async function runAssistantlessChatE2E(
@@ -186,6 +252,10 @@ export async function runAssistantlessChatE2E(
   let captchaRetries = 0;
   let captchaSolved = 0;
   let captchaFailed = 0;
+  let repeatedItemCompositeBuilds = 0;
+  let repeatedItemCompositeYoloCalls = 0;
+  let repeatedItemCompositeVlmCalls = 0;
+  let repeatedItemCompositeVlmFallbacks = 0;
   let forceLlm = false;
   let lastFailureReason: string | undefined;
   let pendingVisionHint: VisionHint | undefined;
@@ -201,6 +271,92 @@ export async function runAssistantlessChatE2E(
       message: `step ${step + 1} 시작 전 상태 공유`
     });
     snapshotsShared += 1;
+
+    if (
+      input.shouldRunRepeatedItemComposite &&
+      input.collectRepeatedItemImages &&
+      input.judgeRepeatedItemsWithYolo
+    ) {
+      const triggerInput: RepeatedItemTriggerInput = {
+        step,
+        goal: input.goal,
+        screenshotPath: beforePath,
+        reason: lastFailureReason
+      };
+
+      const shouldRun = await input.shouldRunRepeatedItemComposite(triggerInput);
+      if (shouldRun) {
+        const images = await input.collectRepeatedItemImages(triggerInput);
+
+        if (images.length > 0) {
+          const outputRoot = input.repeatedItemCompositeRootDir ?? dirname(beforePath);
+          const outputImagePath = resolve(outputRoot, `repeated-items-step-${step + 1}.png`);
+          const outputManifestPath = resolve(
+            outputRoot,
+            `repeated-items-step-${step + 1}.manifest.json`
+          );
+
+          const judgement = await executeRepeatedItemJudgement({
+            images,
+            outputImagePath,
+            outputManifestPath,
+            columns: input.repeatedItemCompositeColumns,
+            cellWidth: input.repeatedItemCompositeCellWidth,
+            cellHeight: input.repeatedItemCompositeCellHeight,
+            runYolo: async ({ compositeImagePath, manifest }) => {
+              repeatedItemCompositeYoloCalls += 1;
+              return input.judgeRepeatedItemsWithYolo!({
+                step,
+                goal: input.goal,
+                screenshotPath: beforePath,
+                compositeImagePath,
+                manifest
+              });
+            },
+            assessYolo: input.assessRepeatedItemYolo
+              ? async ({ compositeImagePath, manifest, yolo, mappedDetections }) =>
+                  input.assessRepeatedItemYolo!({
+                    step,
+                    goal: input.goal,
+                    screenshotPath: beforePath,
+                    compositeImagePath,
+                    manifest,
+                    yolo,
+                    mappedDetections
+                  })
+              : undefined,
+            runVlm: input.judgeRepeatedItemsWithVlm
+              ? async ({ compositeImagePath, manifest, yolo, mappedDetections }) => {
+                  repeatedItemCompositeVlmCalls += 1;
+                  return input.judgeRepeatedItemsWithVlm!({
+                    step,
+                    goal: input.goal,
+                    screenshotPath: beforePath,
+                    compositeImagePath,
+                    manifest,
+                    yolo,
+                    mappedDetections
+                  });
+                }
+              : undefined
+          });
+
+          repeatedItemCompositeBuilds += 1;
+          if (judgement.usedVlmFallback) {
+            repeatedItemCompositeVlmFallbacks += 1;
+          }
+
+          const bestDetection = bestMappedDetection(judgement.mappedDetections);
+          if (bestDetection?.sourceId) {
+            pendingVisionHint = {
+              model: judgement.usedVlmFallback ? 'vlm-composite' : 'yolo26-composite',
+              target: bestDetection.sourceId,
+              confidence: bestDetection.confidence
+            };
+          }
+        }
+      }
+    }
 
     if (input.detectCaptchaWithYolo) {
       const detection = await input.detectCaptchaWithYolo({
@@ -301,7 +457,11 @@ export async function runAssistantlessChatE2E(
               captchaLlmSolveCalls,
               captchaRetries,
               captchaSolved,
-              captchaFailed
+              captchaFailed,
+              repeatedItemCompositeBuilds,
+              repeatedItemCompositeYoloCalls,
+              repeatedItemCompositeVlmCalls,
+              repeatedItemCompositeVlmFallbacks
             };
           }
 
@@ -371,7 +531,11 @@ export async function runAssistantlessChatE2E(
           captchaLlmSolveCalls,
           captchaRetries,
           captchaSolved,
-          captchaFailed
+          captchaFailed,
+          repeatedItemCompositeBuilds,
+          repeatedItemCompositeYoloCalls,
+          repeatedItemCompositeVlmCalls,
+          repeatedItemCompositeVlmFallbacks
         };
       }
       continue;
@@ -414,7 +578,11 @@ export async function runAssistantlessChatE2E(
         captchaLlmSolveCalls,
         captchaRetries,
         captchaSolved,
-        captchaFailed
+        captchaFailed,
+        repeatedItemCompositeBuilds,
+        repeatedItemCompositeYoloCalls,
+        repeatedItemCompositeVlmCalls,
+        repeatedItemCompositeVlmFallbacks
       };
     }
 
@@ -437,6 +605,10 @@ export async function runAssistantlessChatE2E(
     captchaLlmSolveCalls,
     captchaRetries,
     captchaSolved,
-    captchaFailed
+    captchaFailed,
+    repeatedItemCompositeBuilds,
+    repeatedItemCompositeYoloCalls,
+    repeatedItemCompositeVlmCalls,
+    repeatedItemCompositeVlmFallbacks
   };
 }

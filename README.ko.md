@@ -27,6 +27,7 @@ flowchart LR
 
 - 결정론 워크플로우 우선 실행 + 필요 구간만 폴백
 - 자동화 계획/실행을 위한 멀티턴 세션 상태 관리
+- 반복 리스트 합성 판단(`이미지 합성 -> YOLO26 -> 동일 이미지 VLM fallback -> 역추적`)
 - Slack/Telegram 구현 없이 assistantless E2E 시뮬레이션
 - worktree 격리 + 테스트/수정 + 승인 기반 진화 백엔드
 
@@ -64,6 +65,8 @@ cd runtime
 npm run example:sdk:basic
 npm run example:sdk:multiturn
 npm run example:sdk:auto-improve
+npm run example:sdk:human-handoff
+npm run example:repeated-item
 ```
 
 ## 모델 정책

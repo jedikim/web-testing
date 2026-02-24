@@ -5,6 +5,8 @@ export * from './session/types';
 export * from './session/store';
 export * from './session/engine';
 export * from './backend';
+export * from './vision/composite-sheet';
+export * from './vision/repeated-item-judgement';
 export * from './testing/automation-full-flow';
 export * from './integration/human-loop-runtime';
 export * from './evolution/types';

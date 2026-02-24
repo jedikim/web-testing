@@ -27,6 +27,7 @@ flowchart LR
 
 - deterministic workflow execution first, fallback only when needed
 - multi-turn chat-like session state for automation planning/execution
+- repeated-item composite judgement (`merge -> YOLO26 -> same-image VLM fallback -> reverse trace`)
 - assistantless E2E simulation without implementing Slack/Telegram integration itself
 - evolution backend for isolated candidate versions (worktree + test/fix + approval)
 
@@ -64,6 +65,8 @@ cd runtime
 npm run example:sdk:basic
 npm run example:sdk:multiturn
 npm run example:sdk:auto-improve
+npm run example:sdk:human-handoff
+npm run example:repeated-item
 ```
 
 ## Model Policy

@@ -35,3 +35,4 @@
 - 2026-02-24 Web Automation Core for Assistant: [English](./plans/2026-02-24-web-automation-core-for-assistant.en.md) | [한국어](./plans/2026-02-24-web-automation-core-for-assistant.md)
 - 2026-02-24 Backend-first SDK + Self-Improvement: [English](./plans/2026-02-24-backend-first-sdk-and-self-improvement-plan.en.md) | [한국어](./plans/2026-02-24-backend-first-sdk-and-self-improvement-plan.md)
 - 2026-02-24 Dual-Mode Multi-Turn Backend + SDK: [English](./plans/2026-02-24-dual-mode-multiturn-backend-sdk-plan.en.md) | [한국어](./plans/2026-02-24-dual-mode-multiturn-backend-sdk-plan.md)
+- 2026-02-24 Repeated-Item Composite Vision: [English](./plans/2026-02-24-repeated-item-composite-vision-plan.en.md) | [한국어](./plans/2026-02-24-repeated-item-composite-vision-plan.md)

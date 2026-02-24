@@ -105,6 +105,42 @@ npm run example:sdk:human-handoff
 
 This example demonstrates policy-safe interruption where automation is blocked and awaits human decision.
 
+### 3.3 Repeated listing image composite (YOLO -> VLM fallback)
+
+Use this when list items are visually repetitive:
+
+1. merge item images into one composite image
+2. run YOLO26 on the composite first
+3. if YOLO is uncertain, run VLM on the same composite image
+4. reverse-map detections back to original item IDs
+
+```ts
+const result = await runAssistantlessChatE2E({
+  ...baseInput,
+  shouldRunRepeatedItemComposite: async () => true,
+  collectRepeatedItemImages: async () => itemImages,
+  judgeRepeatedItemsWithYolo: async ({ compositeImagePath, manifest }) => {
+    return yoloJudge(compositeImagePath, manifest);
+  },
+  judgeRepeatedItemsWithVlm: async ({ compositeImagePath, yolo, mappedDetections }) => {
+    return vlmJudge(compositeImagePath, yolo, mappedDetections);
+  }
+});
+```
+
+Relevant code:
+
+- `runtime/src/vision/composite-sheet.ts`
+- `runtime/src/vision/repeated-item-judgement.ts`
+- `runtime/src/testing/assistantless-chat-e2e.ts`
+
+Runnable example:
+
+```bash
+cd runtime
+npm run example:repeated-item
+```
+
 ## 4. Human Handoff Contract
 
 Core runtime contract:
