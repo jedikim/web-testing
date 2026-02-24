@@ -111,4 +111,88 @@ describe('runAssistantlessChatE2E', () => {
     expect(result.revisions).toBe(0);
     expect(result.steps).toBe(1);
   });
+
+  it('handles captcha escalation with yolo -> vlm -> llm retries before continuing', async () => {
+    let solveAttempt = 0;
+    let verifyAttempt = 0;
+
+    const result = await runAssistantlessChatE2E({
+      goal: 'captcha escalation flow',
+      llmWarmupSteps: 1,
+      maxSteps: 3,
+      captchaMaxRetries: 3,
+      captureScreenshot: async ({ step, stage }) => `runs/captcha-${step}-${stage}.png`,
+      shareWithUser: async () => undefined,
+      analyzeWithLlm: async () => ({ kind: 'click', target: '#next' }),
+      decideWithRules: async () => ({ kind: 'click', target: '#next' }),
+      detectCaptchaWithYolo: async () => ({
+        detected: true,
+        confidence: 0.82,
+        label: 'captcha'
+      }),
+      confirmCaptchaWithVlm: async () => ({
+        confirmed: true,
+        reason: 'captcha widget visible'
+      }),
+      solveCaptchaWithLlm: async () => {
+        solveAttempt += 1;
+        return {
+          solved: true,
+          action: { kind: 'click', target: '#captcha-checkbox' }
+        };
+      },
+      executeCaptchaSolveAction: async () => true,
+      verifyCaptchaCleared: async () => {
+        verifyAttempt += 1;
+        return verifyAttempt >= 2;
+      },
+      executeAction: async () => ({ status: 'pass', done: true }),
+      askUserDecision: async () => 'go'
+    });
+
+    expect(result.status).toBe('pass');
+    expect(result.captchaYoloCalls).toBe(1);
+    expect(result.captchaVlmCalls).toBe(1);
+    expect(result.captchaLlmSolveCalls).toBe(2);
+    expect(result.captchaRetries).toBe(2);
+    expect(result.captchaSolved).toBe(1);
+    expect(result.captchaFailed).toBe(0);
+    expect(solveAttempt).toBe(2);
+  });
+
+  it('blocks when captcha retries are exhausted and user chooses not_go', async () => {
+    const result = await runAssistantlessChatE2E({
+      goal: 'captcha unresolved flow',
+      llmWarmupSteps: 1,
+      maxSteps: 2,
+      captchaMaxRetries: 2,
+      captureScreenshot: async ({ step, stage }) => `runs/captcha-block-${step}-${stage}.png`,
+      shareWithUser: async () => undefined,
+      analyzeWithLlm: async () => ({ kind: 'click', target: '#next' }),
+      decideWithRules: async () => ({ kind: 'click', target: '#next' }),
+      detectCaptchaWithYolo: async () => ({
+        detected: true,
+        confidence: 0.91,
+        label: 'captcha'
+      }),
+      confirmCaptchaWithVlm: async () => ({
+        confirmed: true
+      }),
+      solveCaptchaWithLlm: async () => ({
+        solved: false,
+        reason: 'solver failed'
+      }),
+      executeAction: async () => ({ status: 'pass', done: true }),
+      askUserDecision: async () => 'not_go'
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.decisions).toEqual(['not_go']);
+    expect(result.captchaYoloCalls).toBe(1);
+    expect(result.captchaVlmCalls).toBe(1);
+    expect(result.captchaLlmSolveCalls).toBe(2);
+    expect(result.captchaRetries).toBe(2);
+    expect(result.captchaSolved).toBe(0);
+    expect(result.captchaFailed).toBe(1);
+  });
 });

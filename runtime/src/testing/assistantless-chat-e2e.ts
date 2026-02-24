@@ -67,15 +67,79 @@ export interface AskDecisionInput {
   question: string;
 }
 
+export interface CaptchaYoloDetectionInput {
+  step: number;
+  goal: string;
+  screenshotPath: string;
+}
+
+export interface CaptchaYoloDetectionResult {
+  detected: boolean;
+  confidence?: number;
+  label?: string;
+}
+
+export interface CaptchaVlmConfirmationInput {
+  step: number;
+  goal: string;
+  screenshotPath: string;
+  detection: CaptchaYoloDetectionResult;
+}
+
+export interface CaptchaVlmConfirmationResult {
+  confirmed: boolean;
+  reason?: string;
+}
+
+export interface CaptchaLlmSolveInput {
+  step: number;
+  goal: string;
+  screenshotPath: string;
+  detection: CaptchaYoloDetectionResult;
+  confirmation?: CaptchaVlmConfirmationResult;
+  attempt: number;
+}
+
+export interface CaptchaLlmSolveResult {
+  solved: boolean;
+  action?: StepAction;
+  reason?: string;
+}
+
+export interface ExecuteCaptchaSolveInput {
+  step: number;
+  goal: string;
+  action: StepAction;
+  screenshotPath: string;
+  attempt: number;
+}
+
+export interface VerifyCaptchaClearedInput {
+  step: number;
+  goal: string;
+  screenshotPath: string;
+  attempt: number;
+}
+
 export interface AssistantlessChatE2EInput {
   goal: string;
   maxSteps?: number;
   llmWarmupSteps?: number;
+  captchaMaxRetries?: number;
   captureScreenshot: (input: CaptureScreenshotInput) => Promise<string>;
   shareWithUser: (input: ShareSnapshotInput) => Promise<void>;
   analyzeWithLlm: (input: LlmAnalysisInput) => Promise<StepAction>;
   decideWithRules: (input: RuleDecisionInput) => Promise<StepAction>;
   detectWithVision?: (input: VisionHintInput) => Promise<VisionHint>;
+  detectCaptchaWithYolo?: (
+    input: CaptchaYoloDetectionInput
+  ) => Promise<CaptchaYoloDetectionResult>;
+  confirmCaptchaWithVlm?: (
+    input: CaptchaVlmConfirmationInput
+  ) => Promise<CaptchaVlmConfirmationResult>;
+  solveCaptchaWithLlm?: (input: CaptchaLlmSolveInput) => Promise<CaptchaLlmSolveResult>;
+  executeCaptchaSolveAction?: (input: ExecuteCaptchaSolveInput) => Promise<boolean>;
+  verifyCaptchaCleared?: (input: VerifyCaptchaClearedInput) => Promise<boolean>;
   executeAction: (input: ExecuteStepInput) => Promise<ExecuteActionResult>;
   askUserDecision: (input: AskDecisionInput) => Promise<LoopDecision>;
 }
@@ -89,6 +153,12 @@ export interface AssistantlessChatE2EOutput {
   revisions: number;
   decisions: LoopDecision[];
   snapshotsShared: number;
+  captchaYoloCalls: number;
+  captchaVlmCalls: number;
+  captchaLlmSolveCalls: number;
+  captchaRetries: number;
+  captchaSolved: number;
+  captchaFailed: number;
 }
 
 function normalizeDecision(decision: LoopDecision): LoopDecision {
@@ -103,12 +173,19 @@ export async function runAssistantlessChatE2E(
 ): Promise<AssistantlessChatE2EOutput> {
   const maxSteps = input.maxSteps ?? 8;
   const llmWarmupSteps = input.llmWarmupSteps ?? 1;
+  const captchaMaxRetries = Math.max(1, input.captchaMaxRetries ?? 3);
 
   let llmCalls = 0;
   let ruleCalls = 0;
   let visionCalls = 0;
   let revisions = 0;
   let snapshotsShared = 0;
+  let captchaYoloCalls = 0;
+  let captchaVlmCalls = 0;
+  let captchaLlmSolveCalls = 0;
+  let captchaRetries = 0;
+  let captchaSolved = 0;
+  let captchaFailed = 0;
   let forceLlm = false;
   let lastFailureReason: string | undefined;
   let pendingVisionHint: VisionHint | undefined;
@@ -124,6 +201,116 @@ export async function runAssistantlessChatE2E(
       message: `step ${step + 1} 시작 전 상태 공유`
     });
     snapshotsShared += 1;
+
+    if (input.detectCaptchaWithYolo) {
+      const detection = await input.detectCaptchaWithYolo({
+        step,
+        goal: input.goal,
+        screenshotPath: beforePath
+      });
+      captchaYoloCalls += 1;
+
+      if (detection.detected) {
+        let confirmation: CaptchaVlmConfirmationResult | undefined;
+        if (input.confirmCaptchaWithVlm) {
+          confirmation = await input.confirmCaptchaWithVlm({
+            step,
+            goal: input.goal,
+            screenshotPath: beforePath,
+            detection
+          });
+          captchaVlmCalls += 1;
+        }
+
+        let cleared = false;
+        if (input.solveCaptchaWithLlm) {
+          for (let attempt = 1; attempt <= captchaMaxRetries; attempt += 1) {
+            captchaRetries += 1;
+            const solveResult = await input.solveCaptchaWithLlm({
+              step,
+              goal: input.goal,
+              screenshotPath: beforePath,
+              detection,
+              confirmation,
+              attempt
+            });
+            captchaLlmSolveCalls += 1;
+
+            if (!solveResult.solved) {
+              continue;
+            }
+
+            if (solveResult.action && input.executeCaptchaSolveAction) {
+              const actionOk = await input.executeCaptchaSolveAction({
+                step,
+                goal: input.goal,
+                action: solveResult.action,
+                screenshotPath: beforePath,
+                attempt
+              });
+              if (!actionOk) {
+                continue;
+              }
+            }
+
+            if (input.verifyCaptchaCleared) {
+              const verify = await input.verifyCaptchaCleared({
+                step,
+                goal: input.goal,
+                screenshotPath: beforePath,
+                attempt
+              });
+              if (!verify) {
+                continue;
+              }
+            }
+
+            cleared = true;
+            captchaSolved += 1;
+            break;
+          }
+        }
+
+        if (!cleared) {
+          captchaFailed += 1;
+          forceLlm = true;
+          lastFailureReason = 'captcha unresolved';
+
+          const decision = normalizeDecision(
+            await input.askUserDecision({
+              step,
+              goal: input.goal,
+              screenshotPath: beforePath,
+              question: '캡차 자동 해결에 실패했습니다. 계속 진행할까요?'
+            })
+          );
+          decisions.push(decision);
+
+          if (decision === 'not_go' || decision === 'unknown') {
+            return {
+              status: 'blocked',
+              steps: step + 1,
+              llmCalls,
+              ruleCalls,
+              visionCalls,
+              revisions,
+              decisions,
+              snapshotsShared,
+              captchaYoloCalls,
+              captchaVlmCalls,
+              captchaLlmSolveCalls,
+              captchaRetries,
+              captchaSolved,
+              captchaFailed
+            };
+          }
+
+          if (decision === 'revise') {
+            revisions += 1;
+          }
+        }
+      }
+    }
 
     const useLlm = step < llmWarmupSteps || forceLlm;
     const action = useLlm
@@ -178,7 +365,13 @@ export async function runAssistantlessChatE2E(
           visionCalls,
           revisions,
           decisions,
-          snapshotsShared
+          snapshotsShared,
+          captchaYoloCalls,
+          captchaVlmCalls,
+          captchaLlmSolveCalls,
+          captchaRetries,
+          captchaSolved,
+          captchaFailed
         };
       }
       continue;
@@ -215,7 +408,13 @@ export async function runAssistantlessChatE2E(
         visionCalls,
         revisions,
         decisions,
-        snapshotsShared
+        snapshotsShared,
+        captchaYoloCalls,
+        captchaVlmCalls,
+        captchaLlmSolveCalls,
+        captchaRetries,
+        captchaSolved,
+        captchaFailed
       };
     }
 
@@ -232,6 +431,12 @@ export async function runAssistantlessChatE2E(
     visionCalls,
     revisions,
     decisions,
-    snapshotsShared
+    snapshotsShared,
+    captchaYoloCalls,
+    captchaVlmCalls,
+    captchaLlmSolveCalls,
+    captchaRetries,
+    captchaSolved,
+    captchaFailed
   };
 }

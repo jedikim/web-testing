@@ -69,12 +69,14 @@ npm run test:e2e:kr:headful
 1. 스크린샷 공유 + go/revise/not_go 의사결정 루프
 2. 첫 단계 LLM 분석 후 rule-first 반복
 3. 실패 시 YOLO26 힌트 + LLM revise 재시도
+4. 캡차 감지 시 YOLO26 -> VLM -> LLM 재시도 체인
 
 명령:
 
 ```bash
 cd runtime
 npm run test:e2e:assistantless:contract
+npm run test:e2e:assistantless:live
 ```
 
 ### Layer E: 외부 AI 비서 통합 (외부 프로젝트 담당)
@@ -145,16 +147,18 @@ npm run test:e2e:provider:live
 1. `assistantless_llm_then_rule`: 초기 LLM 후 rule 경로로 최소화
 2. `assistantless_fail_revise_with_vision`: 실패 후 vision 힌트 + revise 재시도
 3. `assistantless_block_not_go`: 사용자 중단 결정
+4. `assistantless_captcha_escalation_retry`: 캡차 에스컬레이션 재시도
 
 ## 3. 합격 기준
 
 1. Layer A/B는 항상 100% pass
 2. Layer C는 6개 이상 시나리오 중 80% 이상 pass
 3. Layer D(contract)는 100% pass
-4. Layer F(contract)는 100% pass
-5. Layer F(live)는 matrix total의 80% 이상 pass
-6. Layer C/F 실패 시 screenshot/json 리포트가 남아야 함
-7. `scripts/validate-run-artifacts.sh` pass
+4. Layer D(live)는 expected status 기준 100% pass
+5. Layer F(contract)는 100% pass
+6. Layer F(live)는 matrix total의 80% 이상 pass
+7. Layer C/F 실패 시 screenshot/json 리포트가 남아야 함
+8. `scripts/validate-run-artifacts.sh` pass
 
 ## 4. 실패 대응
 
@@ -172,6 +176,7 @@ npx playwright install chromium
 cp .env.example .env
 npm run test:automation:full
 npm run test:e2e:assistantless:contract
+npm run test:e2e:assistantless:live
 npm run test:provider:contract
 npm run test:e2e:kr
 npm run test:e2e:kr:headful

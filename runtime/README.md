@@ -64,6 +64,7 @@ npm run typecheck
 - 계약 테스트(오프라인): `tests/kr-e2e-scenarios.test.ts`
 - 라이브 스모크(옵트인): `tests/e2e-kr-live.test.ts`
 - 전체 플로우 시뮬레이션: `tests/automation-full-flow.test.ts`
+- 복잡 반복 라이브 시뮬레이션: `tests/e2e-assistantless-kr-live.test.ts`
 
 실행:
 
@@ -74,6 +75,7 @@ npm run test:e2e:kr:contract
 npm run test:e2e:kr
 npm run test:e2e:kr:headful
 npm run test:e2e:assistantless:contract
+npm run test:e2e:assistantless:live
 npm run test:provider:contract
 # 실제 키/엔드포인트가 있으면
 npm run test:e2e:provider:live

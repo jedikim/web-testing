@@ -13,6 +13,6 @@
   - runtime: npm run test:provider:contract (15 passed)
   - runtime: npm run test:full-flow (12 passed)
   - runtime: npm run test:e2e:kr:headful (7 passed)
-  - runtime: npm test (97 passed, 7 skipped)
+  - runtime: npm test (100 passed, 8 skipped)
   - runtime: npm run typecheck (pass)
   - root: ./scripts/validate-run-artifacts.sh (pass)

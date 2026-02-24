@@ -9,6 +9,6 @@
   - action: defer
 - Decision: approve
 - Evidence:
-  - runtime: npm test (97 passed, 7 skipped)
-  - runtime: npm run test:acceptance (5 passed)
+  - runtime: npm test (100 passed, 8 skipped)
+  - runtime: npm run test:acceptance (6 passed)
   - runtime: npm run typecheck (pass)

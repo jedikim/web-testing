@@ -32,6 +32,7 @@
 1. 초기 단계 LLM 분석 후 rule-first 경로로 반복
 2. 실패 시 YOLO26 힌트 + revise 재시도
 3. 실패 후 `not_go` 결정 시 즉시 중단
+4. 캡차 의심 시 `YOLO26 감지 -> VLM 확인 -> LLM 풀이 재시도` 체인 수행
 
 ## 3. 실행 방법
 
@@ -52,6 +53,7 @@ npm run test:e2e:kr:contract
 npm run test:e2e:kr
 npm run test:e2e:kr:headful
 npm run test:e2e:assistantless:contract
+npm run test:e2e:assistantless:live
 npm run test:provider:contract
 # 실제 키/엔드포인트가 있으면
 npm run test:e2e:provider:live
@@ -59,6 +61,7 @@ npm run test:e2e:provider:live
 
 라이브 테스트는 실행 시 `runtime/.env`를 자동으로 읽는다.
 실제 브라우저 동작 점검은 `test:e2e:kr:headful` 경로를 기본으로 사용한다.
+assistantless 반복 라이브 테스트는 `RUN_ASSISTANTLESS_KR_E2E=1`, `ASSISTANTLESS_KR_ITERATIONS=N`으로 제어한다.
 
 ## 4. 결과 아티팩트
 

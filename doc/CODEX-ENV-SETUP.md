@@ -27,17 +27,19 @@
 
 1. `RUN_KR_E2E`: 한국 사이트 라이브 E2E 실행 여부 (`1` 또는 `0`)
 2. `RUN_PROVIDER_LIVE_E2E`: 멀티 벤더 provider 라이브 E2E 실행 여부
-3. `PW_HEADLESS`: Playwright headless 실행 (`1` 또는 `0`, 실전 점검은 `0` 권장)
-4. `PLAYWRIGHT_TIMEOUT_MS`: 기본 타임아웃(ms)
-5. `HUMAN_LOOP_MAX_TURNS`: human-loop 최대 반복 수
-6. `ARTIFACT_ROOT`: 아티팩트 루트 경로(기본 `runs/samples/artifacts`)
-7. `LLM_ENABLED`: 단일 provider LLM 경로 사용 여부
-8. `LLM_PROVIDER`: `openai|gemini|anthropic|openai_compatible`
-9. `LLM_MODEL`, `LLM_MODEL_OPTIONS`, `LLM_BASE_URL`: 단일 provider 모델/베이스URL 설정
-10. `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`: 회사별 키
-11. `GEMINI_MODELS`, `OPENAI_MODELS`, `ANTHROPIC_MODELS`: 회사별 모델 목록(csv)
-12. `LLM_VENDOR_ORDER`: 멀티 벤더 매트릭스 순서(csv)
-13. `YOLO26_ENABLED`, `YOLO26_API_KEY`, `YOLO26_BASE_URL`, `YOLO26_MODELS`: YOLO26 멀티 모델 설정(오픈소스 로컬 엔드포인트는 API 키 없이 가능)
+3. `RUN_ASSISTANTLESS_KR_E2E`: assistantless KR 라이브 E2E 실행 여부
+4. `ASSISTANTLESS_KR_ITERATIONS`: assistantless 반복 횟수(기본 1)
+5. `PW_HEADLESS`: Playwright headless 실행 (`1` 또는 `0`, 실전 점검은 `0` 권장)
+6. `PLAYWRIGHT_TIMEOUT_MS`: 기본 타임아웃(ms)
+7. `HUMAN_LOOP_MAX_TURNS`: human-loop 최대 반복 수
+8. `ARTIFACT_ROOT`: 아티팩트 루트 경로(기본 `runs/samples/artifacts`)
+9. `LLM_ENABLED`: 단일 provider LLM 경로 사용 여부
+10. `LLM_PROVIDER`: `openai|gemini|anthropic|openai_compatible`
+11. `LLM_MODEL`, `LLM_MODEL_OPTIONS`, `LLM_BASE_URL`: 단일 provider 모델/베이스URL 설정
+12. `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`: 회사별 키
+13. `GEMINI_MODELS`, `OPENAI_MODELS`, `ANTHROPIC_MODELS`: 회사별 모델 목록(csv)
+14. `LLM_VENDOR_ORDER`: 멀티 벤더 매트릭스 순서(csv)
+15. `YOLO26_ENABLED`, `YOLO26_API_KEY`, `YOLO26_BASE_URL`, `YOLO26_MODELS`: YOLO26 멀티 모델 설정(오픈소스 로컬 엔드포인트는 API 키 없이 가능)
 
 ## 4. 안전 규칙
 
@@ -47,6 +49,7 @@
 4. 키 값은 `runtime/.env`나 OS secret store에만 저장한다.
 5. `git status` 전에 `.env` 파일이 추적 대상이 아닌지 확인한다.
 6. headful 브라우저 검증은 `PW_HEADLESS=0`으로 실행한다.
+7. 캡차 대응 정책은 `YOLO26 -> VLM -> LLM 재시도 -> human handoff` 순서를 따른다.
 
 ## 5. Gemini + Multi-Model 예시
 
