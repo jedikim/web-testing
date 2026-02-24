@@ -6,7 +6,7 @@
   "endedAt": "2026-02-24T09:45:21Z",
   "durationMs": 21000,
   "context": {
-    "mode": "live",
+    "mode": "screenshot",
     "browser": "chromium",
     "targetUrl": "https://shopping.example.com"
   },

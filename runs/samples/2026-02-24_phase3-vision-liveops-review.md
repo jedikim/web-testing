@@ -1,0 +1,13 @@
+## Code Review Report
+- Scope: Phase 3 vision/screenshot foundations (ROI batching, go/not-go checkpoint, view mode policy)
+- Reviewer: codex
+- Summary: ROI remapping and safety-gated checkpoint policy are deterministic and test-covered.
+- Issues:
+  - severity: Minor
+  - file: runtime/src/view/view-mode.ts
+  - comment: screenshot-only policy is intentional for v0.1; dynamic mode policy is deferred.
+  - action: defer
+- Decision: approve
+- Evidence:
+  - runtime: npm test (35 passed)
+  - runtime: npm run typecheck (pass)

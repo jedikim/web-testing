@@ -1,3 +1,5 @@
+> Language: [English](./PRD-v0.1.en.md) | [한국어](./PRD-v0.1.md)
+
 # Adaptive Web Automation PRD v0.1
 
 ## -1. Codex 실행 지시 프로필
@@ -16,6 +18,7 @@ Codex는 아래 규칙을 우선 적용한다.
    - `doc/CODEX-TEST-FIX-CYCLE.md`
    - `doc/CODEX-RUN-ARTIFACTS.md`
    - `doc/CODEX-CODE-REVIEW.md`
+   - `doc/CODEX-EVOLUTION-BACKEND.md`
 
 ## -0. 멀티에이전트 실행 규칙
 
@@ -48,7 +51,7 @@ flowchart LR
 
 1. 처음부터 모든 스텝을 고정하지 않고, 실행 중 필요한 만큼만 생성/수정한다.
 2. 매 실행의 결과를 저장/분석해 다음 실행에서 더 적은 토큰으로 해결한다.
-3. 사람이 실시간으로 보거나(스트리밍), 어려우면 스크린샷 질의로 개입할 수 있게 설계한다.
+3. 기본 UX는 스크린샷 질의 기반이며, Telegram/Slack 대화를 통해 자동화를 점진 완성하도록 설계한다.
 
 ---
 
@@ -103,22 +106,25 @@ flowchart LR
 
 ## 3. 사용자 경험(UX) 모드
 
-### 3.1 Live Builder 모드(우선)
+### 3.1 Screenshot Chat 모드(기본)
 
-사용자는 원격 Chromium 화면을 실시간으로 본다.  
-실시간 구현은 우선순위를 다음처럼 둔다.
+사용자는 실시간 스트리밍 대신, 필요 시점의 스크린샷과 요약을 Telegram/Slack에서 받는다.
 
-1. 1순위: CDP `Page.startScreencast` 기반 스트리밍
-2. 2순위: WebRTC 중계(대규모 동시 시청/저지연 필요 시)
+핵심 흐름:
 
-### 3.2 Screenshot Question 모드(폴백)
+1. 에이전트가 단계별 실행
+2. 판단 불확실/민감 액션 전 스크린샷 캡처
+3. 채팅으로 `go / not go / 수정 지시` 질의
+4. 사용자 응답을 반영해 워크플로우/셀렉터/정책 갱신
 
-실시간 보기가 어렵거나 품질이 불안정하면, 시스템이 핵심 순간의 스크린샷을 캡처하고 사용자에게 `go / not go` 질문을 보낸다.
+### 3.2 Autonomous Continuation 모드
 
-적용 조건:
+사용자 응답 지연 시, 안전 정책 범위 안에서 자동으로 진행 가능한 스텝만 계속 수행한다.
 
-1. 판단 신뢰도 임계치 미달
-2. 결제/제출 직전
+중단 조건:
+
+1. 신뢰도 임계치 미달
+2. 결제/제출/계정 변경 등 민감 액션
 3. 캡차/2FA/법적 민감 단계
 
 ---
@@ -128,6 +134,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     U["User Goal"] --> O["Orchestrator"]
+    U --> CH["Chat Gateway (Telegram/Slack)"]
     O --> P["Planner (LLM, Sparse)"]
     O --> R["Rule Engine"]
     R --> X["Executor (Playwright)"]
@@ -152,6 +159,9 @@ flowchart LR
     X --> LOG["Run Artifacts"]
     E --> LOG
     V --> LOG
+    O --> SS["Screenshot Broker"]
+    SS --> CH
+    CH -->|go/not-go/revise| O
     LOG --> LEARN["Learning Loop (offline)"]
     LEARN --> VER
 ```
@@ -353,7 +363,7 @@ Python 서비스로 분리하고 웹 자동화 런타임(TS)과 HTTP로 통신�
 
 ### 9.1 분리 이유
 
-1. 실시간 런타임과 학습/최적화 경로의 장애 분리
+1. 온라인 런타임과 학습/최적화 경로의 장애 분리
 2. DSPy/GEPA 실험의 독립 배포
 3. GPU/CPU 자원 분리 운영
 
@@ -374,35 +384,35 @@ Python 서비스로 분리하고 웹 자동화 런타임(TS)과 HTTP로 통신�
 
 ---
 
-## 10. 실시간 화면 공유 설계
+## 10. Screenshot + Chat 운영 설계
 
-### 10.1 원격 Headful 실행
+### 10.1 개인 환경 우선 배치
 
 권장:
 
-1. 원격 컨테이너에서 headed Chromium 실행
+1. 소형 PC/맥미니에서 단일 세션 중심으로 실행
 2. Playwright가 브라우저 제어
-3. 화면은 CDP screencast 또는 WebRTC로 사용자에게 중계
+3. 필요 시점 스크린샷만 캡처해 Telegram/Slack에 전달
 
 ### 10.2 통신 구조
 
 ```mermaid
 flowchart LR
-    C["Client Web/TG UI"] --> G["Gateway"]
+    C["Telegram/Slack User"] --> G["Chat Gateway"]
     G --> S["Session Manager"]
-    S --> B["Remote Browser Pod (Headful Chromium)"]
-    B --> P["Playwright Controller"]
-    B --> SC["CDP Screencast/WebRTC Stream"]
-    SC --> C
-    C -->|go/not-go| S
+    S --> B["Local Browser Runtime (Playwright)"]
+    B --> P["Planner/Verifier"]
+    B --> SS["Screenshot Capture"]
+    SS --> G
+    G -->|go/not-go/revise| S
     S --> P
 ```
 
-### 10.3 마우스 커서 가시화
+### 10.3 스크린샷 질의 규칙
 
-1. 커서 오버레이 레이어를 별도 렌더링
-2. 액션 이벤트(`move/down/up`)를 스트림과 동기화
-3. 스크린샷 모드에서도 동일 커서 마커 삽입
+1. 민감 액션 전 반드시 캡처
+2. 불확실성(신뢰도 임계치 미달) 발생 시 캡처
+3. 채팅 응답 타임아웃 시 안전 스텝만 진행, 민감 스텝은 대기
 
 ---
 
@@ -455,10 +465,10 @@ flowchart LR
 - Patch-only 업데이트
 - Screenshot Question 모드
 
-### Phase 3. Vision + Live Ops
+### Phase 3. Vision + Screenshot Ops
 
 - ROI 배칭/역매핑
-- 실시간 화면 스트리밍(CDP 우선)
+- Screenshot 질의 흐름
 - Human handoff 워크플로우
 
 ### Phase 4. Self-Improvement

@@ -14,8 +14,15 @@
 5. 실행 아티팩트: `doc/CODEX-RUN-ARTIFACTS.md`
 6. 코드 리뷰: `doc/CODEX-CODE-REVIEW.md`
 7. 태스크 템플릿: `doc/CODEX-TASK-TEMPLATE.md`
+8. 외부 연동 경계: `doc/CODEX-INTEGRATION-BOUNDARY.md`
+9. E2E 테스트: `doc/CODEX-E2E-TESTING.md`
+10. 환경변수 설정: `doc/CODEX-ENV-SETUP.md`
+11. 자동화 테스트 플랜: `doc/CODEX-AUTOMATION-TEST-PLAN.md`
+12. 진화 백엔드: `doc/CODEX-EVOLUTION-BACKEND.md`
+13. SDK/백엔드 사용법: `doc/CODEX-SDK-BACKEND-USAGE.md`
+14. 실사용 가이드: `doc/CODEX-PRACTICAL-USAGE.md`
 
-충돌 시 우선순위: `PRD > RUNBOOK > PLAN > TEST/FIX > ARTIFACTS > REVIEW > TEMPLATE`
+충돌 시 우선순위: `PRD > RUNBOOK > PLAN > PRACTICAL-USAGE > SDK-BACKEND-USAGE > EVOLUTION-BACKEND > AUTOMATION-TEST-PLAN > ENV-SETUP > E2E > INTEGRATION-BOUNDARY > TEST/FIX > ARTIFACTS > REVIEW > TEMPLATE`
 
 ## 3) Multi-Agent Roles (Logical)
 
@@ -53,6 +60,14 @@
 4. 액션 직후 검증 실패 시 무한 재시도하지 않는다(재시도 한도 필수).
 5. 신규 기능은 로그/메트릭 포인트를 함께 추가한다.
 6. 테스트 통과만으로 완료 처리하지 않는다. 리뷰 승인까지 확인한다.
+7. 기본 사용자 인터랙션은 실시간 스트리밍이 아니라 스크린샷 질의(Telegram/Slack)로 처리한다.
+8. Telegram/Slack webhook/세션 라우팅/비서 프롬프트는 외부 AI 비서 프로젝트 범위이며, 이 저장소는 `assistantless e2e 시뮬레이션 + 코어 계약`까지만 구현한다.
+9. 캡차/2FA/보안 챌린지는 자동 우회/자동 풀이를 시도하지 않고 즉시 human handoff로 전환한다.
+10. 실전형 자동 배치 테스트는 `/home/jedi/code/web-agentic-codex/testing/autonomous-batch` 시나리오 폴더에 `process.md`, `result.json`, 스크린샷, `PLAN.md`, `WORKFLOW.md`, `FINAL-OPTIMIZED-RESULT.md`를 저장한다.
+11. 진화(evolution) 파이프라인은 `bug/exception` 트리거에서만 시작하며 신규 요구마다 자동 실행하지 않는다.
+12. 진화 candidate는 반드시 `git worktree` 격리 경로에서 테스트/수정하고, 승인 전에는 active pointer를 교체하지 않는다.
+13. 문서 변경 시 `영어/한국어` 이중 문서를 유지하고, 각 문서 상단에 상호 언어 전환 링크를 제공한다.
+14. 운영 모드는 `backend_simple`(HTTP)과 `sdk_detailed`(임베딩)로 구분하되, 세션 스키마/턴 기록 계약은 공통으로 유지한다.
 
 ## 6) Directory Conventions
 

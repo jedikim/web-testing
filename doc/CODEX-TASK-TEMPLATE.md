@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-TASK-TEMPLATE.en.md) | [한국어](./CODEX-TASK-TEMPLATE.md)
+
 # CODEX TASK TEMPLATE
 
 ## 1) 요청 템플릿 (사용자 -> Codex)
@@ -15,6 +17,8 @@
 - url:
 - credentials source:
 - target data:
+- chat channel: telegram/slack
+- user chat id:
 
 ### Done Criteria
 - [ ] 기능 완료 기준 1
@@ -82,6 +86,7 @@ flowchart LR
   - run_json:
   - log:
   - screenshot:
+  - chat_trace:
 
 ## Review
 - decision:
@@ -94,4 +99,29 @@ flowchart LR
 ## Next Options
 1.
 2.
+```
+
+## 5) Evolution(버그/예외) 템플릿
+
+```md
+## Evolution Trigger
+- type: bug|exception
+- source run:
+- why now:
+
+## Sandbox Candidate
+- base branch:
+- candidate branch:
+- worktree path:
+- scenario pack:
+
+## Test/Fix Loop
+- attempt-1:
+- attempt-2:
+- final status: awaiting_approval|failed
+
+## Promotion
+- approved by:
+- active pointer path:
+- version history path:
 ```
