@@ -70,6 +70,7 @@ Required root `.gitignore` patterns:
 
 - `CHAT_AUTOMATION_SERVER_HOST`, `CHAT_AUTOMATION_SERVER_PORT`
 - `CHAT_AUTOMATION_SESSION_ROOT`
+- `CHAT_AUTOMATION_UPLOAD_ROOT`
 - start command: `npm run example:chat-backend`
 
 ## 4. Recommended Model Policy
@@ -111,6 +112,7 @@ GEMINI_API_KEY=your-key
 CHAT_AUTOMATION_SERVER_HOST=127.0.0.1
 CHAT_AUTOMATION_SERVER_PORT=4999
 CHAT_AUTOMATION_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/chat-automation/state
+CHAT_AUTOMATION_UPLOAD_ROOT=/home/jedi/code/web-agentic-codex/testing/chat-automation/state/uploads
 ```
 
 ## 6. Safety Rules

@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
@@ -44,7 +44,8 @@ async function startServer() {
 
   const server = createChatAutomationHttpServer({
     service,
-    uiDir
+    uiDir,
+    uploadDir: resolve(stateRoot, 'uploads')
   });
 
   await new Promise<void>((resolvePromise) => {
@@ -68,7 +69,8 @@ async function startServer() {
   });
 
   return {
-    baseUrl
+    baseUrl,
+    stateRoot
   };
 }
 
@@ -80,13 +82,17 @@ async function waitForRunStatus(
 ): Promise<{ run: { status: string; waitingCaptcha?: boolean }; logs: Array<{ message: string }> }> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    const response = await fetch(`${baseUrl}/example/chat/sessions/${encodeURIComponent(sessionId)}`);
-    const payload = (await response.json()) as {
-      ok: boolean;
-      data: { run: { status: string; waitingCaptcha?: boolean }; logs: Array<{ message: string }> };
-    };
-    if (statuses.includes(payload.data.run.status)) {
-      return payload.data;
+    try {
+      const response = await fetch(`${baseUrl}/example/chat/sessions/${encodeURIComponent(sessionId)}`);
+      const payload = (await response.json()) as {
+        ok: boolean;
+        data?: { run: { status: string; waitingCaptcha?: boolean }; logs: Array<{ message: string }> };
+      };
+      if (response.ok && payload.ok && payload.data && statuses.includes(payload.data.run.status)) {
+        return payload.data;
+      }
+    } catch {
+      // Ignore transient read errors and retry.
     }
     await sleep(25);
   }
@@ -241,5 +247,83 @@ describe('chat automation server', () => {
       body: '{"title":'
     });
     expect(invalidJson.status).toBe(400);
+  });
+
+  it('accepts image attachments and stores uploaded files for chat message', async () => {
+    const { baseUrl, stateRoot } = await startServer();
+
+    const createdResponse = await fetch(`${baseUrl}/example/chat/sessions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: 'attachment session',
+        operatorId: 'operator-attach'
+      })
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as {
+      data: { session: { id: string } };
+    };
+    const sessionId = created.data.session.id;
+
+    const tinyPngDataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAukB9Wn1JvQAAAAASUVORK5CYII=';
+
+    const sendResponse = await fetch(
+      `${baseUrl}/example/chat/sessions/${encodeURIComponent(sessionId)}/message`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          content: '첨부 이미지와 비슷한 상품을 네이버에서 찾아줘.',
+          browserMode: 'headful',
+          operatorId: 'operator-attach',
+          attachments: [
+            {
+              name: 'tiny-reference.png',
+              mimeType: 'image/png',
+              dataUrl: tinyPngDataUrl
+            }
+          ]
+        })
+      }
+    );
+    expect(sendResponse.status).toBe(200);
+
+    await waitForRunStatus(baseUrl, sessionId, ['completed']);
+
+    const detailResponse = await fetch(`${baseUrl}/example/chat/sessions/${encodeURIComponent(sessionId)}`);
+    expect(detailResponse.status).toBe(200);
+    const detailPayload = (await detailResponse.json()) as {
+      ok: boolean;
+      data: {
+        session: {
+          turns: Array<{
+            role: string;
+            metadata?: {
+              attachments?: Array<{
+                name?: string;
+                source?: string;
+                path?: string;
+              }>;
+            };
+          }>;
+        };
+      };
+    };
+    expect(detailPayload.ok).toBe(true);
+    const userTurn = detailPayload.data.session.turns.find((turn) => turn.role === 'user');
+    const attachment = userTurn?.metadata?.attachments?.[0];
+    expect(attachment?.name).toBe('tiny-reference.png');
+    expect(attachment?.source).toBe('upload');
+    expect(typeof attachment?.path).toBe('string');
+    if (attachment?.path) {
+      await access(attachment.path);
+      expect(attachment.path.startsWith(resolve(stateRoot, 'uploads'))).toBe(true);
+    }
   });
 });

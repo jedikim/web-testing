@@ -30,6 +30,7 @@ flowchart LR
 - repeated-item composite judgement (`merge -> YOLO26 -> same-image VLM fallback -> reverse trace`)
 - assistantless E2E simulation without implementing Slack/Telegram integration itself
 - chat automation backend sample (`/example/chat/*`) with live log stream, headful/headless switch, pause/resume/cancel, captcha handoff input
+- chat UI image attachment support for requests like "find similar items on Naver using this photo"
 - evolution backend for isolated candidate versions (worktree + test/fix + approval)
 
 ## Quick Start

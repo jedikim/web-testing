@@ -93,10 +93,17 @@ curl -s http://127.0.0.1:4999/example/chat/sessions \
 curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/message \
   -H 'content-type: application/json' \
   -d '{
-    "content": "Open naver.com and plan family-friendly places near Pangyo after weather check.",
+    "content": "Find similar items on Naver image search using attached photo.",
     "browserMode": "headful",
     "operatorId": "operator-main",
-    "autoPauseOthers": true
+    "autoPauseOthers": true,
+    "attachments": [
+      {
+        "name": "reference-shoe.png",
+        "mimeType": "image/png",
+        "dataUrl": "data:image/png;base64,<BASE64>"
+      }
+    ]
   }'
 ```
 

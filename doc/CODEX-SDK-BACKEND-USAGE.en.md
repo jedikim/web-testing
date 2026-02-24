@@ -101,6 +101,7 @@ Default endpoint: `http://127.0.0.1:4999`
 2. runtime logs and step progress stream to UI continuously
 3. captcha/security challenge is handled by explicit user input route, not bypass logic
 4. new message can auto-pause older session when operator id is the same
+5. message accepts image attachments (`attachments[]`) for similar-search automation flows
 
 ## 4. Mode B: SDK Detailed
 

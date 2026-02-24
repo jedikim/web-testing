@@ -220,4 +220,67 @@ describe('ChatAutomationService', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('stores attachment metadata and enables attachment-aware steps', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'chat-automation-attachments-'));
+
+    try {
+      const store = new SessionStore({
+        rootDir: root
+      });
+      const service = new ChatAutomationService({
+        store,
+        stepDelayMs: 15
+      });
+      await service.init();
+
+      const created = await service.createSession({
+        title: 'attachment session',
+        operatorId: 'op-attach'
+      });
+
+      await service.sendMessage({
+        sessionId: created.session.id,
+        content: '첨부한 사진과 비슷한 것 네이버에서 찾아줘.',
+        browserMode: 'headful',
+        operatorId: 'op-attach',
+        attachments: [
+          {
+            name: 'reference-shoe.png',
+            mimeType: 'image/png',
+            source: 'path',
+            path: '/tmp/reference-shoe.png',
+            sizeBytes: 1234
+          }
+        ]
+      });
+
+      const done = await waitForSnapshot(
+        service,
+        created.session.id,
+        (snapshot) => snapshot.run.status === 'completed'
+      );
+
+      const userTurn = done.session.turns.find((turn) => turn.role === 'user');
+      const metadata = userTurn?.metadata as
+        | {
+            attachments?: Array<{ name?: string; source?: string }>;
+          }
+        | undefined;
+
+      expect(metadata?.attachments?.length).toBe(1);
+      expect(metadata?.attachments?.[0]?.name).toBe('reference-shoe.png');
+      expect(metadata?.attachments?.[0]?.source).toBe('path');
+      expect(done.logs.some((entry) => entry.message.includes('Attachment-aware flow enabled'))).toBe(
+        true
+      );
+      expect(
+        done.logs.some((entry) =>
+          entry.message.includes('Prepare Naver similar-image search flow with attached reference')
+        )
+      ).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +9,7 @@ import { SessionStore } from '../session/store';
 import {
   ChatAutomationService,
   type BrowserMode,
+  type ChatMessageAttachmentInput,
   type CreateChatSessionInput
 } from './chat-automation-service';
 
@@ -21,6 +22,15 @@ interface JsonResponse {
 export interface ChatAutomationHttpServerOptions {
   service: ChatAutomationService;
   uiDir?: string;
+  uploadDir?: string;
+}
+
+interface RawAttachmentPayload {
+  name?: unknown;
+  mimeType?: unknown;
+  url?: unknown;
+  path?: unknown;
+  dataUrl?: unknown;
 }
 
 function contentType(path: string): string {
@@ -49,13 +59,14 @@ function sendJson(res: ServerResponse, statusCode: number, payload: JsonResponse
 async function parseBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
+  const maxSizeBytes = 15 * 1024 * 1024;
 
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     chunks.push(buffer);
     size += buffer.byteLength;
 
-    if (size > 3 * 1024 * 1024) {
+    if (size > maxSizeBytes) {
       throw new Error('request body too large');
     }
   }
@@ -106,6 +117,129 @@ function sanitizeRelativePath(pathname: string): string {
   return pathname.replace(/^\/+/, '').replace(/\.\.+/g, '').replace(/\\/g, '/');
 }
 
+function sanitizeFilename(raw: string): string {
+  const value = raw.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+  return value.length > 0 ? value : 'attachment';
+}
+
+function extensionFromMime(mimeType: string | undefined): string {
+  if (!mimeType) {
+    return '.bin';
+  }
+  const normalized = mimeType.toLowerCase();
+  if (normalized.includes('png')) {
+    return '.png';
+  }
+  if (normalized.includes('jpeg') || normalized.includes('jpg')) {
+    return '.jpg';
+  }
+  if (normalized.includes('webp')) {
+    return '.webp';
+  }
+  if (normalized.includes('gif')) {
+    return '.gif';
+  }
+  return '.bin';
+}
+
+function parseDataUrl(raw: string): { mimeType?: string; buffer: Buffer } {
+  const matched = raw.match(/^data:([^;,]+)?;base64,(.+)$/);
+  if (!matched) {
+    throw new Error('invalid attachment dataUrl');
+  }
+  const mimeType = matched[1] ? matched[1].trim() : undefined;
+  const encoded = matched[2]!.trim();
+  if (encoded.length === 0) {
+    throw new Error('invalid attachment dataUrl');
+  }
+  return {
+    mimeType,
+    buffer: Buffer.from(encoded, 'base64')
+  };
+}
+
+function asRawAttachmentList(value: unknown): RawAttachmentPayload[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((entry) => typeof entry === 'object' && entry !== null && !Array.isArray(entry))
+    .map((entry) => entry as RawAttachmentPayload);
+}
+
+async function resolveMessageAttachments(
+  sessionId: string,
+  attachments: RawAttachmentPayload[],
+  uploadRoot: string
+): Promise<ChatMessageAttachmentInput[]> {
+  if (attachments.length === 0) {
+    return [];
+  }
+  if (attachments.length > 8) {
+    throw new Error('attachments exceed limit (max 8)');
+  }
+
+  const targetDir = resolve(uploadRoot, sanitizeFilename(sessionId));
+  await mkdir(targetDir, { recursive: true });
+
+  const resolved: ChatMessageAttachmentInput[] = [];
+
+  for (let index = 0; index < attachments.length; index += 1) {
+    const entry = attachments[index]!;
+    const name = entry.name ? String(entry.name).trim() : `attachment-${index + 1}`;
+    const mimeType = entry.mimeType ? String(entry.mimeType).trim() : undefined;
+    const url = entry.url ? String(entry.url).trim() : '';
+    const path = entry.path ? String(entry.path).trim() : '';
+    const dataUrl = entry.dataUrl ? String(entry.dataUrl).trim() : '';
+
+    if (url.length > 0) {
+      resolved.push({
+        name,
+        mimeType,
+        source: 'url',
+        url
+      });
+      continue;
+    }
+
+    if (path.length > 0) {
+      resolved.push({
+        name,
+        mimeType,
+        source: 'path',
+        path
+      });
+      continue;
+    }
+
+    if (dataUrl.length > 0) {
+      const parsed = parseDataUrl(dataUrl);
+      const sizeBytes = parsed.buffer.byteLength;
+      if (sizeBytes > 8 * 1024 * 1024) {
+        throw new Error('attachment too large (max 8MB each)');
+      }
+
+      const extension = extname(name) || extensionFromMime(parsed.mimeType ?? mimeType);
+      const stem = extname(name) ? name.slice(0, -extname(name).length) : name;
+      const filename = `${Date.now()}-${index + 1}-${sanitizeFilename(stem)}${extension.startsWith('.') ? extension : `.${extension}`}`;
+      const absolutePath = resolve(targetDir, filename);
+      if (!absolutePath.startsWith(`${targetDir}/`) && absolutePath !== targetDir) {
+        throw new Error('invalid attachment path');
+      }
+      await writeFile(absolutePath, parsed.buffer);
+      resolved.push({
+        name,
+        mimeType: parsed.mimeType ?? mimeType,
+        source: 'upload',
+        path: absolutePath,
+        sizeBytes
+      });
+    }
+  }
+
+  return resolved;
+}
+
 function statusCodeForError(error: Error): number {
   if (error.message.startsWith('session not found:')) {
     return 404;
@@ -123,11 +257,16 @@ function statusCodeForError(error: Error): number {
     return 400;
   }
 
+  if (error.message.includes('attachment')) {
+    return 400;
+  }
+
   return 500;
 }
 
 export function createChatAutomationHttpServer(options: ChatAutomationHttpServerOptions) {
   const uiDir = options.uiDir ?? resolve(process.cwd(), 'runtime', 'examples', 'chat-automation-ui');
+  const uploadDir = options.uploadDir ?? resolve(process.cwd(), 'testing', 'chat-automation', 'uploads');
 
   return createServer(async (req, res) => {
     try {
@@ -186,13 +325,19 @@ export function createChatAutomationHttpServer(options: ChatAutomationHttpServer
       const messageRoute = path.match(/^\/example\/chat\/sessions\/([^/]+)\/message$/);
       if (method === 'POST' && messageRoute) {
         const body = asRecord(await parseBody(req));
+        const attachments = await resolveMessageAttachments(
+          messageRoute[1]!,
+          asRawAttachmentList(body.attachments),
+          uploadDir
+        );
 
         const snapshot = await options.service.sendMessage({
           sessionId: messageRoute[1]!,
           content: String(body.content ?? ''),
           browserMode: asBrowserMode(body.browserMode),
           operatorId: body.operatorId ? String(body.operatorId) : undefined,
-          autoPauseOthers: asBoolean(body.autoPauseOthers, true)
+          autoPauseOthers: asBoolean(body.autoPauseOthers, true),
+          attachments
         });
 
         sendJson(res, 200, {
@@ -316,6 +461,7 @@ export interface StartChatAutomationServerOptions {
   repoRoot?: string;
   sessionRoot?: string;
   uiDir?: string;
+  uploadDir?: string;
   stepDelayMs?: number;
 }
 
@@ -328,6 +474,10 @@ export async function startChatAutomationServer(options: StartChatAutomationServ
     options.sessionRoot ??
     process.env.CHAT_AUTOMATION_SESSION_ROOT ??
     resolve(repoRoot, 'testing', 'chat-automation', 'state');
+  const uploadDir =
+    options.uploadDir ??
+    process.env.CHAT_AUTOMATION_UPLOAD_ROOT ??
+    resolve(sessionRoot, 'uploads');
 
   const store = new SessionStore({
     rootDir: sessionRoot
@@ -341,7 +491,8 @@ export async function startChatAutomationServer(options: StartChatAutomationServ
 
   const server = createChatAutomationHttpServer({
     service,
-    uiDir: options.uiDir
+    uiDir: options.uiDir,
+    uploadDir
   });
 
   const host = options.host ?? process.env.CHAT_AUTOMATION_SERVER_HOST ?? '127.0.0.1';

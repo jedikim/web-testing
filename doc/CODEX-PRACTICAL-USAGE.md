@@ -93,10 +93,17 @@ curl -s http://127.0.0.1:4999/example/chat/sessions \
 curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/message \
   -H 'content-type: application/json' \
   -d '{
-    "content": "naver.com 열고 날씨 확인 후 판교 기준 가족 나들이 후보를 정리해줘",
+    "content": "첨부한 사진과 비슷한 것을 네이버 이미지 검색에서 찾아줘",
     "browserMode": "headful",
     "operatorId": "operator-main",
-    "autoPauseOthers": true
+    "autoPauseOthers": true,
+    "attachments": [
+      {
+        "name": "reference-shoe.png",
+        "mimeType": "image/png",
+        "dataUrl": "data:image/png;base64,<BASE64>"
+      }
+    ]
   }'
 ```
 

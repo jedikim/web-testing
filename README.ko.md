@@ -30,6 +30,7 @@ flowchart LR
 - 반복 리스트 합성 판단(`이미지 합성 -> YOLO26 -> 동일 이미지 VLM fallback -> 역추적`)
 - Slack/Telegram 구현 없이 assistantless E2E 시뮬레이션
 - 채팅형 자동화 백엔드 샘플(`/example/chat/*`): 실시간 로그 스트림, headful/headless 선택, pause/resume/cancel, 캡차 handoff 입력
+- 채팅 UI 이미지 첨부 지원: "이 사진과 비슷한 것을 네이버에서 찾아줘" 같은 요청 처리
 - worktree 격리 + 테스트/수정 + 승인 기반 진화 백엔드
 
 ## 빠른 시작

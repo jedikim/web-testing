@@ -3,7 +3,8 @@ const state = {
   selectedSessionId: null,
   snapshot: null,
   stream: null,
-  refreshTimer: null
+  refreshTimer: null,
+  pendingFiles: []
 };
 
 const sessionListEl = document.getElementById('sessionList');
@@ -31,6 +32,8 @@ const submitCaptchaBtn = document.getElementById('submitCaptchaBtn');
 const browserModeSelect = document.getElementById('browserModeSelect');
 const autoPauseCheckbox = document.getElementById('autoPauseCheckbox');
 const messageInput = document.getElementById('messageInput');
+const attachmentInput = document.getElementById('attachmentInput');
+const attachmentList = document.getElementById('attachmentList');
 const sendBtn = document.getElementById('sendBtn');
 
 function escapeHtml(value) {
@@ -39,6 +42,65 @@ function escapeHtml(value) {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) {
+    return '0 B';
+  }
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderPendingAttachments() {
+  if (!attachmentList) {
+    return;
+  }
+  if (state.pendingFiles.length === 0) {
+    attachmentList.textContent = 'No attachments selected.';
+    return;
+  }
+  attachmentList.innerHTML = state.pendingFiles
+    .map((file) => `<span class="attachment-chip">${escapeHtml(file.name)} (${formatBytes(file.size)})</span>`)
+    .join('');
+}
+
+function renderTurnAttachments(turn) {
+  const attachments = Array.isArray(turn?.metadata?.attachments) ? turn.metadata.attachments : [];
+  if (attachments.length === 0) {
+    return '';
+  }
+
+  return `
+    <div class="turn-attachments">
+      ${attachments
+        .map((attachment) => {
+          const source = attachment.source ? `(${escapeHtml(String(attachment.source))})` : '';
+          const name = escapeHtml(attachment.name || 'attachment');
+          return `<span class="attachment-chip">${name} ${source}</span>`;
+        })
+        .join('')}
+    </div>
+  `;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolvePromise, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolvePromise(String(reader.result || ''));
+    };
+    reader.onerror = () => {
+      reject(reader.error || new Error('failed to read attachment'));
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 async function request(path, init = {}) {
@@ -70,6 +132,7 @@ function renderTurns(turns = []) {
       <div class="turn">
         <div class="role">${escapeHtml(turn.role)} <span class="muted">${escapeHtml(turn.at)}</span></div>
         <div>${escapeHtml(turn.content).replaceAll('\n', '<br/>')}</div>
+        ${renderTurnAttachments(turn)}
       </div>
     `
     )
@@ -231,17 +294,33 @@ async function sendMessage() {
     throw new Error('Message is empty');
   }
 
+  const attachments = [];
+  for (const file of state.pendingFiles) {
+    const dataUrl = await readFileAsDataUrl(file);
+    attachments.push({
+      name: file.name,
+      mimeType: file.type || undefined,
+      dataUrl
+    });
+  }
+
   await request(`/example/chat/sessions/${encodeURIComponent(sessionId)}/message`, {
     method: 'POST',
     body: JSON.stringify({
       content,
       browserMode: browserModeSelect.value,
       operatorId: operatorInput.value.trim() || 'default-operator',
-      autoPauseOthers: autoPauseCheckbox.checked
+      autoPauseOthers: autoPauseCheckbox.checked,
+      attachments
     })
   });
 
   messageInput.value = '';
+  state.pendingFiles = [];
+  if (attachmentInput) {
+    attachmentInput.value = '';
+  }
+  renderPendingAttachments();
 }
 
 async function postAction(action) {
@@ -295,6 +374,16 @@ bindAsync(pauseBtn, () => postAction('pause'));
 bindAsync(resumeBtn, () => postAction('resume'));
 bindAsync(cancelBtn, () => postAction('cancel'));
 bindAsync(submitCaptchaBtn, submitCaptcha);
+
+if (attachmentInput) {
+  attachmentInput.addEventListener('change', () => {
+    const files = attachmentInput.files ? Array.from(attachmentInput.files) : [];
+    state.pendingFiles = files.filter((file) => file.type.startsWith('image/'));
+    renderPendingAttachments();
+  });
+}
+
+renderPendingAttachments();
 
 refreshSessions()
   .then(async () => {

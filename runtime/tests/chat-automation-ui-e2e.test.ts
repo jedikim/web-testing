@@ -12,6 +12,7 @@ interface RunningHarness {
   uiUrl: string;
   stateRoot: string;
   evidenceDir: string;
+  sampleImagePath: string;
   close: () => Promise<void>;
 }
 
@@ -61,6 +62,14 @@ async function startHarness(testName: string): Promise<RunningHarness> {
   const runStamp = nowIso().replace(/[:.]/g, '-');
   const evidenceDir = resolve(CHAT_UI_E2E_ROOT, `${runStamp}_${sanitizeName(testName)}`);
   await mkdir(evidenceDir, { recursive: true });
+  const sampleImagePath = resolve(stateRoot, 'sample-reference.png');
+  await writeFile(
+    sampleImagePath,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAukB9Wn1JvQAAAAASUVORK5CYII=',
+      'base64'
+    )
+  );
 
   const started = await startChatAutomationServer({
     host: '127.0.0.1',
@@ -81,6 +90,7 @@ async function startHarness(testName: string): Promise<RunningHarness> {
     uiUrl: `${baseUrl}/example/chat/ui`,
     stateRoot,
     evidenceDir,
+    sampleImagePath,
     close: async () => {
       await new Promise<void>((resolvePromise) => {
         started.server.close(() => resolvePromise());
@@ -199,8 +209,13 @@ async function sendMessage(
   page: import('playwright').Page,
   message: string,
   browserMode: 'headful' | 'headless',
-  trace: TestTrace
+  trace: TestTrace,
+  attachmentPaths: string[] = []
 ): Promise<void> {
+  if (attachmentPaths.length > 0) {
+    await page.setInputFiles('#attachmentInput', attachmentPaths);
+    trace.events.push(`attachments selected: ${attachmentPaths.map((path) => path.split('/').pop()).join(', ')}`);
+  }
   await page.locator('#browserModeSelect').selectOption(browserMode);
   await page.locator('#messageInput').fill(message);
   await page.locator('#sendBtn').click();
@@ -253,9 +268,10 @@ describe('chat automation UI e2e', () => {
 
         await sendMessage(
           page,
-          '로그인 과정에서 captcha verification 이 필요하면 사용자 입력을 기다려.',
+          '첨부한 사진과 비슷한 것을 네이버에서 찾아주고, 로그인 과정에서 captcha verification 이 필요하면 사용자 입력을 기다려.',
           'headful',
-          trace
+          trace,
+          [harness.sampleImagePath]
         );
         await waitForStatus(page, 'waiting_captcha', trace);
         await captureStep(page, harness, trace, 'waiting-captcha');
@@ -268,6 +284,9 @@ describe('chat automation UI e2e', () => {
         await captureStep(page, harness, trace, 'completed');
 
         const logs = (await page.locator('#logs').textContent()) ?? '';
+        const turns = (await page.locator('#turns').textContent()) ?? '';
+        expect(turns).toContain('sample-reference.png');
+        expect(logs).toContain('Attachment-aware flow enabled');
         expect(logs).toContain('Captcha input required from user');
         expect(logs).toContain('Run completed successfully');
 

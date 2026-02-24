@@ -28,6 +28,7 @@ export interface ChatAutomationTask {
   content: string;
   browserMode: BrowserMode;
   requestedAt: string;
+  attachments: ChatMessageAttachment[];
 }
 
 export interface ChatAutomationRunState {
@@ -68,6 +69,7 @@ export interface SendMessageInput {
   browserMode: BrowserMode;
   operatorId?: string;
   autoPauseOthers?: boolean;
+  attachments?: ChatMessageAttachmentInput[];
 }
 
 export interface CreateChatSessionInput {
@@ -90,6 +92,26 @@ export interface ChatAutomationServiceOptions {
   logTailSize?: number;
 }
 
+export type ChatMessageAttachmentSource = 'upload' | 'url' | 'path';
+
+export interface ChatMessageAttachment {
+  name: string;
+  mimeType?: string;
+  source: ChatMessageAttachmentSource;
+  path?: string;
+  url?: string;
+  sizeBytes?: number;
+}
+
+export interface ChatMessageAttachmentInput {
+  name?: string;
+  mimeType?: string;
+  source?: ChatMessageAttachmentSource;
+  path?: string;
+  url?: string;
+  sizeBytes?: number;
+}
+
 interface SessionRuntimeState {
   sessionId: string;
   operatorId: string;
@@ -103,7 +125,15 @@ interface SessionRuntimeState {
 }
 
 interface RuntimeStep {
-  kind: 'analysis' | 'browser' | 'navigate' | 'captcha' | 'listing' | 'verify';
+  kind:
+    | 'analysis'
+    | 'browser'
+    | 'navigate'
+    | 'attachment_analysis'
+    | 'image_search'
+    | 'captcha'
+    | 'listing'
+    | 'verify';
   title: string;
 }
 
@@ -157,17 +187,79 @@ function needsCaptchaInput(message: string): boolean {
   return /(captcha|로그인|인증|verification|otp|2fa)/i.test(message);
 }
 
-function buildStepPlan(message: string): RuntimeStep[] {
+function needsSimilarImageSearch(message: string): boolean {
+  return /(비슷|유사|similar|look\s*alike|닮은)/i.test(message);
+}
+
+function normalizeAttachments(raw: ChatMessageAttachmentInput[] | undefined): ChatMessageAttachment[] {
+  if (!raw || raw.length === 0) {
+    return [];
+  }
+
+  const normalized: ChatMessageAttachment[] = [];
+  for (const entry of raw) {
+    const name = (entry.name ?? '').trim();
+    const source = entry.source ?? (entry.url ? 'url' : entry.path ? 'path' : 'upload');
+
+    if (source === 'url') {
+      const url = (entry.url ?? '').trim();
+      if (!url) {
+        continue;
+      }
+      normalized.push({
+        name: name || 'attachment-url',
+        mimeType: entry.mimeType,
+        source,
+        url,
+        sizeBytes: entry.sizeBytes
+      });
+      continue;
+    }
+
+    const path = (entry.path ?? '').trim();
+    if (!path) {
+      continue;
+    }
+    normalized.push({
+      name: name || 'attachment-image',
+      mimeType: entry.mimeType,
+      source,
+      path,
+      sizeBytes: entry.sizeBytes
+    });
+  }
+
+  return normalized;
+}
+
+function buildStepPlan(message: string, attachments: ChatMessageAttachment[]): RuntimeStep[] {
   const steps: RuntimeStep[] = [
     { kind: 'analysis', title: 'Analyze user objective and extract constraints' },
     { kind: 'browser', title: 'Prepare browser runtime and execution mode' },
-    { kind: 'navigate', title: `Navigate target site ${detectSiteFromMessage(message)}` },
+    {
+      kind: 'navigate',
+      title: `Navigate target site ${needsSimilarImageSearch(message) ? 'https://search.naver.com/search.naver?where=image' : detectSiteFromMessage(message)}`
+    },
     { kind: 'listing', title: 'Inspect listing/repeated items and select candidate actions' },
     { kind: 'verify', title: 'Verify outcome and prepare next turn summary' }
   ];
 
-  if (needsCaptchaInput(message)) {
+  if (attachments.length > 0) {
     steps.splice(3, 0, {
+      kind: 'attachment_analysis',
+      title: `Analyze ${attachments.length} attached image(s) and extract visual descriptors`
+    });
+
+    if (needsSimilarImageSearch(message)) {
+      steps.splice(4, 0, {
+        kind: 'image_search',
+        title: 'Prepare Naver similar-image search flow with attached reference'
+      });
+    }
+  }
+
+  if (needsCaptchaInput(message)) {
+    steps.splice(Math.min(steps.length - 1, 3 + (attachments.length > 0 ? 1 : 0)), 0, {
       kind: 'captcha',
       title: 'Captcha / security challenge requires user input'
     });
@@ -455,15 +547,22 @@ export class ChatAutomationService {
     state.run.waitingCaptcha = false;
     state.run.captchaPrompt = undefined;
 
-    const steps = buildStepPlan(task.content);
+    const steps = buildStepPlan(task.content, task.attachments);
     this.log(
       state,
       'info',
-      `Run started (${task.browserMode}) with ${steps.length} steps; target=${detectSiteFromMessage(task.content)}`
+      `Run started (${task.browserMode}) with ${steps.length} steps; target=${detectSiteFromMessage(task.content)}; attachments=${task.attachments.length}`
     );
+    if (task.attachments.length > 0) {
+      const names = task.attachments.map((entry) => entry.name).join(', ');
+      this.log(state, 'info', `Attachment-aware flow enabled for: ${names}`);
+    }
     await this.appendTurn(sessionId, {
       role: 'assistant',
-      content: `Automation started in ${task.browserMode} mode.`
+      content:
+        task.attachments.length > 0
+          ? `Automation started in ${task.browserMode} mode with ${task.attachments.length} image attachment(s).`
+          : `Automation started in ${task.browserMode} mode.`
     });
     await this.emitSnapshot(sessionId);
 
@@ -535,6 +634,7 @@ export class ChatAutomationService {
 
   async sendMessage(input: SendMessageInput): Promise<ChatAutomationSessionSnapshot> {
     const content = ensureNonEmpty(input.content, 'content');
+    const attachments = normalizeAttachments(input.attachments);
 
     const session = await this.mustGetSession(input.sessionId);
     const state = this.ensureRuntime(session);
@@ -545,7 +645,13 @@ export class ChatAutomationService {
 
     await this.appendTurn(input.sessionId, {
       role: 'user',
-      content
+      content,
+      metadata:
+        attachments.length > 0
+          ? {
+              attachments
+            }
+          : undefined
     });
 
     const now = nowIso();
@@ -553,11 +659,16 @@ export class ChatAutomationService {
       id: `${input.sessionId}-run-${now.replace(/[-:.TZ]/g, '')}-${state.queue.length + 1}`,
       content,
       browserMode: input.browserMode,
-      requestedAt: now
+      requestedAt: now,
+      attachments
     });
     state.run.queueLength = state.queue.length;
 
-    this.log(state, 'info', `User message queued (${input.browserMode})`);
+    this.log(
+      state,
+      'info',
+      `User message queued (${input.browserMode}) with ${attachments.length} attachment(s)`
+    );
 
     if (input.autoPauseOthers ?? true) {
       await this.pauseOtherSessions(state.operatorId, input.sessionId);

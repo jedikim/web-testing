@@ -81,6 +81,12 @@
 
           <textarea id="messageInput" rows="4" placeholder="Describe the automation you want to build...&#10;If a captcha/security challenge appears, input it in the captcha section."></textarea>
 
+          <label class="field">
+            <span>Attach image(s) for similar search</span>
+            <input id="attachmentInput" type="file" accept="image/*" multiple />
+          </label>
+          <div id="attachmentList" class="attachment-list muted">No attachments selected.</div>
+
           <div class="row end">
             <button id="sendBtn">Send And Run</button>
           </div>
