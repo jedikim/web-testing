@@ -108,6 +108,19 @@ npm run test:evolution
 npm test
 ```
 
+## Latest Verification Snapshot (2026-02-24)
+
+- Branch state: `main` after merge from `feature/phase1-deterministic-core`
+- Validation commands:
+  - `./scripts/validate-run-artifacts.sh` -> pass
+  - `cd runtime && npm run typecheck` -> pass
+  - `cd runtime && npm test` -> 55 files passed, 140 tests passed, 9 skipped
+  - `cd runtime && npm run test:e2e:chat-ui:headful` -> 2 tests passed
+  - `cd runtime && npm run test:automation:full` -> pass
+  - `cd runtime && npm run test:sdk` -> 11 files passed, 26 tests passed
+  - `cd runtime && npm run test:evolution` -> 3 files passed, 9 tests passed
+- Fix cycle result: no blocker/major issue found in this verification run.
+
 ## Artifacts and State Paths
 
 - runtime artifacts: `runs/samples/artifacts/`

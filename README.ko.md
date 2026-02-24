@@ -108,6 +108,19 @@ npm run test:evolution
 npm test
 ```
 
+## 최신 검증 스냅샷 (2026-02-24)
+
+- 브랜치 상태: `feature/phase1-deterministic-core`를 `main`에 병합한 상태
+- 검증 명령:
+  - `./scripts/validate-run-artifacts.sh` -> pass
+  - `cd runtime && npm run typecheck` -> pass
+  - `cd runtime && npm test` -> 55 files passed, 140 tests passed, 9 skipped
+  - `cd runtime && npm run test:e2e:chat-ui:headful` -> 2 tests passed
+  - `cd runtime && npm run test:automation:full` -> pass
+  - `cd runtime && npm run test:sdk` -> 11 files passed, 26 tests passed
+  - `cd runtime && npm run test:evolution` -> 3 files passed, 9 tests passed
+- 수정 루프 결과: 이번 검증 실행에서 blocker/major 이슈 없음.
+
 ## 아티팩트/상태 경로
 
 - 런타임 아티팩트: `runs/samples/artifacts/`
