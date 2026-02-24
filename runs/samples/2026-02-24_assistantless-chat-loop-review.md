@@ -9,9 +9,10 @@
   - action: defer
 - Decision: approve
 - Evidence:
-  - runtime: npm run test:e2e:assistantless:contract (3 passed)
+  - runtime: npm run test:e2e:assistantless:contract (5 passed)
+  - runtime: ASSISTANTLESS_KR_ITERATIONS=3 npm run test:e2e:assistantless:live (2 passed)
   - runtime: npm run test:provider:contract (15 passed)
-  - runtime: npm run test:full-flow (12 passed)
+  - runtime: npm run test:full-flow (14 passed)
   - runtime: npm run test:e2e:kr:headful (7 passed)
   - runtime: npm test (100 passed, 8 skipped)
   - runtime: npm run typecheck (pass)
