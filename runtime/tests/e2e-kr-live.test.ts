@@ -4,11 +4,19 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { loadRuntimeEnv } from '../src/config/env';
 import { KR_LIVE_SCENARIOS } from '../src/e2e/kr-scenarios';
 
-const RUN_KR_E2E = process.env.RUN_KR_E2E === '1';
-const E2E_TIMEOUT_MS = 90000;
+const runtimeEnv = loadRuntimeEnv({
+  RUN_KR_E2E: process.env.RUN_KR_E2E,
+  PW_HEADLESS: process.env.PW_HEADLESS,
+  PLAYWRIGHT_TIMEOUT_MS: process.env.PLAYWRIGHT_TIMEOUT_MS,
+  ARTIFACT_ROOT: process.env.ARTIFACT_ROOT
+});
+const RUN_KR_E2E = runtimeEnv.runKrE2E;
+const E2E_TIMEOUT_MS = Math.max(runtimeEnv.playwrightTimeoutMs * 4, 30000);
 const TEST_DIR = fileURLToPath(new URL('.', import.meta.url));
+const REPO_ROOT = resolve(TEST_DIR, '..', '..');
 
 describe('korean live smoke e2e', () => {
   it('is disabled unless RUN_KR_E2E=1', () => {
@@ -22,7 +30,7 @@ describe.runIf(RUN_KR_E2E)('korean live smoke e2e - scenarios', () => {
       scenario.id,
       async () => {
         const { chromium } = await import('playwright');
-        const browser = await chromium.launch({ headless: true });
+        const browser = await chromium.launch({ headless: runtimeEnv.playwrightHeadless });
 
         try {
           const context = await browser.newContext({
@@ -37,12 +45,8 @@ describe.runIf(RUN_KR_E2E)('korean live smoke e2e - scenarios', () => {
           const day = startedAt.toISOString().slice(0, 10);
           const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
           const artifactsDir = resolve(
-            TEST_DIR,
-            '..',
-            '..',
-            'runs',
-            'samples',
-            'artifacts',
+            REPO_ROOT,
+            runtimeEnv.artifactRoot,
             'e2e',
             day
           );

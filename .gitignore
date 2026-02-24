@@ -1,3 +1,9 @@
 .worktrees/
 runtime/node_modules/
 runs/samples/artifacts/e2e/
+.env
+.env.*
+!.env.example
+runtime/.env
+runtime/.env.*
+!runtime/.env.example

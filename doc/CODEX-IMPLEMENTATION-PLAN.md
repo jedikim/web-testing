@@ -207,8 +207,10 @@ flowchart TD
 7. Vision/Screenshot 코어: `runtime/src/vision/roi-batcher.ts`, `runtime/src/vision/visual-recovery.ts`, `runtime/src/checkpoint/go-no-go.ts`, `runtime/src/view/view-mode.ts`
 8. Chat 코어: `runtime/src/chat/platform-normalizer.ts`, `runtime/src/chat/screenshot-checkpoint.ts`, `runtime/src/chat/screenshot-chat-loop.ts`
 9. Integration 코어: `runtime/src/integration/human-loop-runtime.ts`
-10. KR E2E 코어: `runtime/src/e2e/kr-scenarios.ts`, `runtime/tests/kr-e2e-scenarios.test.ts`, `runtime/tests/e2e-kr-live.test.ts`
-11. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`, `runtime/src/learning/adaptive-controller.ts`
-12. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`, `runtime/src/ops/resilience-orchestrator.ts`
-13. 테스트: `runtime/tests/*` 28개 파일, 기본 69 통과/6 스킵(라이브 1회 실행 시 75 통과)
-14. 리뷰/검증 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-screenshot-chat-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`, `runs/samples/2026-02-24_kr-live-e2e-report.md`
+10. Env/Config 코어: `runtime/src/config/env.ts`, `runtime/tests/env-config.test.ts`, `runtime/.env.example`
+11. KR E2E 코어: `runtime/src/e2e/kr-scenarios.ts`, `runtime/tests/kr-e2e-scenarios.test.ts`, `runtime/tests/e2e-kr-live.test.ts`
+12. Full-flow 테스트 코어: `runtime/src/testing/automation-full-flow.ts`, `runtime/tests/automation-full-flow.test.ts`
+13. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`, `runtime/src/learning/adaptive-controller.ts`
+14. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`, `runtime/src/ops/resilience-orchestrator.ts`
+15. 테스트: `runtime/tests/*` 30개 파일, 기본 76 통과/6 스킵(라이브 1회 실행 시 82 통과)
+16. 리뷰/검증 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-screenshot-chat-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`, `runs/samples/2026-02-24_kr-live-e2e-report.md`

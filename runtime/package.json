@@ -6,8 +6,10 @@
   "scripts": {
     "test": "vitest run",
     "test:acceptance": "vitest run tests/phase-acceptance.test.ts",
+    "test:full-flow": "vitest run tests/automation-full-flow.test.ts tests/phase-acceptance.test.ts",
     "test:e2e:kr": "RUN_KR_E2E=1 vitest run tests/e2e-kr-live.test.ts",
     "test:e2e:kr:contract": "vitest run tests/kr-e2e-scenarios.test.ts tests/e2e-kr-live.test.ts",
+    "test:automation": "npm run test:full-flow && npm run test:e2e:kr:contract",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

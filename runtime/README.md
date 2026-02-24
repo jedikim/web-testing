@@ -46,16 +46,24 @@ npm run test:acceptance
 npm run typecheck
 ```
 
+## 환경변수
+
+- 예시 파일: `.env.example`
+- 세팅 문서: `../doc/CODEX-ENV-SETUP.md`
+- 런타임 파서: `src/config/env.ts`
+
 ## 한국 사이트 E2E 스모크
 
 - 시나리오 정의: `src/e2e/kr-scenarios.ts`
 - 계약 테스트(오프라인): `tests/kr-e2e-scenarios.test.ts`
 - 라이브 스모크(옵트인): `tests/e2e-kr-live.test.ts`
+- 전체 플로우 시뮬레이션: `tests/automation-full-flow.test.ts`
 
 실행:
 
 ```bash
 cd runtime
+npm run test:full-flow
 npm run test:e2e:kr:contract
 npm run test:e2e:kr
 ```
