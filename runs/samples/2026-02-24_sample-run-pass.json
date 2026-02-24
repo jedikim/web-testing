@@ -1,0 +1,54 @@
+{
+  "runId": "run_2026-02-24_0001",
+  "workflowId": "shopping_search_v01",
+  "status": "pass",
+  "startedAt": "2026-02-24T09:45:00Z",
+  "endedAt": "2026-02-24T09:45:21Z",
+  "durationMs": 21000,
+  "context": {
+    "mode": "live",
+    "browser": "chromium",
+    "targetUrl": "https://shopping.example.com"
+  },
+  "steps": [
+    {
+      "stepId": "n1",
+      "nodeType": "NavigateNode",
+      "action": "goto",
+      "verified": true,
+      "attempts": 1,
+      "startedAt": "2026-02-24T09:45:00Z",
+      "endedAt": "2026-02-24T09:45:03Z"
+    },
+    {
+      "stepId": "n2",
+      "nodeType": "ActionNode",
+      "action": "type",
+      "target": "search_box",
+      "verified": true,
+      "attempts": 1,
+      "startedAt": "2026-02-24T09:45:03Z",
+      "endedAt": "2026-02-24T09:45:06Z"
+    },
+    {
+      "stepId": "n3",
+      "nodeType": "VerifyNode",
+      "action": "assert_results_exist",
+      "verified": true,
+      "attempts": 1,
+      "startedAt": "2026-02-24T09:45:06Z",
+      "endedAt": "2026-02-24T09:45:09Z"
+    }
+  ],
+  "failures": [],
+  "review": {
+    "decision": "approve",
+    "blockerMajorCount": 0,
+    "unresolvedMinorNit": 1,
+    "notes": "Minor log naming cleanup deferred"
+  },
+  "evidence": [
+    "runs/samples/artifacts/run_2026-02-24_0001.log",
+    "runs/samples/artifacts/run_2026-02-24_0001.png"
+  ]
+}

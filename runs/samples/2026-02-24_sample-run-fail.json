@@ -1,0 +1,58 @@
+{
+  "runId": "run_2026-02-24_0002",
+  "workflowId": "shopping_search_v01",
+  "status": "fail",
+  "startedAt": "2026-02-24T09:49:32Z",
+  "endedAt": "2026-02-24T09:50:11Z",
+  "durationMs": 39000,
+  "context": {
+    "mode": "screenshot",
+    "browser": "chromium",
+    "targetUrl": "https://shopping.example.com"
+  },
+  "steps": [
+    {
+      "stepId": "n4",
+      "nodeType": "DiscoverNode",
+      "action": "extract_clickables",
+      "verified": true,
+      "attempts": 1,
+      "startedAt": "2026-02-24T09:49:32Z",
+      "endedAt": "2026-02-24T09:49:35Z"
+    },
+    {
+      "stepId": "n5",
+      "nodeType": "ActionNode",
+      "action": "click",
+      "target": "checkout_button",
+      "verified": false,
+      "attempts": 2,
+      "startedAt": "2026-02-24T09:49:35Z",
+      "endedAt": "2026-02-24T09:49:46Z"
+    }
+  ],
+  "failures": [
+    {
+      "code": "ActionNotApplied",
+      "message": "Click did not change checkout panel state",
+      "stepId": "n5",
+      "suggestedAction": "fallback to right_click or re-discover target"
+    },
+    {
+      "code": "ReviewRejected",
+      "message": "Reviewer flagged missing fallback verification",
+      "stepId": "n5",
+      "suggestedAction": "add regression case and re-review"
+    }
+  ],
+  "review": {
+    "decision": "rework",
+    "blockerMajorCount": 1,
+    "unresolvedMinorNit": 0,
+    "notes": "Major: missing post-click verification branch"
+  },
+  "evidence": [
+    "runs/samples/artifacts/run_2026-02-24_0002.log",
+    "runs/samples/artifacts/run_2026-02-24_0002.png"
+  ]
+}
