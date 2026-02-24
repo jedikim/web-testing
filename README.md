@@ -26,6 +26,10 @@ flowchart LR
 ## What This Repository Does
 
 - deterministic workflow execution first, fallback only when needed
+- Similo-style selector fingerprint recovery before LLM patch fallback
+- cascaded LLM routing (`flash-first -> uncertainty/sensitive gate -> pro -> rule fallback`)
+- semantic replay retrieval + plan template cache/adaptation for repeated tasks
+- self-healing taxonomy classification (selector/timing/data/runtime/render/interaction)
 - multi-turn chat-like session state for automation planning/execution
 - repeated-item composite judgement (`merge -> YOLO26 -> same-image VLM fallback -> reverse trace`)
 - assistantless E2E simulation without implementing Slack/Telegram integration itself
@@ -103,6 +107,10 @@ npm run example:repeated-item
 - default YOLO26 model: `yolo26l`
 - coding/self-improvement loops: `gemini-3.1-pro-preview`
 - automation interaction loops: `gemini-3.0-flash`
+- cascaded routing env:
+  - `BACKEND_AUTOMATION_MODEL` (default `gemini-3.0-flash`)
+  - `BACKEND_CASCADE_ESCALATION_MODEL` (default `gemini-3.1-pro-preview`)
+  - `BACKEND_CASCADE_THRESHOLD` (default `0.65`)
 
 ## Verification Commands
 
@@ -110,22 +118,27 @@ npm run example:repeated-item
 cd runtime
 npm run typecheck
 npm run test:e2e:fixtures
+npm run test:e2e:chat-ui:headful
+npm run test:e2e:kr:headful
+npm run test:e2e:assistantless:live
+npm run test:e2e:provider:live
+npm run test:e2e:autonomous:live
 npm run test:sdk
 npm run test:evolution
 npm test
 ```
 
-## Latest Verification Snapshot (2026-02-24)
+## Latest Verification Snapshot (2026-02-25, KST)
 
-- Branch state: `main` after merge from `feature/phase1-deterministic-core`
+- Branch state: `main`
 - Validation commands:
-  - `./scripts/validate-run-artifacts.sh` -> pass
   - `cd runtime && npm run typecheck` -> pass
-  - `cd runtime && npm test` -> 55 files passed, 140 tests passed, 9 skipped
+  - `cd runtime && npm test` -> 59 files passed, 160 tests passed, 9 skipped
   - `cd runtime && npm run test:e2e:chat-ui:headful` -> 2 tests passed
-  - `cd runtime && npm run test:automation:full` -> pass
-  - `cd runtime && npm run test:sdk` -> 11 files passed, 26 tests passed
-  - `cd runtime && npm run test:evolution` -> 3 files passed, 9 tests passed
+  - `cd runtime && npm run test:e2e:kr:headful` -> 7 tests passed
+  - `cd runtime && npm run test:e2e:assistantless:live` -> 2 tests passed
+  - `cd runtime && npm run test:e2e:provider:live` -> 3 tests passed, 1 skipped (no live provider matrix in env)
+  - `cd runtime && npm run test:e2e:autonomous:live` -> 2 tests passed (headful autonomous batch, 2 iterations)
 - Fix cycle result: no blocker/major issue found in this verification run.
 
 ## Artifacts and State Paths

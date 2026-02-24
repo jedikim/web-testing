@@ -1,5 +1,6 @@
 import type { RunFailure, RunStatus } from '../types';
 import { shouldRetry } from '../policies/retry-policy';
+import { classifyFailureCode, suggestedHealingAction } from '../policies/self-healing-taxonomy';
 import { validateWorkflow } from '../workflow/validate-workflow';
 import type { BranchNode, LoopNode, WorkflowDefinition, WorkflowNode } from '../workflow/types';
 import type { DeterministicAdapter, ExecutionStep } from './types';
@@ -18,8 +19,13 @@ export interface ExecuteWorkflowResult {
   failures: RunFailure[];
 }
 
-function asFailure(code: RunFailure['code'], message: string, stepId?: string): RunFailure {
-  return { code, message, stepId };
+function asFailure(
+  code: RunFailure['code'],
+  message: string,
+  stepId?: string,
+  suggestedAction?: string
+): RunFailure {
+  return { code, message, stepId, suggestedAction };
 }
 
 function resolveNode(nodeById: Map<string, WorkflowNode>, id?: string): WorkflowNode | undefined {
@@ -88,7 +94,10 @@ export async function executeWorkflow(
         return { ok: true };
       }
 
-      const code = result.failureCode ?? 'Unknown';
+      const code = classifyFailureCode({
+        failureCode: result.failureCode ?? 'Unknown',
+        message: result.message
+      });
       const message = result.message ?? `${node.id} failed`;
       if (!shouldRetry({ attempt, maxAttempts: maxAttemptsPerNode, failureCode: code })) {
         steps.push({
@@ -98,7 +107,7 @@ export async function executeWorkflow(
           attempts: attempt,
           success: false
         });
-        failures.push(asFailure(code, message, node.id));
+        failures.push(asFailure(code, message, node.id, suggestedHealingAction(code)));
         return { ok: false, status: code === 'AuthBlocked' ? 'blocked' : 'fail' };
       }
       attempt += 1;

@@ -5,6 +5,14 @@ export interface SelectorPatchOperation {
   path: string;
   value?: {
     css?: string;
+    fingerprint?: {
+      text?: string;
+      role?: string;
+      idHint?: string;
+      classTokens?: string[];
+      nearbyText?: string[];
+      bboxNorm?: [number, number, number, number];
+    };
   };
 }
 

@@ -28,6 +28,11 @@ Coverage:
 1. reproducible local HTML fixture flows
 2. Playwright action adapter stability (type/click/select/wait)
 3. regression checks without live-site dependency
+4. reliability additions:
+   - `tests/auto-recovery.test.ts` (Similo fingerprint-first recovery)
+   - `tests/session-engine-cascaded.test.ts` (flash-first cascade routing)
+   - `tests/plan-cache.test.ts` + `tests/replay-store.test.ts` (semantic cache/replay)
+   - `tests/self-healing-taxonomy.test.ts` + `tests/retry-policy.test.ts` (taxonomy and retry mapping)
 
 ### Layer B: Full Flow Simulation (always)
 ```bash
@@ -65,6 +70,9 @@ cd runtime
 npm run test:provider:contract
 npm run test:e2e:provider:live
 ```
+Note:
+- `test:e2e:provider:live` runs live matrix only when both LLM and YOLO26 targets are configured in env.
+- If `RUN_PROVIDER_LIVE_E2E=1` but matrix env is missing, matrix run is skipped and contract checks still run.
 
 ### Layer G: Evolution Backend (bug/exception only)
 ```bash

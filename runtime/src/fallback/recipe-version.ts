@@ -1,8 +1,18 @@
 import { validateSelectorPatch, type SelectorPatch } from './patch-validator';
 
+export interface SelectorFingerprint {
+  text?: string;
+  role?: string;
+  idHint?: string;
+  classTokens?: string[];
+  nearbyText?: string[];
+  bboxNorm?: [number, number, number, number];
+}
+
 export interface SelectorRecipeEntry {
   css: string;
   updatedAt: string;
+  fingerprint?: SelectorFingerprint;
 }
 
 export interface SelectorRecipe {
@@ -44,7 +54,8 @@ export function applySelectorPatch(
 
     nextSelectors[key] = {
       css: operation.value!.css!,
-      updatedAt
+      updatedAt,
+      fingerprint: operation.value?.fingerprint
     };
   }
 

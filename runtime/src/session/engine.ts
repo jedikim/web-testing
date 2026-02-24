@@ -14,6 +14,13 @@ export interface MultiTurnEngine {
   generate(input: GenerateTurnInput): Promise<GenerateTurnOutput>;
 }
 
+export interface CascadedUncertaintyReport {
+  escalate: boolean;
+  reason?: string;
+  confidence: number;
+  sensitive: boolean;
+}
+
 function recentTurns(turns: SessionTurn[], count = 6): SessionTurn[] {
   return turns.slice(Math.max(0, turns.length - count));
 }
@@ -191,6 +198,158 @@ export class HybridTurnEngine implements MultiTurnEngine {
   }
 }
 
+export interface CascadedTurnEngineOptions {
+  primary: MultiTurnEngine;
+  escalation: MultiTurnEngine;
+  fallback?: MultiTurnEngine;
+  uncertaintyThreshold?: number;
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+  return value;
+}
+
+function estimateConfidence(output: GenerateTurnOutput): number {
+  const metadataConfidence = asNumber((output.metadata as Record<string, unknown> | undefined)?.confidence);
+  if (metadataConfidence !== undefined) {
+    return Math.max(0, Math.min(1, metadataConfidence));
+  }
+
+  const text = output.content.trim();
+  if (text.length < 20) {
+    return 0.35;
+  }
+  if (/\b(maybe|uncertain|not sure|확실하지|모르겠)\b/i.test(text)) {
+    return 0.45;
+  }
+  if (text.length >= 80) {
+    return 0.85;
+  }
+  return 0.7;
+}
+
+function isSensitiveRequest(message: string): boolean {
+  return /(login|로그인|captcha|otp|2fa|payment|결제|password|비밀번호|security)/i.test(message);
+}
+
+function needsEscalationForUncertainty(
+  input: GenerateTurnInput,
+  output: GenerateTurnOutput,
+  threshold: number
+): CascadedUncertaintyReport {
+  const confidence = estimateConfidence(output);
+  const sensitive = isSensitiveRequest(input.userMessage);
+  if (sensitive) {
+    return {
+      escalate: true,
+      reason: 'sensitive_request',
+      confidence,
+      sensitive
+    };
+  }
+
+  if (confidence < threshold) {
+    return {
+      escalate: true,
+      reason: 'low_confidence',
+      confidence,
+      sensitive
+    };
+  }
+
+  return {
+    escalate: false,
+    confidence,
+    sensitive
+  };
+}
+
+function withCascadeMetadata(
+  output: GenerateTurnOutput,
+  metadata: Record<string, unknown>
+): GenerateTurnOutput {
+  return {
+    ...output,
+    metadata: {
+      ...(output.metadata ?? {}),
+      ...metadata
+    }
+  };
+}
+
+export class CascadedTurnEngine implements MultiTurnEngine {
+  private readonly primary: MultiTurnEngine;
+  private readonly escalation: MultiTurnEngine;
+  private readonly fallback: MultiTurnEngine;
+  private readonly uncertaintyThreshold: number;
+
+  constructor(options: CascadedTurnEngineOptions) {
+    this.primary = options.primary;
+    this.escalation = options.escalation;
+    this.fallback = options.fallback ?? new RuleBasedTurnEngine();
+    this.uncertaintyThreshold = Math.min(1, Math.max(0, options.uncertaintyThreshold ?? 0.65));
+  }
+
+  private async runEscalation(
+    input: GenerateTurnInput,
+    reason: string
+  ): Promise<GenerateTurnOutput> {
+    const escalated = await this.escalation.generate(input);
+    return withCascadeMetadata(escalated, {
+      cascadeTier: 'pro',
+      escalated: true,
+      escalationReason: reason
+    });
+  }
+
+  async generate(input: GenerateTurnInput): Promise<GenerateTurnOutput> {
+    try {
+      const primary = await this.primary.generate(input);
+      const assessment = needsEscalationForUncertainty(
+        input,
+        primary,
+        this.uncertaintyThreshold
+      );
+
+      if (!assessment.escalate) {
+        return withCascadeMetadata(primary, {
+          cascadeTier: 'flash',
+          escalated: false,
+          confidence: assessment.confidence,
+          sensitive: assessment.sensitive
+        });
+      }
+
+      try {
+        return await this.runEscalation(input, assessment.reason ?? 'uncertain');
+      } catch {
+        const fallback = await this.fallback.generate(input);
+        return withCascadeMetadata(fallback, {
+          cascadeTier: 'rule_fallback',
+          escalated: true,
+          escalationReason: assessment.reason ?? 'uncertain',
+          fallbackReason: 'escalation_failed'
+        });
+      }
+    } catch {
+      try {
+        return await this.runEscalation(input, 'flash_failed');
+      } catch {
+        const fallback = await this.fallback.generate(input);
+        return withCascadeMetadata(fallback, {
+          cascadeTier: 'rule_fallback',
+          escalated: true,
+          escalationReason: 'flash_failed',
+          fallbackReason: 'flash_and_escalation_failed'
+        });
+      }
+    }
+  }
+}
+
 export interface BuildDefaultTurnEngineOptions {
   useGemini?: boolean;
 }
@@ -203,8 +362,20 @@ export function buildDefaultTurnEngine(
     return new RuleBasedTurnEngine();
   }
 
-  return new HybridTurnEngine({
-    primary: new GeminiTurnEngine(),
-    fallback: new RuleBasedTurnEngine()
+  const thresholdRaw = process.env.BACKEND_CASCADE_THRESHOLD;
+  const thresholdParsed = thresholdRaw ? Number(thresholdRaw) : undefined;
+  const uncertaintyThreshold = Number.isFinite(thresholdParsed ?? Number.NaN)
+    ? thresholdParsed
+    : undefined;
+
+  return new CascadedTurnEngine({
+    primary: new GeminiTurnEngine({
+      model: process.env.BACKEND_AUTOMATION_MODEL ?? 'gemini-3.0-flash'
+    }),
+    escalation: new GeminiTurnEngine({
+      model: process.env.BACKEND_CASCADE_ESCALATION_MODEL ?? 'gemini-3.1-pro-preview'
+    }),
+    fallback: new RuleBasedTurnEngine(),
+    uncertaintyThreshold
   });
 }

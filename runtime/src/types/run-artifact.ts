@@ -5,8 +5,14 @@ export type ReviewDecision = 'approve' | 'rework' | 'not_run';
 export type FailureCode =
   | 'SelectorNotFound'
   | 'ActionNotApplied'
+  | 'HiddenElement'
+  | 'TimingTimeout'
+  | 'NetworkTransient'
   | 'ExpectationFailed'
+  | 'DataMismatch'
   | 'VisualAmbiguity'
+  | 'RenderBlocked'
+  | 'RuntimeCrash'
   | 'AuthBlocked'
   | 'ReviewRejected'
   | 'Unknown';

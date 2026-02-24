@@ -42,4 +42,22 @@ describe('shouldRetry', () => {
       })
     ).toBe(false);
   });
+
+  it('retries timing/network/render related transient failures', () => {
+    expect(
+      shouldRetry({
+        attempt: 1,
+        maxAttempts: 3,
+        failureCode: 'TimingTimeout'
+      })
+    ).toBe(true);
+
+    expect(
+      shouldRetry({
+        attempt: 1,
+        maxAttempts: 3,
+        failureCode: 'NetworkTransient'
+      })
+    ).toBe(true);
+  });
 });

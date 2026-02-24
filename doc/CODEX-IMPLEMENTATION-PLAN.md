@@ -211,6 +211,34 @@
 7. `runtime/src/evolution/server.ts`에 `POST /evolution/auto-improve` 추가
 8. `runtime/package.json` 스크립트 추가(`test:sdk`, `example:sdk:*`)
 
+### Phase 8: Reliability Optimization (Similo + Cascade + Cache + Taxonomy)
+
+목표:
+
+1. Similo 스타일 다속성 fingerprint 기반 selector 복구를 LLM patch 이전 단계에 추가
+2. LLM cascaded routing(Flash-first + uncertainty/sensitive gate + Pro escalation) 적용
+3. 반복 태스크용 semantic plan cache 조회/적응 경로 추가
+4. self-healing taxonomy 분류 + suggested action 연결
+
+완료 기준:
+
+1. fingerprint 매칭 케이스에서 `llmCalls=0` 자동 복구 테스트 통과
+2. cascaded 엔진이 저신뢰/민감 요청에서만 escalation 수행
+3. plan cache hit/adaptation + quality score 저하 테스트 통과
+4. timing/interaction/data/render 분류 테스트 통과
+5. 전체 테스트 + headful/live E2E 명령 재검증 통과
+
+진행 현황(2026-02-25, KST):
+
+1. `runtime/src/fallback/similo.ts` 추가(다속성 유사도 스코어링 + patch 제안)
+2. `runtime/src/fallback/auto-recovery.ts`에 Similo 선행 복구 경로 통합
+3. `runtime/src/session/engine.ts`에 `CascadedTurnEngine` 추가 및 기본 엔진 연결
+4. `runtime/src/learning/plan-cache.ts` 추가 + `chat-automation-service` plan cache 연동
+5. `runtime/src/learning/replay-store.ts`에 semantic similarity 조회(`findSimilar`) 추가
+6. `runtime/src/policies/self-healing-taxonomy.ts` 추가 + deterministic runner suggested action 연결
+7. `runtime/tests/*`에 cascaded/plan-cache/similo/taxonomy 테스트 추가 및 통과
+8. headful/live E2E(`kr`, `assistantless`, `autonomous`) 재실행 통과
+
 ## 2. 작업 우선순위
 
 ```mermaid
@@ -221,6 +249,7 @@ flowchart TD
     D --> E["Phase 5"]
     E --> F["Phase 6"]
     F --> G["Phase 7"]
+    G --> H["Phase 8"]
 ```
 
 선행 Phase가 완료되지 않으면 다음 Phase 기능을 본선 반영하지 않는다.

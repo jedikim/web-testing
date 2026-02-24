@@ -39,6 +39,11 @@ npm run typecheck
 1. 로컬 HTML fixture 기반 실행 재현성
 2. Playwright action adapter(타이핑/클릭/옵션선택/대기) 안정성
 3. 라이브 사이트 의존도 없이 회귀 재현
+4. 신뢰성 보강 테스트:
+   - `tests/auto-recovery.test.ts` (Similo fingerprint 선행 복구)
+   - `tests/session-engine-cascaded.test.ts` (flash-first cascade 라우팅)
+   - `tests/plan-cache.test.ts` + `tests/replay-store.test.ts` (semantic cache/replay)
+   - `tests/self-healing-taxonomy.test.ts` + `tests/retry-policy.test.ts` (taxonomy 분류/재시도)
 
 명령:
 
@@ -128,6 +133,11 @@ npm run test:provider:contract
 # 실제 키/엔드포인트가 있으면:
 npm run test:e2e:provider:live
 ```
+
+주의:
+
+1. `test:e2e:provider:live`는 LLM target + YOLO26 target이 모두 env에 설정된 경우에만 live matrix를 실행한다.
+2. `RUN_PROVIDER_LIVE_E2E=1`이어도 matrix env가 비어 있으면 live matrix는 skip되고 contract 검증만 수행된다.
 
 ### Layer G: Evolution Backend (bug/exception only)
 

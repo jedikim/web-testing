@@ -34,6 +34,7 @@ Dual 모드 운용을 위한 환경변수 기준을 고정한다.
 - `PLAYWRIGHT_TIMEOUT_MS`
 - `RUN_KR_E2E`, `RUN_ASSISTANTLESS_KR_E2E`, `RUN_AUTONOMOUS_BATCH_E2E`
 - `AUTONOMOUS_BATCH_ROOT`
+- `SIMILO_ENABLED` (`1`: selector fingerprint 복구 활성, `0`: 비활성)
 
 ### 3.2 Provider/모델 매트릭스
 
@@ -69,6 +70,10 @@ Dual 모드 운용을 위한 환경변수 기준을 고정한다.
 - `BACKEND_SESSION_ROOT`
 - `BACKEND_LLM_ENABLED` (`1`: Gemini turn engine, `0`: rule-only)
 - `BACKEND_AUTOMATION_MODEL` (권장 `gemini-3.0-flash`)
+- `BACKEND_CASCADE_ESCALATION_MODEL` (권장 `gemini-3.1-pro-preview`)
+- `BACKEND_CASCADE_THRESHOLD` (권장 `0.65`)
+- `PLAN_CACHE_ENABLED` (`1`: 유사 플랜 재사용/적응 활성)
+- `PLAN_CACHE_SIMILARITY_THRESHOLD` (권장 `0.45`)
 
 ### 3.6 Chat automation 예제 백엔드
 
@@ -107,6 +112,10 @@ BACKEND_SERVER_PORT=4888
 BACKEND_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/backend/state
 BACKEND_LLM_ENABLED=1
 BACKEND_AUTOMATION_MODEL=gemini-3.0-flash
+BACKEND_CASCADE_ESCALATION_MODEL=gemini-3.1-pro-preview
+BACKEND_CASCADE_THRESHOLD=0.65
+PLAN_CACHE_ENABLED=1
+PLAN_CACHE_SIMILARITY_THRESHOLD=0.45
 GEMINI_API_KEY=your-key
 ```
 

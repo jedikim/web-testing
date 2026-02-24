@@ -79,6 +79,26 @@ describe('executeWorkflow', () => {
     expect(result.steps[0]?.success).toBe(false);
   });
 
+  it('applies self-healing taxonomy classification and suggested action on failure', async () => {
+    const workflow: WorkflowDefinition = {
+      workflowId: 'healing_case',
+      nodes: [{ id: 'n1', type: 'ActionNode', op: 'click_login' }]
+    };
+
+    const adapter = new FakeAdapter({
+      n1: () => ({
+        ok: false,
+        failureCode: 'ActionNotApplied',
+        message: 'Element is not visible and cannot be clicked'
+      })
+    });
+
+    const result = await executeWorkflow(workflow, { adapter, maxAttemptsPerNode: 1 });
+    expect(result.status).toBe('fail');
+    expect(result.failures[0]?.code).toBe('HiddenElement');
+    expect(result.failures[0]?.suggestedAction).toContain('menu');
+  });
+
   it('supports branch + loop flow without llm', async () => {
     const workflow: WorkflowDefinition = {
       workflowId: 'branch_loop_case',

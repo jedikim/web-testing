@@ -14,18 +14,42 @@ const REPO_ROOT = resolve(TEST_DIR, '..', '..');
 loadEnvFiles({ cwd: REPO_ROOT, filenames: ['runtime/.env', '.env'] });
 
 const RUN_PROVIDER_LIVE_E2E = process.env.RUN_PROVIDER_LIVE_E2E === '1';
+let providerEnvError: Error | undefined;
+let providerEnv = { llmTargets: [], visionTargets: [] } as ReturnType<typeof loadProviderMatrixEnv>;
+try {
+  providerEnv = loadProviderMatrixEnv(process.env);
+} catch (error) {
+  providerEnvError = error instanceof Error ? error : new Error(String(error));
+}
+const HAS_PROVIDER_LIVE_TARGETS =
+  providerEnv.llmTargets.length > 0 && providerEnv.visionTargets.length > 0;
 
 describe('provider live e2e', () => {
   it('is disabled unless RUN_PROVIDER_LIVE_E2E=1', () => {
     expect(typeof RUN_PROVIDER_LIVE_E2E).toBe('boolean');
   });
+
+  it('requires llm + vision live targets to run', () => {
+    expect(typeof HAS_PROVIDER_LIVE_TARGETS).toBe('boolean');
+  });
+
+  it('does not silently ignore provider env parse errors when live run is requested', () => {
+    if (!RUN_PROVIDER_LIVE_E2E) {
+      expect(true).toBe(true);
+      return;
+    }
+    if (providerEnvError) {
+      throw providerEnvError;
+    }
+    expect(providerEnvError).toBeUndefined();
+  });
 });
 
-describe.runIf(RUN_PROVIDER_LIVE_E2E)('provider live e2e - matrix', () => {
+describe.runIf(RUN_PROVIDER_LIVE_E2E && HAS_PROVIDER_LIVE_TARGETS)('provider live e2e - matrix', () => {
   it(
     'runs llm multi-vendor and yolo26 multi-model matrix from env',
     async () => {
-      const env = loadProviderMatrixEnv(process.env);
+      const env = providerEnv;
       expect(env.llmTargets.length).toBeGreaterThan(0);
       expect(env.visionTargets.length).toBeGreaterThan(0);
 

@@ -102,6 +102,21 @@ Done criteria:
 3. `POST /evolution/auto-improve` endpoint is validated
 4. `CODEX-SDK-BACKEND-USAGE` documentation is synchronized
 
+### Phase 8: Reliability Optimization (Similo + Cascade + Cache + Taxonomy)
+
+Goals:
+1. add Similo-style multi-attribute selector fingerprint recovery before LLM patch
+2. enforce cascaded LLM routing (flash-first with uncertainty/sensitive gate)
+3. add semantic plan caching/adaptation for repeated chat automation tasks
+4. classify failures with self-healing taxonomy and attach deterministic actions
+
+Done criteria:
+1. selector recovery test passes with `llmCalls=0` on fingerprint match
+2. cascade engine escalates only when needed and falls back safely
+3. plan cache hit/adaptation and quality degradation tests pass
+4. taxonomy classifies timing/interaction/data/render failures correctly
+5. full runtime test suite + headful/live e2e commands pass
+
 ## 2. Dependency Order
 
 ```mermaid
@@ -113,6 +128,7 @@ flowchart TD
     P4 --> P5[Phase 5]
     P5 --> P6[Phase 6]
     P6 --> P7[Phase 7]
+    P7 --> P8[Phase 8]
 ```
 
 ## 3. Phase Exit Checklist

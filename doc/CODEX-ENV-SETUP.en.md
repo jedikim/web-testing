@@ -34,6 +34,7 @@ Required root `.gitignore` patterns:
 - `PLAYWRIGHT_TIMEOUT_MS`
 - `RUN_KR_E2E`, `RUN_ASSISTANTLESS_KR_E2E`, `RUN_AUTONOMOUS_BATCH_E2E`
 - `AUTONOMOUS_BATCH_ROOT`
+- `SIMILO_ENABLED` (`1`: selector fingerprint recovery enabled, `0`: disabled)
 
 ### 3.2 Provider and model matrix
 
@@ -69,6 +70,10 @@ Required root `.gitignore` patterns:
 - `BACKEND_SESSION_ROOT`
 - `BACKEND_LLM_ENABLED` (`1` for Gemini turn engine, `0` for rule-only)
 - `BACKEND_AUTOMATION_MODEL` (recommended `gemini-3.0-flash`)
+- `BACKEND_CASCADE_ESCALATION_MODEL` (recommended `gemini-3.1-pro-preview`)
+- `BACKEND_CASCADE_THRESHOLD` (recommended `0.65`)
+- `PLAN_CACHE_ENABLED` (`1` to reuse/adapt similar plans)
+- `PLAN_CACHE_SIMILARITY_THRESHOLD` (recommended `0.45`)
 
 ### 3.6 Chat automation example backend
 
@@ -107,6 +112,10 @@ BACKEND_SERVER_PORT=4888
 BACKEND_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/backend/state
 BACKEND_LLM_ENABLED=1
 BACKEND_AUTOMATION_MODEL=gemini-3.0-flash
+BACKEND_CASCADE_ESCALATION_MODEL=gemini-3.1-pro-preview
+BACKEND_CASCADE_THRESHOLD=0.65
+PLAN_CACHE_ENABLED=1
+PLAN_CACHE_SIMILARITY_THRESHOLD=0.45
 GEMINI_API_KEY=your-key
 ```
 

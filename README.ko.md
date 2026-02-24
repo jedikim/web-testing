@@ -26,6 +26,10 @@ flowchart LR
 ## 이 저장소가 제공하는 것
 
 - 결정론 워크플로우 우선 실행 + 필요 구간만 폴백
+- Similo 스타일 selector fingerprint 복구(LLM patch 이전 우선 시도)
+- cascaded LLM 라우팅(`flash 우선 -> 불확실/민감 게이트 -> pro -> rule fallback`)
+- 반복 태스크용 semantic replay 검색 + plan template 캐시/적응
+- self-healing taxonomy 분류(selector/timing/data/runtime/render/interaction)
 - 자동화 계획/실행을 위한 멀티턴 세션 상태 관리
 - 반복 리스트 합성 판단(`이미지 합성 -> YOLO26 -> 동일 이미지 VLM fallback -> 역추적`)
 - Slack/Telegram 구현 없이 assistantless E2E 시뮬레이션
@@ -103,6 +107,10 @@ npm run example:repeated-item
 - 기본 YOLO26 모델: `yolo26l`
 - 코딩/자가개선 루프: `gemini-3.1-pro-preview`
 - 자동화 상호작용 루프: `gemini-3.0-flash`
+- cascaded 라우팅 환경변수:
+  - `BACKEND_AUTOMATION_MODEL` (기본 `gemini-3.0-flash`)
+  - `BACKEND_CASCADE_ESCALATION_MODEL` (기본 `gemini-3.1-pro-preview`)
+  - `BACKEND_CASCADE_THRESHOLD` (기본 `0.65`)
 
 ## 검증 명령
 
@@ -110,22 +118,27 @@ npm run example:repeated-item
 cd runtime
 npm run typecheck
 npm run test:e2e:fixtures
+npm run test:e2e:chat-ui:headful
+npm run test:e2e:kr:headful
+npm run test:e2e:assistantless:live
+npm run test:e2e:provider:live
+npm run test:e2e:autonomous:live
 npm run test:sdk
 npm run test:evolution
 npm test
 ```
 
-## 최신 검증 스냅샷 (2026-02-24)
+## 최신 검증 스냅샷 (2026-02-25, KST)
 
-- 브랜치 상태: `feature/phase1-deterministic-core`를 `main`에 병합한 상태
+- 브랜치 상태: `main`
 - 검증 명령:
-  - `./scripts/validate-run-artifacts.sh` -> pass
   - `cd runtime && npm run typecheck` -> pass
-  - `cd runtime && npm test` -> 55 files passed, 140 tests passed, 9 skipped
+  - `cd runtime && npm test` -> 59 files passed, 160 tests passed, 9 skipped
   - `cd runtime && npm run test:e2e:chat-ui:headful` -> 2 tests passed
-  - `cd runtime && npm run test:automation:full` -> pass
-  - `cd runtime && npm run test:sdk` -> 11 files passed, 26 tests passed
-  - `cd runtime && npm run test:evolution` -> 3 files passed, 9 tests passed
+  - `cd runtime && npm run test:e2e:kr:headful` -> 7 tests passed
+  - `cd runtime && npm run test:e2e:assistantless:live` -> 2 tests passed
+  - `cd runtime && npm run test:e2e:provider:live` -> 3 tests passed, 1 skipped (env에 live provider matrix 미설정)
+  - `cd runtime && npm run test:e2e:autonomous:live` -> 2 tests passed (headful autonomous batch, 2 iterations)
 - 수정 루프 결과: 이번 검증 실행에서 blocker/major 이슈 없음.
 
 ## 아티팩트/상태 경로

@@ -42,6 +42,39 @@ describe('recipe versioning', () => {
     expect(next.selectors.filter_button?.css).toBe('button[data-test=\"filter\"]');
   });
 
+  it('stores selector fingerprint when patch includes fingerprint value', () => {
+    const recipe: SelectorRecipe = {
+      workflowId: 'shopping_search_v01',
+      version: 'v001',
+      selectors: {}
+    };
+
+    const patch: SelectorPatch = {
+      target: 'selectors',
+      reason: 'similo fingerprint update',
+      operations: [
+        {
+          op: 'add',
+          path: '/selectors/search_input',
+          value: {
+            css: 'input#query',
+            fingerprint: {
+              text: '검색',
+              role: 'textbox',
+              classTokens: ['search-box'],
+              idHint: 'query',
+              nearbyText: ['통합검색']
+            }
+          }
+        }
+      ]
+    };
+
+    const next = applySelectorPatch(recipe, patch, '2026-02-24T10:00:00Z');
+    expect(next.selectors.search_input?.fingerprint?.text).toBe('검색');
+    expect(next.selectors.search_input?.fingerprint?.idHint).toBe('query');
+  });
+
   it('removes selector entries using remove operation', () => {
     const recipe: SelectorRecipe = {
       workflowId: 'shopping_search_v01',

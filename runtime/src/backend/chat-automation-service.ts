@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 
+import { PlanCache, type PlanCacheStep } from '../learning/plan-cache';
 import { SessionStore } from '../session/store';
 import type { AddSessionTurnInput, AutomationSession, CreateSessionInput, SessionTurn } from '../session/types';
 
@@ -45,6 +46,9 @@ export interface ChatAutomationRunState {
   waitingCaptcha: boolean;
   captchaPrompt?: string;
   queueLength: number;
+  planCacheHit?: boolean;
+  planCacheScore?: number;
+  planTemplateId?: string;
 }
 
 export interface ChatAutomationSessionSnapshot {
@@ -133,6 +137,8 @@ export interface ChatAutomationServiceOptions {
   store: SessionStore;
   stepDelayMs?: number;
   logTailSize?: number;
+  planCacheEnabled?: boolean;
+  planCacheSimilarityThreshold?: number;
 }
 
 export type ChatMessageAttachmentSource = 'upload' | 'url' | 'path';
@@ -167,6 +173,7 @@ interface SessionRuntimeState {
   pendingCaptchaValue?: string;
   handoffs: ChatAutomationHandoff[];
   latestScreenshot?: ChatAutomationScreenshotRef;
+  activePlanTemplateId?: string;
 }
 
 interface RuntimeStep {
@@ -194,6 +201,17 @@ function ensureNonEmpty(value: string, name: string): string {
     throw new Error(`${name} must not be empty`);
   }
   return trimmed;
+}
+
+function parseOptionalNumber(raw: string | undefined): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return undefined;
+  }
+  return parsed;
 }
 
 function nowIso(): string {
@@ -231,6 +249,15 @@ function detectSiteFromMessage(message: string): string {
   }
 
   return 'https://example.com';
+}
+
+function detectDomainFromMessage(message: string): string | undefined {
+  const site = detectSiteFromMessage(message);
+  try {
+    return new URL(site).hostname;
+  } catch {
+    return undefined;
+  }
 }
 
 function needsCaptchaInput(message: string): boolean {
@@ -318,6 +345,13 @@ function buildStepPlan(message: string, attachments: ChatMessageAttachment[]): R
   return steps;
 }
 
+function toPlanCacheSteps(steps: RuntimeStep[]): PlanCacheStep[] {
+  return steps.map((step) => ({
+    kind: step.kind,
+    title: step.title
+  }));
+}
+
 function asCreateSessionInput(input: CreateChatSessionInput): CreateSessionInput {
   return {
     mode: 'backend_simple',
@@ -341,6 +375,8 @@ export class ChatAutomationService {
   private readonly store: SessionStore;
   private readonly stepDelayMs: number;
   private readonly logTailSize: number;
+  private readonly planCacheEnabled: boolean;
+  private readonly planCache: PlanCache;
   private readonly emitter = new EventEmitter();
   private readonly runtime = new Map<string, SessionRuntimeState>();
 
@@ -348,6 +384,12 @@ export class ChatAutomationService {
     this.store = options.store;
     this.stepDelayMs = Math.max(1, Math.floor(options.stepDelayMs ?? 450));
     this.logTailSize = Math.max(20, Math.floor(options.logTailSize ?? 300));
+    this.planCacheEnabled = options.planCacheEnabled ?? process.env.PLAN_CACHE_ENABLED === '1';
+    const similarityThreshold =
+      options.planCacheSimilarityThreshold ?? parseOptionalNumber(process.env.PLAN_CACHE_SIMILARITY_THRESHOLD);
+    this.planCache = new PlanCache({
+      similarityThreshold
+    });
   }
 
   async init(): Promise<void> {
@@ -468,6 +510,50 @@ export class ChatAutomationService {
     this.emitter.on(event, listener);
     return () => {
       this.emitter.off(event, listener);
+    };
+  }
+
+  private resolvePlan(task: ChatAutomationTask): {
+    steps: RuntimeStep[];
+    cacheHit: boolean;
+    score?: number;
+    templateId?: string;
+  } {
+    const generated = buildStepPlan(task.content, task.attachments);
+    if (!this.planCacheEnabled) {
+      return { steps: generated, cacheHit: false };
+    }
+
+    const workflowId = 'chat-automation-default';
+    const domain = detectDomainFromMessage(task.content);
+    const match = this.planCache.findBestMatch({
+      workflowId,
+      goal: task.content,
+      domain
+    });
+
+    if (!match) {
+      return { steps: generated, cacheHit: false };
+    }
+
+    const adapted = this.planCache.adaptSteps(match.template, {
+      goal: task.content,
+      domain
+    });
+
+    const steps: RuntimeStep[] = adapted.map((step) => ({
+      kind: step.kind as RuntimeStep['kind'],
+      title: step.title
+    }));
+    if (steps.length === 0) {
+      return { steps: generated, cacheHit: false };
+    }
+
+    return {
+      steps,
+      cacheHit: true,
+      score: match.score,
+      templateId: match.template.id
     };
   }
 
@@ -656,8 +742,26 @@ export class ChatAutomationService {
     state.run.currentStepTitle = undefined;
     state.run.waitingCaptcha = false;
     state.run.captchaPrompt = undefined;
+    state.activePlanTemplateId = undefined;
+    state.run.planCacheHit = undefined;
+    state.run.planCacheScore = undefined;
+    state.run.planTemplateId = undefined;
 
-    const steps = buildStepPlan(task.content, task.attachments);
+    const plan = this.resolvePlan(task);
+    const steps = plan.steps;
+    state.activePlanTemplateId = plan.templateId;
+    state.run.planCacheHit = plan.cacheHit;
+    state.run.planCacheScore = plan.score;
+    state.run.planTemplateId = plan.templateId;
+
+    if (plan.cacheHit) {
+      this.log(
+        state,
+        'info',
+        `Plan cache hit (score=${(plan.score ?? 0).toFixed(3)} template=${plan.templateId})`
+      );
+    }
+
     this.log(
       state,
       'info',
@@ -687,6 +791,23 @@ export class ChatAutomationService {
     state.run.updatedAt = nowIso();
     state.run.currentStepTitle = 'Completed';
     this.log(state, 'info', 'Run completed successfully');
+    if (this.planCacheEnabled) {
+      const workflowId = 'chat-automation-default';
+      const domain = detectDomainFromMessage(task.content);
+      if (state.activePlanTemplateId) {
+        this.planCache.recordResult(state.activePlanTemplateId, 'pass');
+      } else {
+        const stored = this.planCache.storeTemplate({
+          workflowId,
+          goal: task.content,
+          domain,
+          steps: toPlanCacheSteps(steps),
+          status: 'pass'
+        });
+        state.activePlanTemplateId = stored.id;
+        state.run.planTemplateId = stored.id;
+      }
+    }
     await this.appendTurn(sessionId, {
       role: 'assistant',
       content: 'Automation run completed. You can continue with next request or open another session.'
@@ -736,6 +857,9 @@ export class ChatAutomationService {
             state.run.status = 'failed';
             state.run.lastError = message;
             state.run.updatedAt = nowIso();
+            if (this.planCacheEnabled && state.activePlanTemplateId) {
+              this.planCache.recordResult(state.activePlanTemplateId, 'fail');
+            }
             this.log(state, 'error', `Run failed: ${message}`);
             try {
               await this.appendTurn(sessionId, {
@@ -748,6 +872,7 @@ export class ChatAutomationService {
                 throw appendError;
               }
             }
+            state.activePlanTemplateId = undefined;
           }
         }
       } finally {
