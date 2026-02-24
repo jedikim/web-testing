@@ -13,11 +13,14 @@ import { resolveEvolutionModelPolicy } from './model-policy';
 import { buildScenarioPack } from './scenario-growth';
 import { EvolutionStorage } from './storage';
 import type {
+  ActiveVersionPointer,
   ApproveEvolutionJobInput,
   CreateEvolutionJobInput,
   EvolutionChangeCategory,
+  EvolutionJobDiffSnapshot,
   EvolutionEvent,
   EvolutionJob,
+  EvolutionVersionSummary,
   JobProgressSnapshot,
   RejectEvolutionJobInput
 } from './types';
@@ -75,6 +78,15 @@ async function readTail(path: string, maxChars: number): Promise<string> {
     return content.slice(-maxChars);
   } catch {
     return '';
+  }
+}
+
+async function readPrefix(path: string, maxChars: number): Promise<string | undefined> {
+  try {
+    const content = await readFile(path, 'utf-8');
+    return content.slice(0, maxChars);
+  } catch {
+    return undefined;
   }
 }
 
@@ -201,9 +213,83 @@ export class EvolutionService {
     const activeVersion = await this.storage.getActiveVersion(job.workflowId);
 
     return {
+      schemaVersion: 'evolution.job.snapshot.v1',
+      emittedAt: this.now(),
       job,
       events,
       activeVersion
+    };
+  }
+
+  async listVersionSummaries(): Promise<EvolutionVersionSummary[]> {
+    const activePointers = await this.storage.listActiveVersions();
+    const summaries: EvolutionVersionSummary[] = [];
+
+    for (const pointer of activePointers) {
+      const history = await this.storage.getVersionHistory(pointer.workflowId);
+      summaries.push({
+        workflowId: pointer.workflowId,
+        current: pointer,
+        history
+      });
+    }
+
+    return summaries.sort((left, right) => {
+      const leftAt = left.current?.promotedAt ?? '';
+      const rightAt = right.current?.promotedAt ?? '';
+      return rightAt.localeCompare(leftAt);
+    });
+  }
+
+  async getVersionSummary(workflowId: string): Promise<EvolutionVersionSummary> {
+    const current = await this.storage.getActiveVersion(workflowId);
+    const history = await this.storage.getVersionHistory(workflowId);
+    return {
+      workflowId,
+      current,
+      history
+    };
+  }
+
+  async getJobDiff(jobId: string): Promise<EvolutionJobDiffSnapshot> {
+    const job = await this.mustGetJob(jobId);
+    const candidate = job.candidate;
+
+    const attempts =
+      candidate?.testAttempts.map(async (attempt) => {
+        const patchPath = resolve(
+          this.storage.attemptsDir(job.id),
+          `attempt-${String(attempt.attempt).padStart(3, '0')}.patch.diff`
+        );
+        const [outputTail, autoFixNote, patchPreview] = await Promise.all([
+          readTail(attempt.outputPath, 3000),
+          attempt.autoFixNotePath ? readPrefix(attempt.autoFixNotePath, 3000) : Promise.resolve(undefined),
+          readPrefix(patchPath, 4000)
+        ]);
+
+        return {
+          attempt: attempt.attempt,
+          ok: attempt.ok,
+          exitCode: attempt.exitCode,
+          outputPath: attempt.outputPath,
+          outputTail: outputTail.length > 0 ? outputTail : undefined,
+          autoFixNotePath: attempt.autoFixNotePath,
+          autoFixNote,
+          patchPath: patchPreview ? patchPath : undefined,
+          patchPreview
+        };
+      }) ?? [];
+
+    return {
+      schemaVersion: 'evolution.job.diff.v1',
+      emittedAt: this.now(),
+      jobId: job.id,
+      workflowId: job.workflowId,
+      status: job.status,
+      candidateVersion: candidate?.version,
+      branchName: candidate?.branchName,
+      worktreePath: candidate?.worktreePath,
+      attempts: await Promise.all(attempts)
     };
   }
 

@@ -4,6 +4,7 @@ runs/samples/artifacts/e2e/
 runs/samples/artifacts/e2e-assistantless/
 runs/samples/artifacts/provider-matrix/
 /testing/
+/temp/
 .env
 .env.*
 !.env.example

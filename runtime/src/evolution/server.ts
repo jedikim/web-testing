@@ -134,6 +134,48 @@ export function createEvolutionHttpServer(options: EvolutionHttpServerOptions) {
         return;
       }
 
+      if (method === 'GET' && path === '/evolution/versions') {
+        const summaries = await options.service.listVersionSummaries();
+        sendJson(res, 200, {
+          ok: true,
+          data: summaries
+        });
+        return;
+      }
+
+      const versionsCurrentMatch = path.match(/^\/evolution\/versions\/([^/]+)\/current$/);
+      if (method === 'GET' && versionsCurrentMatch) {
+        const workflowId = decodeURIComponent(versionsCurrentMatch[1]!);
+        const summary = await options.service.getVersionSummary(workflowId);
+        sendJson(res, 200, {
+          ok: true,
+          data: summary.current
+        });
+        return;
+      }
+
+      const versionsHistoryMatch = path.match(/^\/evolution\/versions\/([^/]+)\/history$/);
+      if (method === 'GET' && versionsHistoryMatch) {
+        const workflowId = decodeURIComponent(versionsHistoryMatch[1]!);
+        const summary = await options.service.getVersionSummary(workflowId);
+        sendJson(res, 200, {
+          ok: true,
+          data: summary.history
+        });
+        return;
+      }
+
+      const versionsWorkflowMatch = path.match(/^\/evolution\/versions\/([^/]+)$/);
+      if (method === 'GET' && versionsWorkflowMatch) {
+        const workflowId = decodeURIComponent(versionsWorkflowMatch[1]!);
+        const summary = await options.service.getVersionSummary(workflowId);
+        sendJson(res, 200, {
+          ok: true,
+          data: summary
+        });
+        return;
+      }
+
       if (method === 'POST' && path === '/evolution/jobs') {
         const body = asRecord(await parseBody(req));
         const snapshot = await options.service.createJob({
@@ -194,6 +236,16 @@ export function createEvolutionHttpServer(options: EvolutionHttpServerOptions) {
         sendJson(res, 200, {
           ok: true,
           data: snapshot
+        });
+        return;
+      }
+
+      const diffMatch = path.match(/^\/evolution\/jobs\/([^/]+)\/diff$/);
+      if (method === 'GET' && diffMatch) {
+        const diff = await options.service.getJobDiff(diffMatch[1]!);
+        sendJson(res, 200, {
+          ok: true,
+          data: diff
         });
         return;
       }

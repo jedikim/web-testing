@@ -84,6 +84,8 @@ describe('EvolutionApiClient', () => {
           json({
             ok: true,
             data: {
+              schemaVersion: 'evolution.job.snapshot.v1',
+              emittedAt: '2026-02-24T00:00:00.000Z',
               job: {
                 id: 'job-1',
                 status: 'awaiting_approval'
@@ -95,12 +97,104 @@ describe('EvolutionApiClient', () => {
         return;
       }
 
+      if (req.url === '/evolution/jobs/job-1/diff' && req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          json({
+            ok: true,
+            data: {
+              schemaVersion: 'evolution.job.diff.v1',
+              emittedAt: '2026-02-24T00:00:00.000Z',
+              jobId: 'job-1',
+              workflowId: 'wf-1',
+              status: 'awaiting_approval',
+              attempts: []
+            }
+          })
+        );
+        return;
+      }
+
+      if (req.url === '/evolution/versions' && req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          json({
+            ok: true,
+            data: [
+              {
+                workflowId: 'wf-1',
+                current: {
+                  workflowId: 'wf-1',
+                  jobId: 'job-1',
+                  version: 1
+                },
+                history: []
+              }
+            ]
+          })
+        );
+        return;
+      }
+
+      if (req.url === '/evolution/versions/wf-1' && req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          json({
+            ok: true,
+            data: {
+              workflowId: 'wf-1',
+              current: {
+                workflowId: 'wf-1',
+                jobId: 'job-1',
+                version: 1
+              },
+              history: []
+            }
+          })
+        );
+        return;
+      }
+
+      if (req.url === '/evolution/versions/wf-1/current' && req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          json({
+            ok: true,
+            data: {
+              workflowId: 'wf-1',
+              jobId: 'job-1',
+              version: 1
+            }
+          })
+        );
+        return;
+      }
+
+      if (req.url === '/evolution/versions/wf-1/history' && req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          json({
+            ok: true,
+            data: [
+              {
+                workflowId: 'wf-1',
+                jobId: 'job-1',
+                version: 1
+              }
+            ]
+          })
+        );
+        return;
+      }
+
       if (req.url === '/evolution/jobs/job-1/approve' && req.method === 'POST') {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(
           json({
             ok: true,
             data: {
+              schemaVersion: 'evolution.job.snapshot.v1',
+              emittedAt: '2026-02-24T00:00:00.000Z',
               job: {
                 id: 'job-1',
                 status: 'promoted'
@@ -130,6 +224,23 @@ describe('EvolutionApiClient', () => {
 
     const snapshot = await client.getSnapshot('job-1');
     expect(snapshot.job.status).toBe('awaiting_approval');
+    expect(snapshot.schemaVersion).toBe('evolution.job.snapshot.v1');
+
+    const diff = await client.getJobDiff('job-1');
+    expect(diff.schemaVersion).toBe('evolution.job.diff.v1');
+    expect(diff.jobId).toBe('job-1');
+
+    const versionSummaries = await client.listVersionSummaries();
+    expect(versionSummaries[0]?.workflowId).toBe('wf-1');
+
+    const versionSummary = await client.getVersionSummary('wf-1');
+    expect(versionSummary.workflowId).toBe('wf-1');
+
+    const currentVersion = await client.getCurrentVersion('wf-1');
+    expect(currentVersion?.jobId).toBe('job-1');
+
+    const versionHistory = await client.getVersionHistory('wf-1');
+    expect(versionHistory.length).toBe(1);
 
     const approved = await client.approveJob('job-1', {
       confirmedBy: 'tester'
@@ -149,6 +260,8 @@ describe('EvolutionApiClient', () => {
           json({
             ok: true,
             data: {
+              schemaVersion: 'evolution.job.snapshot.v1',
+              emittedAt: new Date().toISOString(),
               job: {
                 id: 'job-2',
                 status

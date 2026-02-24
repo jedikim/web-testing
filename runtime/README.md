@@ -43,6 +43,9 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - Playwright 액션 어댑터(`src/engine/playwright-executor.ts`)를 추가했다.
 - Selector auto-recovery(`src/fallback/auto-recovery.ts`)와 visual auto-recovery(`src/vision/visual-recovery.ts`)를 추가했다.
 - Adaptive controller(`src/learning/adaptive-controller.ts`)와 resilience orchestrator(`src/ops/resilience-orchestrator.ts`)를 추가했다.
+- 진화 버전/변경점 조회 API 경로(`GET /evolution/versions*`, `GET /evolution/jobs/:id/diff`)를 추가했다.
+- 세션 스크린샷/핸드오프 조회 API 경로(`GET /backend/sessions/:id/screenshot`, `GET /example/chat/sessions/:id/handoffs`)를 추가했다.
+- 로컬 HTML fixture 기반 결정론 E2E(`tests/e2e-fixture-playwright-adapter.test.ts`)를 추가했다.
 - `tests/phase-acceptance.test.ts`로 Phase 1~5 완료 기준을 통합 검증한다.
 
 ## 로컬 검증
@@ -90,6 +93,7 @@ npm run example:sdk:auto-improve
 ```bash
 cd runtime
 npm run test:full-flow
+npm run test:e2e:fixtures
 npm run test:e2e:kr:contract
 npm run test:e2e:kr
 npm run test:e2e:kr:headful

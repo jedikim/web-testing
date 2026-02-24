@@ -114,6 +114,14 @@ curl -N http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/stream
 ```
 
 This stream emits runtime step updates and log entries that the sample UI renders in real time.
+The snapshot payload includes `schemaVersion=chat.session.snapshot.v1`.
+
+handoff/screenshot lookup:
+
+```bash
+curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/handoffs
+curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/screenshot
+```
 
 ### 3.4 Pause old session when new conversation starts
 

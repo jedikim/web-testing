@@ -26,6 +26,7 @@
 - 진화 백엔드: [English](./CODEX-EVOLUTION-BACKEND.en.md) | [한국어](./CODEX-EVOLUTION-BACKEND.md)
 - SDK + 백엔드 사용법: [English](./CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./CODEX-SDK-BACKEND-USAGE.md)
 - 실사용 가이드: [English](./CODEX-PRACTICAL-USAGE.en.md) | [한국어](./CODEX-PRACTICAL-USAGE.md)
+- 외부 레포 비교 분석: [English](./CODEX-EXTERNAL-REPO-GAP-ANALYSIS.en.md) | [한국어](./CODEX-EXTERNAL-REPO-GAP-ANALYSIS.md)
 - 태스크 템플릿: [English](./CODEX-TASK-TEMPLATE.en.md) | [한국어](./CODEX-TASK-TEMPLATE.md)
 
 ## 계획 아카이브

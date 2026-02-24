@@ -73,6 +73,7 @@ describe('ChatAutomationService', () => {
         (snapshot) => snapshot.run.status === 'completed'
       );
 
+      expect(done.schemaVersion).toBe('chat.session.snapshot.v1');
       expect(done.run.browserMode).toBe('headful');
       expect(done.run.queueLength).toBe(0);
       expect(done.logs.some((entry) => entry.message.includes('Run started (headful)'))).toBe(true);
@@ -117,6 +118,9 @@ describe('ChatAutomationService', () => {
 
       expect(waiting.run.waitingCaptcha).toBe(true);
       expect(waiting.run.captchaPrompt).toContain('Security challenge');
+      expect(waiting.handoffs.some((entry) => entry.type === 'captcha' && entry.status === 'waiting')).toBe(
+        true
+      );
 
       await service.submitCaptcha({
         sessionId: created.session.id,
@@ -131,6 +135,9 @@ describe('ChatAutomationService', () => {
 
       expect(done.run.waitingCaptcha).toBe(false);
       expect(done.logs.some((entry) => entry.message.includes('Captcha accepted'))).toBe(true);
+      expect(done.handoffs.some((entry) => entry.type === 'captcha' && entry.status === 'resolved')).toBe(
+        true
+      );
       expect(
         done.session.turns.some((turn) => turn.content.includes('Captcha value received. Continuing automation.'))
       ).toBe(true);
@@ -271,6 +278,8 @@ describe('ChatAutomationService', () => {
       expect(metadata?.attachments?.length).toBe(1);
       expect(metadata?.attachments?.[0]?.name).toBe('reference-shoe.png');
       expect(metadata?.attachments?.[0]?.source).toBe('path');
+      expect(done.latestScreenshot?.source).toBe('attachment');
+      expect(done.latestScreenshot?.path).toBe('/tmp/reference-shoe.png');
       expect(done.logs.some((entry) => entry.message.includes('Attachment-aware flow enabled'))).toBe(
         true
       );

@@ -48,9 +48,13 @@ export interface ChatAutomationRunState {
 }
 
 export interface ChatAutomationSessionSnapshot {
+  schemaVersion: 'chat.session.snapshot.v1';
+  emittedAt: string;
   session: AutomationSession;
   run: ChatAutomationRunState;
   logs: ChatAutomationLogEntry[];
+  handoffs: ChatAutomationHandoff[];
+  latestScreenshot?: ChatAutomationScreenshotRef;
 }
 
 export interface ChatAutomationSessionSummary {
@@ -61,6 +65,26 @@ export interface ChatAutomationSessionSummary {
   browserMode?: BrowserMode;
   updatedAt: string;
   queueLength: number;
+}
+
+export type ChatAutomationHandoffType = 'captcha' | 'security_challenge';
+
+export type ChatAutomationHandoffStatus = 'waiting' | 'resolved' | 'canceled';
+
+export interface ChatAutomationHandoff {
+  id: string;
+  type: ChatAutomationHandoffType;
+  status: ChatAutomationHandoffStatus;
+  prompt: string;
+  requestedAt: string;
+  resolvedAt?: string;
+  valueLength?: number;
+}
+
+export interface ChatAutomationScreenshotRef {
+  path: string;
+  source: 'attachment' | 'turn_screenshot' | 'runtime';
+  capturedAt: string;
 }
 
 export interface SendMessageInput {
@@ -122,6 +146,8 @@ interface SessionRuntimeState {
   paused: boolean;
   canceled: boolean;
   pendingCaptchaValue?: string;
+  handoffs: ChatAutomationHandoff[];
+  latestScreenshot?: ChatAutomationScreenshotRef;
 }
 
 interface RuntimeStep {
@@ -312,7 +338,8 @@ export class ChatAutomationService {
         logs: [],
         workerRunning: false,
         paused: false,
-        canceled: false
+        canceled: false,
+        handoffs: []
       });
     }
   }
@@ -335,7 +362,8 @@ export class ChatAutomationService {
       logs: [],
       workerRunning: false,
       paused: false,
-      canceled: false
+      canceled: false,
+      handoffs: []
     };
     this.runtime.set(session.id, created);
     return created;
@@ -434,13 +462,29 @@ export class ChatAutomationService {
     state.run.queueLength = state.queue.length;
 
     return {
+      schemaVersion: 'chat.session.snapshot.v1',
+      emittedAt: nowIso(),
       session,
       run: {
         ...state.run,
         queueLength: state.queue.length
       },
-      logs: [...state.logs]
+      logs: [...state.logs],
+      handoffs: [...state.handoffs],
+      latestScreenshot: state.latestScreenshot
     };
+  }
+
+  async listHandoffs(sessionId: string): Promise<ChatAutomationHandoff[]> {
+    const session = await this.mustGetSession(sessionId);
+    const state = this.ensureRuntime(session);
+    return [...state.handoffs];
+  }
+
+  async getLatestScreenshot(sessionId: string): Promise<ChatAutomationScreenshotRef | undefined> {
+    const session = await this.mustGetSession(sessionId);
+    const state = this.ensureRuntime(session);
+    return state.latestScreenshot;
   }
 
   private async pauseOtherSessions(operatorId: string, exceptSessionId: string): Promise<void> {
@@ -489,6 +533,14 @@ export class ChatAutomationService {
     await this.emitSnapshot(sessionId);
 
     if (step.kind === 'captcha') {
+      state.handoffs.push({
+        id: `${task.id}-handoff-${state.handoffs.length + 1}`,
+        type: 'captcha',
+        status: 'waiting',
+        prompt: 'Security challenge detected. Enter captcha value to continue.',
+        requestedAt: nowIso()
+      });
+
       state.run.status = state.paused ? 'paused' : 'waiting_captcha';
       state.run.waitingCaptcha = true;
       state.run.captchaPrompt = 'Security challenge detected. Enter captcha value to continue.';
@@ -519,6 +571,16 @@ export class ChatAutomationService {
       state.run.waitingCaptcha = false;
       state.run.captchaPrompt = undefined;
       state.run.status = state.paused ? 'paused' : 'running';
+
+      const waiting = [...state.handoffs]
+        .reverse()
+        .find((entry) => entry.type === 'captcha' && entry.status === 'waiting');
+      if (waiting) {
+        waiting.status = 'resolved';
+        waiting.resolvedAt = nowIso();
+        waiting.valueLength = submitted.length;
+      }
+
       this.log(state, 'info', `Captcha accepted (length=${submitted.length})`);
       await this.appendTurn(sessionId, {
         role: 'assistant',
@@ -670,6 +732,15 @@ export class ChatAutomationService {
       `User message queued (${input.browserMode}) with ${attachments.length} attachment(s)`
     );
 
+    const firstAttachmentWithPath = attachments.find((entry) => entry.path);
+    if (firstAttachmentWithPath?.path) {
+      state.latestScreenshot = {
+        path: firstAttachmentWithPath.path,
+        source: 'attachment',
+        capturedAt: now
+      };
+    }
+
     if (input.autoPauseOthers ?? true) {
       await this.pauseOtherSessions(state.operatorId, input.sessionId);
     }
@@ -725,6 +796,11 @@ export class ChatAutomationService {
     state.run.captchaPrompt = undefined;
     state.run.status = 'canceled';
     state.run.updatedAt = nowIso();
+    for (const handoff of state.handoffs) {
+      if (handoff.status === 'waiting') {
+        handoff.status = 'canceled';
+      }
+    }
     this.log(state, 'warn', 'Session canceled by user');
     await this.emitSnapshot(sessionId);
     return this.getSnapshot(sessionId);

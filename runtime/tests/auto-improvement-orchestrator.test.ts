@@ -10,6 +10,8 @@ function makeSnapshot(
   status: JobProgressSnapshot['job']['status']
 ): JobProgressSnapshot {
   return {
+    schemaVersion: 'evolution.job.snapshot.v1',
+    emittedAt: '2026-02-24T00:00:00.000Z',
     job: {
       id: 'job-1',
       title: 'auto-improvement bug for wf-1',

@@ -1,4 +1,11 @@
-import type { ApproveEvolutionJobInput, CreateEvolutionJobInput, JobProgressSnapshot, RejectEvolutionJobInput } from '../evolution/types';
+import type {
+  ApproveEvolutionJobInput,
+  CreateEvolutionJobInput,
+  EvolutionJobDiffSnapshot,
+  EvolutionVersionSummary,
+  JobProgressSnapshot,
+  RejectEvolutionJobInput
+} from '../evolution/types';
 
 interface JsonPayload<T> {
   ok: boolean;
@@ -74,6 +81,42 @@ export class EvolutionApiClient {
     return this.request(`/evolution/jobs/${encodeURIComponent(jobId)}`, {
       method: 'GET'
     });
+  }
+
+  async getJobDiff(jobId: string): Promise<EvolutionJobDiffSnapshot> {
+    return this.request(`/evolution/jobs/${encodeURIComponent(jobId)}/diff`, {
+      method: 'GET'
+    });
+  }
+
+  async listVersionSummaries(): Promise<EvolutionVersionSummary[]> {
+    return this.request('/evolution/versions', { method: 'GET' });
+  }
+
+  async getVersionSummary(workflowId: string): Promise<EvolutionVersionSummary> {
+    return this.request(`/evolution/versions/${encodeURIComponent(workflowId)}`, {
+      method: 'GET'
+    });
+  }
+
+  async getCurrentVersion(
+    workflowId: string
+  ): Promise<EvolutionVersionSummary['current'] | undefined> {
+    return this.request(
+      `/evolution/versions/${encodeURIComponent(workflowId)}/current`,
+      {
+        method: 'GET'
+      }
+    );
+  }
+
+  async getVersionHistory(workflowId: string): Promise<EvolutionVersionSummary['history']> {
+    return this.request(
+      `/evolution/versions/${encodeURIComponent(workflowId)}/history`,
+      {
+        method: 'GET'
+      }
+    );
   }
 
   async approveJob(jobId: string, input: ApproveEvolutionJobInput): Promise<JobProgressSnapshot> {

@@ -80,9 +80,14 @@ testing/evolution/state/
 6. `POST /evolution/jobs/:id/approve`
 7. `POST /evolution/jobs/:id/reject`
 8. `GET /evolution/jobs/:id/events`
-9. `GET /evolution/jobs/:id/stream` (SSE)
-10. `GET /evolution/ui`
-11. `POST /evolution/auto-improve` (실패 결과 입력으로 자동 job 생성/완료/선택적 auto-approve)
+9. `GET /evolution/jobs/:id/diff`
+10. `GET /evolution/jobs/:id/stream` (SSE)
+11. `GET /evolution/versions`
+12. `GET /evolution/versions/:workflowId`
+13. `GET /evolution/versions/:workflowId/current`
+14. `GET /evolution/versions/:workflowId/history`
+15. `GET /evolution/ui`
+16. `POST /evolution/auto-improve` (실패 결과 입력으로 자동 job 생성/완료/선택적 auto-approve)
 
 ## 6. 실행 방법
 
@@ -116,7 +121,18 @@ npm run test:evolution
 npm test
 ```
 
-## 9. 참고 사양
+## 9. 승인 전 체크리스트 (필수)
+
+`awaiting_approval` 상태에서 승인하기 전에 아래를 확인한다.
+
+1. `GET /evolution/jobs/:id/diff` 결과 확인
+   - 테스트 로그 tail이 포함되어 있는지
+   - auto-fix patch preview가 비정상적으로 과도하지 않은지
+2. 해당 job의 `attempt-*.log`, `attempt-*-autofix.md`, `attempt-*.patch.diff` 파일 확인
+3. 연관 시나리오 실행 증거(스크린샷/결과 JSON) 확인
+4. 최종 승인 시 `confirmedBy`, `note`를 남겨 추적 가능하게 기록
+
+## 10. 참고 사양
 
 1. Git worktree: https://git-scm.com/docs/git-worktree
 2. SSE(EventSource): https://developer.mozilla.org/en-US/docs/Web/API/EventSource

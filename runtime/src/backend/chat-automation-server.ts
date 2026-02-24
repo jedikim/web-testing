@@ -322,6 +322,26 @@ export function createChatAutomationHttpServer(options: ChatAutomationHttpServer
         return;
       }
 
+      const sessionHandoffs = path.match(/^\/example\/chat\/sessions\/([^/]+)\/handoffs$/);
+      if (method === 'GET' && sessionHandoffs) {
+        const handoffs = await options.service.listHandoffs(sessionHandoffs[1]!);
+        sendJson(res, 200, {
+          ok: true,
+          data: handoffs
+        });
+        return;
+      }
+
+      const sessionScreenshot = path.match(/^\/example\/chat\/sessions\/([^/]+)\/screenshot$/);
+      if (method === 'GET' && sessionScreenshot) {
+        const screenshot = await options.service.getLatestScreenshot(sessionScreenshot[1]!);
+        sendJson(res, 200, {
+          ok: true,
+          data: screenshot
+        });
+        return;
+      }
+
       const messageRoute = path.match(/^\/example\/chat\/sessions\/([^/]+)\/message$/);
       if (method === 'POST' && messageRoute) {
         const body = asRecord(await parseBody(req));

@@ -65,7 +65,12 @@ Default mode: `pointer`
 - `POST /evolution/jobs/:id/approve`
 - `POST /evolution/jobs/:id/reject`
 - `GET /evolution/jobs/:id/events`
+- `GET /evolution/jobs/:id/diff`
 - `GET /evolution/jobs/:id/stream` (SSE)
+- `GET /evolution/versions`
+- `GET /evolution/versions/:workflowId`
+- `GET /evolution/versions/:workflowId/current`
+- `GET /evolution/versions/:workflowId/history`
 - `GET /evolution/ui`
 - `POST /evolution/auto-improve` (create/complete optional auto-approve from failed outcome)
 
@@ -84,3 +89,14 @@ npm run typecheck
 npm run test:evolution
 npm test
 ```
+
+## 8. Mandatory Pre-Approval Checklist
+
+Before approving an `awaiting_approval` job:
+
+1. inspect `GET /evolution/jobs/:id/diff`
+   - verify test-log tail is present
+   - verify auto-fix patch preview is not unexpectedly broad
+2. inspect artifacts under `attempt-*.log`, `attempt-*-autofix.md`, `attempt-*.patch.diff`
+3. verify linked scenario evidence (screenshots/result JSON)
+4. provide approval audit fields (`confirmedBy`, `note`) when calling approve API

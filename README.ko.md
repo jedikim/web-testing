@@ -30,8 +30,10 @@ flowchart LR
 - 반복 리스트 합성 판단(`이미지 합성 -> YOLO26 -> 동일 이미지 VLM fallback -> 역추적`)
 - Slack/Telegram 구현 없이 assistantless E2E 시뮬레이션
 - 채팅형 자동화 백엔드 샘플(`/example/chat/*`): 실시간 로그 스트림, headful/headless 선택, pause/resume/cancel, 캡차 handoff 입력
+- 스크린샷/handoff 조회 표준 세션 API 제공(`/backend/*`, `/example/chat/*`)
 - 채팅 UI 이미지 첨부 지원: "이 사진과 비슷한 것을 네이버에서 찾아줘" 같은 요청 처리
 - worktree 격리 + 테스트/수정 + 승인 기반 진화 백엔드
+- 진화 버전/변경점 조회 API 제공(`/evolution/versions*`, `/evolution/jobs/:id/diff`)
 
 ## 빠른 시작
 
@@ -107,6 +109,7 @@ npm run example:repeated-item
 ```bash
 cd runtime
 npm run typecheck
+npm run test:e2e:fixtures
 npm run test:sdk
 npm run test:evolution
 npm test

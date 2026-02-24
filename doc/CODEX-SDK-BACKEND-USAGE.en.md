@@ -49,8 +49,10 @@ Default endpoint: `http://127.0.0.1:4888`
 4. `GET /backend/sessions/:id`
 5. `POST /backend/sessions/:id/turns`
 6. `POST /backend/sessions/:id/close`
-7. `GET /backend/sessions/:id/stream` (SSE)
-8. `GET /backend/ui`
+7. `GET /backend/sessions/:id/screenshot`
+8. `GET /backend/sessions/:id/handoffs`
+9. `GET /backend/sessions/:id/stream` (SSE)
+10. `GET /backend/ui`
 
 ### 2.3 Minimal flow example
 
@@ -88,12 +90,14 @@ Default endpoint: `http://127.0.0.1:4999`
 3. `POST /example/chat/sessions`
 4. `GET /example/chat/sessions/:id`
 5. `POST /example/chat/sessions/:id/message`
-6. `POST /example/chat/sessions/:id/pause`
-7. `POST /example/chat/sessions/:id/resume`
-8. `POST /example/chat/sessions/:id/cancel`
-9. `POST /example/chat/sessions/:id/captcha`
-10. `GET /example/chat/sessions/:id/stream` (SSE)
-11. `GET /example/chat/ui`
+6. `GET /example/chat/sessions/:id/handoffs`
+7. `GET /example/chat/sessions/:id/screenshot`
+8. `POST /example/chat/sessions/:id/pause`
+9. `POST /example/chat/sessions/:id/resume`
+10. `POST /example/chat/sessions/:id/cancel`
+11. `POST /example/chat/sessions/:id/captcha`
+12. `GET /example/chat/sessions/:id/stream` (SSE)
+13. `GET /example/chat/ui`
 
 ### 3.3 Behavior guarantees
 
@@ -110,6 +114,14 @@ Default endpoint: `http://127.0.0.1:4999`
 1. `createWebAutomationSdk` (full flow + auto-improvement integration)
 2. `createMultiTurnAutomationSdk` (session-centric detailed API)
 3. `createEvolutionApiClient` (evolution HTTP control)
+
+Major `createEvolutionApiClient` methods:
+
+1. `listJobs`, `createJob`, `getSnapshot`
+2. `getJobDiff`
+3. `listVersionSummaries`, `getVersionSummary`
+4. `getCurrentVersion`, `getVersionHistory`
+5. `approveJob`, `rejectJob`, `retryJob`, `waitForTerminal`
 
 ### 4.2 Multi-turn SDK example
 

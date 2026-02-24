@@ -88,6 +88,11 @@ describe('EvolutionService', () => {
     expect(finalSnapshot.job.candidate?.testAttempts.length).toBe(2);
     expect(finalSnapshot.job.changelog.some((entry) => entry.category === 'exception')).toBe(true);
 
+    const diff = await service.getJobDiff(created.job.id);
+    expect(diff.schemaVersion).toBe('evolution.job.diff.v1');
+    expect(diff.attempts.length).toBe(2);
+    expect(diff.attempts[0]?.outputTail).toBeDefined();
+
     await rm(stateRoot, { recursive: true, force: true });
   });
 
@@ -119,6 +124,10 @@ describe('EvolutionService', () => {
     expect(approved.job.status).toBe('promoted');
     expect(approved.activeVersion?.workflowId).toBe('kr-scenario-approve');
     expect(approved.activeVersion?.confirmedBy).toBe('qa-user');
+
+    const versionSummary = await service.getVersionSummary('kr-scenario-approve');
+    expect(versionSummary.current?.version).toBe(1);
+    expect(versionSummary.history.length).toBeGreaterThan(0);
 
     await rm(stateRoot, { recursive: true, force: true });
   });

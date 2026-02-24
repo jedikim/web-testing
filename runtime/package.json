@@ -10,6 +10,7 @@
     "test:e2e:kr": "RUN_KR_E2E=1 vitest run tests/e2e-kr-live.test.ts",
     "test:e2e:kr:headful": "PW_HEADLESS=0 RUN_KR_E2E=1 vitest run tests/e2e-kr-live.test.ts",
     "test:e2e:kr:contract": "vitest run tests/kr-e2e-scenarios.test.ts tests/e2e-kr-live.test.ts",
+    "test:e2e:fixtures": "vitest run tests/e2e-fixture-playwright-adapter.test.ts",
     "test:e2e:assistantless:contract": "vitest run tests/assistantless-chat-e2e.test.ts",
     "test:e2e:assistantless:live": "RUN_ASSISTANTLESS_KR_E2E=1 PW_HEADLESS=0 vitest run tests/e2e-assistantless-kr-live.test.ts",
     "test:e2e:chat-ui:headful": "PW_HEADLESS=0 vitest run tests/chat-automation-ui-e2e.test.ts",

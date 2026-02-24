@@ -104,7 +104,39 @@ export interface ActiveVersionPointer {
   confirmedBy: string;
 }
 
+export interface EvolutionVersionSummary {
+  workflowId: string;
+  current?: ActiveVersionPointer;
+  history: ActiveVersionPointer[];
+}
+
+export interface EvolutionAttemptDiff {
+  attempt: number;
+  ok: boolean;
+  exitCode: number;
+  outputPath: string;
+  outputTail?: string;
+  autoFixNotePath?: string;
+  autoFixNote?: string;
+  patchPath?: string;
+  patchPreview?: string;
+}
+
+export interface EvolutionJobDiffSnapshot {
+  schemaVersion: 'evolution.job.diff.v1';
+  emittedAt: string;
+  jobId: string;
+  workflowId: string;
+  status: EvolutionStatus;
+  candidateVersion?: number;
+  branchName?: string;
+  worktreePath?: string;
+  attempts: EvolutionAttemptDiff[];
+}
+
 export interface JobProgressSnapshot {
+  schemaVersion: 'evolution.job.snapshot.v1';
+  emittedAt: string;
   job: EvolutionJob;
   events: EvolutionEvent[];
   activeVersion?: ActiveVersionPointer;

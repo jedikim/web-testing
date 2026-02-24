@@ -168,6 +168,26 @@ export function createBackendSimpleHttpServer(options: BackendSimpleHttpServerOp
         return;
       }
 
+      const sessionHandoffsMatch = path.match(/^\/backend\/sessions\/([^/]+)\/handoffs$/);
+      if (method === 'GET' && sessionHandoffsMatch) {
+        const handoffs = await options.service.listHandoffs(sessionHandoffsMatch[1]!);
+        sendJson(res, 200, {
+          ok: true,
+          data: handoffs
+        });
+        return;
+      }
+
+      const sessionScreenshotMatch = path.match(/^\/backend\/sessions\/([^/]+)\/screenshot$/);
+      if (method === 'GET' && sessionScreenshotMatch) {
+        const screenshot = await options.service.getLatestScreenshot(sessionScreenshotMatch[1]!);
+        sendJson(res, 200, {
+          ok: true,
+          data: screenshot
+        });
+        return;
+      }
+
       const turnMatch = path.match(/^\/backend\/sessions\/([^/]+)\/turns$/);
       if (method === 'POST' && turnMatch) {
         const body = asRecord(await parseBody(req));

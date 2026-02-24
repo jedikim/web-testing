@@ -224,4 +224,29 @@ export class EvolutionStorage {
   async getActiveVersion(workflowId: string): Promise<ActiveVersionPointer | undefined> {
     return readJsonFile<ActiveVersionPointer>(this.activeVersionPath(workflowId));
   }
+
+  async listActiveVersions(): Promise<ActiveVersionPointer[]> {
+    await this.init();
+    const entries = await readdir(this.activeVersionsRoot(), { withFileTypes: true });
+    const pointers: ActiveVersionPointer[] = [];
+
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.json')) {
+        continue;
+      }
+      const pointer = await readJsonFile<ActiveVersionPointer>(
+        resolve(this.activeVersionsRoot(), entry.name)
+      );
+      if (pointer) {
+        pointers.push(pointer);
+      }
+    }
+
+    return pointers.sort((left, right) => right.promotedAt.localeCompare(left.promotedAt));
+  }
+
+  async getVersionHistory(workflowId: string): Promise<ActiveVersionPointer[]> {
+    const history = await readJsonFile<ActiveVersionPointer[]>(this.historyPath(workflowId));
+    return history ?? [];
+  }
 }

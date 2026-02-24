@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deterministic Fixture</title>
+    <style>
+      body { font-family: sans-serif; margin: 24px; }
+      .row { margin-bottom: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <label for="query">Query</label>
+      <input id="query" type="text" />
+      <button id="run">Run</button>
+    </div>
+    <div class="row">
+      <label for="sort">Sort</label>
+      <select id="sort">
+        <option value="popular">popular</option>
+        <option value="price">price</option>
+      </select>
+    </div>
+    <div id="result" data-ready="0"></div>
+    <div id="sort-value" data-ready="0"></div>
+
+    <script>
+      const queryInput = document.getElementById('query');
+      const runButton = document.getElementById('run');
+      const result = document.getElementById('result');
+      const sort = document.getElementById('sort');
+      const sortValue = document.getElementById('sort-value');
+
+      runButton.addEventListener('click', () => {
+        result.textContent = queryInput.value;
+        result.setAttribute('data-ready', '1');
+      });
+
+      sort.addEventListener('change', () => {
+        sortValue.textContent = sort.value;
+        sortValue.setAttribute('data-ready', '1');
+      });
+    </script>
+  </body>
+</html>

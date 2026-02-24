@@ -19,6 +19,16 @@ npm test
 npm run typecheck
 ```
 
+### Layer A1: Deterministic Fixture E2E (always)
+```bash
+cd runtime
+npm run test:e2e:fixtures
+```
+Coverage:
+1. reproducible local HTML fixture flows
+2. Playwright action adapter stability (type/click/select/wait)
+3. regression checks without live-site dependency
+
 ### Layer B: Full Flow Simulation (always)
 ```bash
 cd runtime
@@ -79,7 +89,7 @@ The autonomous live batch includes multi-step KR-focused scenarios:
 
 ## 3. Acceptance Criteria
 
-1. Layers A/B/G: 100% pass
+1. Layers A/A1/B/G: 100% pass
 2. Layer D live: expected status match
 3. Layer D artifacts must include per-scenario evidence files
 4. Layer F live: >= 80% matrix pass
@@ -94,6 +104,7 @@ npm install
 npx playwright install chromium
 cp .env.example .env
 npm run test:automation:full
+npm run test:e2e:fixtures
 npm run test:e2e:assistantless:contract
 npm run test:e2e:assistantless:live
 npm run test:e2e:autonomous:live

@@ -106,7 +106,8 @@ describe('backend simple server', () => {
           'content-type': 'application/json'
         },
         body: JSON.stringify({
-          content: 'hello backend'
+          content: 'hello backend',
+          screenshotPath: '/tmp/backend-shot.png'
         })
       }
     );
@@ -126,6 +127,29 @@ describe('backend simple server', () => {
     expect(sessionPayload.data.turns.length).toBe(2);
     expect(sessionPayload.data.turns[0]?.role).toBe('user');
     expect(sessionPayload.data.turns[1]?.role).toBe('assistant');
+
+    const screenshotResponse = await fetch(
+      `${baseUrl}/backend/sessions/${encodeURIComponent(created.data.id)}/screenshot`
+    );
+    expect(screenshotResponse.status).toBe(200);
+    const screenshotPayload = (await screenshotResponse.json()) as {
+      ok: boolean;
+      data?: { path?: string; source?: string };
+    };
+    expect(screenshotPayload.ok).toBe(true);
+    expect(screenshotPayload.data?.path).toBe('/tmp/backend-shot.png');
+    expect(screenshotPayload.data?.source).toBe('turn_screenshot');
+
+    const handoffsResponse = await fetch(
+      `${baseUrl}/backend/sessions/${encodeURIComponent(created.data.id)}/handoffs`
+    );
+    expect(handoffsResponse.status).toBe(200);
+    const handoffsPayload = (await handoffsResponse.json()) as {
+      ok: boolean;
+      data: unknown[];
+    };
+    expect(handoffsPayload.ok).toBe(true);
+    expect(handoffsPayload.data).toEqual([]);
 
     const closeResponse = await fetch(
       `${baseUrl}/backend/sessions/${encodeURIComponent(created.data.id)}/close`,

@@ -35,3 +35,61 @@
 1. 이 저장소는 특정 채널 SDK에 하드 의존하지 않는다.
 2. 외부 채널이 바뀌어도 코어 자동화 로직은 변경하지 않는다.
 3. 민감 액션은 `go` 승인 없이는 실행하지 않는다.
+
+## 5. 세션/이벤트 JSON 계약
+
+### 5.1 Backend Simple (`/backend/*`)
+
+핵심 조회 엔드포인트:
+
+1. `GET /backend/sessions/:id`
+2. `GET /backend/sessions/:id/stream` (SSE snapshot)
+3. `GET /backend/sessions/:id/screenshot`
+4. `GET /backend/sessions/:id/handoffs`
+
+`GET /backend/sessions/:id/screenshot` 응답 예시:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "path": "/tmp/backend-shot.png",
+    "source": "turn_screenshot",
+    "capturedAt": "2026-02-24T12:00:00.000Z",
+    "turnId": "sess-...-turn-3"
+  }
+}
+```
+
+### 5.2 Chat Automation (`/example/chat/*`)
+
+`GET /example/chat/sessions/:id` 및 SSE `snapshot` 이벤트는 아래 스키마를 따른다.
+
+```json
+{
+  "schemaVersion": "chat.session.snapshot.v1",
+  "emittedAt": "2026-02-24T12:00:00.000Z",
+  "session": { "id": "sess-..." },
+  "run": { "status": "running", "queueLength": 1 },
+  "logs": [{ "id": "log-1", "level": "info", "message": "Run started" }],
+  "handoffs": [
+    {
+      "id": "sess-...-handoff-1",
+      "type": "captcha",
+      "status": "waiting",
+      "prompt": "Security challenge detected. Enter captcha value to continue.",
+      "requestedAt": "2026-02-24T12:00:10.000Z"
+    }
+  ],
+  "latestScreenshot": {
+    "path": "/.../uploads/reference.png",
+    "source": "attachment",
+    "capturedAt": "2026-02-24T12:00:05.000Z"
+  }
+}
+```
+
+보조 엔드포인트:
+
+1. `GET /example/chat/sessions/:id/handoffs`
+2. `GET /example/chat/sessions/:id/screenshot`

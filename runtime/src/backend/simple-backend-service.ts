@@ -28,6 +28,13 @@ export interface BackendSimpleServiceOptions {
   engine?: MultiTurnEngine;
 }
 
+export interface BackendSessionScreenshotRef {
+  path: string;
+  source: 'turn_screenshot' | 'attachment';
+  capturedAt: string;
+  turnId: string;
+}
+
 export type SessionUpdateListener = (session: AutomationSession) => void;
 
 function requireNonEmpty(value: string, name: string): string {
@@ -44,6 +51,25 @@ function lastTurn(session: AutomationSession): SessionTurn {
     throw new Error(`session has no turns: ${session.id}`);
   }
   return turn;
+}
+
+function attachmentPathFromTurn(turn: SessionTurn): string | undefined {
+  const metadata = turn.metadata;
+  if (!metadata) {
+    return undefined;
+  }
+
+  const attachments = (metadata as { attachments?: Array<{ path?: string }> }).attachments;
+  if (!Array.isArray(attachments) || attachments.length === 0) {
+    return undefined;
+  }
+
+  for (const entry of attachments) {
+    if (typeof entry?.path === 'string' && entry.path.trim().length > 0) {
+      return entry.path;
+    }
+  }
+  return undefined;
 }
 
 export class BackendSimpleService {
@@ -88,6 +114,41 @@ export class BackendSimpleService {
       throw new Error(`session not found: ${sessionId}`);
     }
     return session;
+  }
+
+  async listHandoffs(sessionId: string): Promise<unknown[]> {
+    await this.getSession(sessionId);
+    return [];
+  }
+
+  async getLatestScreenshot(sessionId: string): Promise<BackendSessionScreenshotRef | undefined> {
+    const session = await this.getSession(sessionId);
+    for (let index = session.turns.length - 1; index >= 0; index -= 1) {
+      const turn = session.turns[index];
+      if (!turn) {
+        continue;
+      }
+
+      if (turn.screenshotPath) {
+        return {
+          path: turn.screenshotPath,
+          source: 'turn_screenshot',
+          capturedAt: turn.at,
+          turnId: turn.id
+        };
+      }
+
+      const attachmentPath = attachmentPathFromTurn(turn);
+      if (attachmentPath) {
+        return {
+          path: attachmentPath,
+          source: 'attachment',
+          capturedAt: turn.at,
+          turnId: turn.id
+        };
+      }
+    }
+    return undefined;
   }
 
   async closeSession(sessionId: string): Promise<AutomationSession> {

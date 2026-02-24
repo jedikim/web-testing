@@ -32,6 +32,21 @@ npm test
 npm run typecheck
 ```
 
+### Layer A1: Deterministic Fixture E2E (항상 실행)
+
+대상:
+
+1. 로컬 HTML fixture 기반 실행 재현성
+2. Playwright action adapter(타이핑/클릭/옵션선택/대기) 안정성
+3. 라이브 사이트 의존도 없이 회귀 재현
+
+명령:
+
+```bash
+cd runtime
+npm run test:e2e:fixtures
+```
+
 ### Layer B: Full-Flow Simulation (항상 실행)
 
 대상:
@@ -200,16 +215,17 @@ npm run test:sdk
 ## 3. 합격 기준
 
 1. Layer A/B는 항상 100% pass
-2. Layer C는 6개 이상 시나리오 중 80% 이상 pass
-3. Layer D(contract)는 100% pass
-4. Layer D(live)는 expected status 기준 100% pass
-5. Layer D(autonomous live)는 expected status 기준 100% pass, `/home/jedi/code/web-agentic-codex/testing/...` 각 시나리오 폴더에 `process.md` + `result.json` + 스크린샷 + `PLAN.md` + `WORKFLOW.md` + `FINAL-OPTIMIZED-RESULT.md`가 저장되어야 함
-6. Layer F(contract)는 100% pass
-7. Layer F(live)는 matrix total의 80% 이상 pass
-8. Layer C/F 실패 시 screenshot/json 리포트가 남아야 함
-9. `scripts/validate-run-artifacts.sh` pass
-10. Layer G는 100% pass, 승인 전환 후 active pointer 파일 생성 확인
-11. Layer H는 100% pass
+2. Layer A1은 100% pass
+3. Layer C는 6개 이상 시나리오 중 80% 이상 pass
+4. Layer D(contract)는 100% pass
+5. Layer D(live)는 expected status 기준 100% pass
+6. Layer D(autonomous live)는 expected status 기준 100% pass, `/home/jedi/code/web-agentic-codex/testing/...` 각 시나리오 폴더에 `process.md` + `result.json` + 스크린샷 + `PLAN.md` + `WORKFLOW.md` + `FINAL-OPTIMIZED-RESULT.md`가 저장되어야 함
+7. Layer F(contract)는 100% pass
+8. Layer F(live)는 matrix total의 80% 이상 pass
+9. Layer C/F 실패 시 screenshot/json 리포트가 남아야 함
+10. `scripts/validate-run-artifacts.sh` pass
+11. Layer G는 100% pass, 승인 전환 후 active pointer 파일 생성 확인
+12. Layer H는 100% pass
 
 ## 4. 실패 대응
 
@@ -226,6 +242,7 @@ npm install
 npx playwright install chromium
 cp .env.example .env
 npm run test:automation:full
+npm run test:e2e:fixtures
 npm run test:e2e:assistantless:contract
 npm run test:e2e:assistantless:live
 npm run test:e2e:autonomous:live

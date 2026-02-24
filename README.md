@@ -30,8 +30,10 @@ flowchart LR
 - repeated-item composite judgement (`merge -> YOLO26 -> same-image VLM fallback -> reverse trace`)
 - assistantless E2E simulation without implementing Slack/Telegram integration itself
 - chat automation backend sample (`/example/chat/*`) with live log stream, headful/headless switch, pause/resume/cancel, captcha handoff input
+- standardized session contract endpoints for screenshot/handoff (`/backend/*`, `/example/chat/*`)
 - chat UI image attachment support for requests like "find similar items on Naver using this photo"
 - evolution backend for isolated candidate versions (worktree + test/fix + approval)
+- evolution version/diff query APIs (`/evolution/versions*`, `/evolution/jobs/:id/diff`)
 
 ## Quick Start
 
@@ -107,6 +109,7 @@ npm run example:repeated-item
 ```bash
 cd runtime
 npm run typecheck
+npm run test:e2e:fixtures
 npm run test:sdk
 npm run test:evolution
 npm test

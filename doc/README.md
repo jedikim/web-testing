@@ -26,6 +26,7 @@ Each document includes a language switch link at the top.
 - Evolution Backend: [English](./CODEX-EVOLUTION-BACKEND.en.md) | [한국어](./CODEX-EVOLUTION-BACKEND.md)
 - SDK + Backend Usage: [English](./CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./CODEX-SDK-BACKEND-USAGE.md)
 - Practical Usage Guide: [English](./CODEX-PRACTICAL-USAGE.en.md) | [한국어](./CODEX-PRACTICAL-USAGE.md)
+- External Repo Gap Analysis: [English](./CODEX-EXTERNAL-REPO-GAP-ANALYSIS.en.md) | [한국어](./CODEX-EXTERNAL-REPO-GAP-ANALYSIS.md)
 - Task Template: [English](./CODEX-TASK-TEMPLATE.en.md) | [한국어](./CODEX-TASK-TEMPLATE.md)
 
 ## Plan Archive

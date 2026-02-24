@@ -114,6 +114,14 @@ curl -N http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/stream
 ```
 
 이 스트림은 실행 스텝과 로그를 지속적으로 내보내며, 예제 UI가 실시간으로 표시한다.
+스냅샷 payload에는 `schemaVersion=chat.session.snapshot.v1`가 포함된다.
+
+handoff/스크린샷 조회:
+
+```bash
+curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/handoffs
+curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/screenshot
+```
 
 ### 3.4 새 대화 시작 시 이전 세션 일시정지
 

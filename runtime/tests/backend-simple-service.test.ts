@@ -57,6 +57,13 @@ describe('BackendSimpleService', () => {
       expect(output.session.turns.length).toBe(2);
       expect(updateEvents.length).toBeGreaterThan(0);
 
+      const screenshot = await service.getLatestScreenshot(session.id);
+      expect(screenshot?.path).toBe('/tmp/a.png');
+      expect(screenshot?.source).toBe('turn_screenshot');
+
+      const handoffs = await service.listHandoffs(session.id);
+      expect(handoffs).toEqual([]);
+
       await service.closeSession(session.id);
 
       await expect(

@@ -201,6 +201,19 @@ describe('chat automation server', () => {
     const completed = await waitForRunStatus(baseUrl, sessionId, ['completed']);
     expect(completed.run.status).toBe('completed');
     expect(completed.logs.some((entry) => entry.message.includes('Captcha submitted by user'))).toBe(true);
+
+    const handoffResponse = await fetch(
+      `${baseUrl}/example/chat/sessions/${encodeURIComponent(sessionId)}/handoffs`
+    );
+    expect(handoffResponse.status).toBe(200);
+    const handoffPayload = (await handoffResponse.json()) as {
+      ok: boolean;
+      data: Array<{ type: string; status: string }>;
+    };
+    expect(handoffPayload.ok).toBe(true);
+    expect(handoffPayload.data.some((entry) => entry.type === 'captcha' && entry.status === 'resolved')).toBe(
+      true
+    );
   });
 
   it('streams live snapshot events over SSE and validates malformed input', async () => {
@@ -237,6 +250,7 @@ describe('chat automation server', () => {
     const firstChunk = await reader!.read();
     const chunkText = decoder.decode(firstChunk.value ?? new Uint8Array());
     expect(chunkText).toContain('event: snapshot');
+    expect(chunkText).toContain('"schemaVersion":"chat.session.snapshot.v1"');
     abortController.abort();
 
     const invalidJson = await fetch(`${baseUrl}/example/chat/sessions`, {
@@ -301,6 +315,7 @@ describe('chat automation server', () => {
     const detailPayload = (await detailResponse.json()) as {
       ok: boolean;
       data: {
+        schemaVersion: string;
         session: {
           turns: Array<{
             role: string;
@@ -316,6 +331,7 @@ describe('chat automation server', () => {
       };
     };
     expect(detailPayload.ok).toBe(true);
+    expect(detailPayload.data.schemaVersion).toBe('chat.session.snapshot.v1');
     const userTurn = detailPayload.data.session.turns.find((turn) => turn.role === 'user');
     const attachment = userTurn?.metadata?.attachments?.[0];
     expect(attachment?.name).toBe('tiny-reference.png');
@@ -325,5 +341,17 @@ describe('chat automation server', () => {
       await access(attachment.path);
       expect(attachment.path.startsWith(resolve(stateRoot, 'uploads'))).toBe(true);
     }
+
+    const screenshotResponse = await fetch(
+      `${baseUrl}/example/chat/sessions/${encodeURIComponent(sessionId)}/screenshot`
+    );
+    expect(screenshotResponse.status).toBe(200);
+    const screenshotPayload = (await screenshotResponse.json()) as {
+      ok: boolean;
+      data?: { path?: string; source?: string };
+    };
+    expect(screenshotPayload.ok).toBe(true);
+    expect(screenshotPayload.data?.source).toBe('attachment');
+    expect(screenshotPayload.data?.path).toContain('/uploads/');
   });
 });

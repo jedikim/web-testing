@@ -113,10 +113,11 @@ describe('evolution server', () => {
     expect(createResponse.status).toBe(201);
     const created = (await createResponse.json()) as {
       ok: boolean;
-      data: { job: { id: string } };
+      data: { schemaVersion: string; job: { id: string } };
     };
 
     expect(created.ok).toBe(true);
+    expect(created.data.schemaVersion).toBe('evolution.job.snapshot.v1');
     await service.waitForCompletion(created.data.job.id);
 
     const jobsResponse = await fetch(`${baseUrl}/evolution/jobs`);
@@ -128,6 +129,21 @@ describe('evolution server', () => {
     expect(jobsPayload.ok).toBe(true);
     expect(jobsPayload.data.length).toBeGreaterThan(0);
     expect(jobsPayload.data[0]?.status).toBe('awaiting_approval');
+
+    const diffResponse = await fetch(`${baseUrl}/evolution/jobs/${created.data.job.id}/diff`);
+    expect(diffResponse.status).toBe(200);
+    const diffPayload = (await diffResponse.json()) as {
+      ok: boolean;
+      data: {
+        schemaVersion: string;
+        jobId: string;
+        attempts: Array<{ attempt: number; outputPath: string }>;
+      };
+    };
+    expect(diffPayload.ok).toBe(true);
+    expect(diffPayload.data.schemaVersion).toBe('evolution.job.diff.v1');
+    expect(diffPayload.data.jobId).toBe(created.data.job.id);
+    expect(diffPayload.data.attempts.length).toBeGreaterThan(0);
   });
 
   it('approves awaiting jobs and serves UI assets', async () => {
@@ -164,6 +180,35 @@ describe('evolution server', () => {
 
     expect(approvePayload.ok).toBe(true);
     expect(approvePayload.data.job.status).toBe('promoted');
+
+    const versionsResponse = await fetch(`${baseUrl}/evolution/versions`);
+    expect(versionsResponse.status).toBe(200);
+    const versionsPayload = (await versionsResponse.json()) as {
+      ok: boolean;
+      data: Array<{ workflowId: string }>;
+    };
+    expect(versionsPayload.ok).toBe(true);
+    expect(versionsPayload.data.some((entry) => entry.workflowId === 'wf-api-2')).toBe(true);
+
+    const currentResponse = await fetch(`${baseUrl}/evolution/versions/wf-api-2/current`);
+    expect(currentResponse.status).toBe(200);
+    const currentPayload = (await currentResponse.json()) as {
+      ok: boolean;
+      data?: { workflowId: string; version: number };
+    };
+    expect(currentPayload.ok).toBe(true);
+    expect(currentPayload.data?.workflowId).toBe('wf-api-2');
+    expect(currentPayload.data?.version).toBe(1);
+
+    const historyResponse = await fetch(`${baseUrl}/evolution/versions/wf-api-2/history`);
+    expect(historyResponse.status).toBe(200);
+    const historyPayload = (await historyResponse.json()) as {
+      ok: boolean;
+      data: Array<{ workflowId: string; version: number }>;
+    };
+    expect(historyPayload.ok).toBe(true);
+    expect(historyPayload.data.length).toBeGreaterThan(0);
+    expect(historyPayload.data[0]?.workflowId).toBe('wf-api-2');
 
     const uiResponse = await fetch(`${baseUrl}/evolution/ui`);
     const html = await uiResponse.text();
