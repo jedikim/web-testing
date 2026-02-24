@@ -2,127 +2,88 @@
 
 # CODEX AUTOMATION TEST PLAN
 
+Last Updated: 2026-02-25 (KST)
+
 ## 0. Goal
 
-Validate production-like behavior before deployment:
-1. deterministic workflow stability
-2. recovery-path reproducibility
-3. Korea-site live smoke validity
-4. evolution backend reliability
+Ship changes with practical confidence by validating:
+1. deterministic correctness
+2. recovery behavior
+3. chat/backends operational behavior
+4. live scenario robustness
 
-## 1. Mandatory Layer Order
+## 1. Mandatory Test Order
 
-### Layer A: Unit / Contract (always)
+1. Baseline quality
 ```bash
 cd runtime
-npm test
 npm run typecheck
+npm test
 ```
 
-### Layer A1: Deterministic Fixture E2E (always)
+2. Fixture deterministic E2E
 ```bash
 cd runtime
 npm run test:e2e:fixtures
 ```
-Coverage:
-1. reproducible local HTML fixture flows
-2. Playwright action adapter stability (type/click/select/wait)
-3. regression checks without live-site dependency
-4. reliability additions:
-   - `tests/auto-recovery.test.ts` (Similo fingerprint-first recovery)
-   - `tests/session-engine-cascaded.test.ts` (flash-first cascade routing)
-   - `tests/plan-cache.test.ts` + `tests/replay-store.test.ts` (semantic cache/replay)
-   - `tests/self-healing-taxonomy.test.ts` + `tests/retry-policy.test.ts` (taxonomy and retry mapping)
 
-### Layer B: Full Flow Simulation (always)
+3. Chat UI headful E2E
 ```bash
 cd runtime
-npm run test:full-flow
+npm run test:e2e:chat-ui:headful
 ```
 
-### Layer C: KR Live Smoke (opt-in)
+4. KR live smoke and assistantless flows
 ```bash
 cd runtime
-npm run test:e2e:kr
 npm run test:e2e:kr:headful
-```
-
-### Layer D: Assistantless Chat Loop
-```bash
-cd runtime
-npm run test:e2e:assistantless:contract
 npm run test:e2e:assistantless:live
 npm run test:e2e:autonomous:live
 ```
 
-### Layer E: External Assistant Integration
-Owned by external project.
-
-### Layer F: Multi-Vendor LLM + YOLO26 Matrix
-
-Scope:
-1. LLM providers: `gemini`, `openai` only
-2. default model set: `gemini-3.1-pro-preview,gemini-3.0-flash` and `gpt-5.2-codex,gpt-5-mini`
-3. YOLO26 default model set: `yolo26l`
-
+5. Provider and evolution/sdk layers
 ```bash
 cd runtime
 npm run test:provider:contract
 npm run test:e2e:provider:live
-```
-Note:
-- `test:e2e:provider:live` runs live matrix only when both LLM and YOLO26 targets are configured in env.
-- If `RUN_PROVIDER_LIVE_E2E=1` but matrix env is missing, matrix run is skipped and contract checks still run.
-
-### Layer G: Evolution Backend (bug/exception only)
-```bash
-cd runtime
 npm run test:evolution
-```
-
-### Layer H: SDK + Backend Contract
-```bash
-cd runtime
 npm run test:sdk
 ```
 
-## 2. Complex Scenario Coverage
+## 2. Reliability Test Focus
 
-The autonomous live batch includes multi-step KR-focused scenarios:
-- weather + family place search around Pangyo (map.naver)
-- cross-site planning (weather + map + search)
-- weekend multi-source route planning (13+ steps)
-- public-info + transport chain with captcha retries
-- budget/route + selector drift revise flow (14+ steps)
+These areas must be covered in normal regression:
+1. Similo selector fingerprint recovery
+2. Cascaded LLM routing behavior
+3. Plan cache reuse and degradation logic
+4. Self-healing failure classification and retry behavior
+
+Representative tests:
+- `tests/auto-recovery.test.ts`
+- `tests/session-engine-cascaded.test.ts`
+- `tests/plan-cache.test.ts`
+- `tests/replay-store.test.ts`
+- `tests/self-healing-taxonomy.test.ts`
+- `tests/retry-policy.test.ts`
 
 ## 3. Acceptance Criteria
 
-1. Layers A/A1/B/G: 100% pass
-2. Layer D live: expected status match
-3. Layer D artifacts must include per-scenario evidence files
-4. Layer F live: >= 80% matrix pass
-5. artifact structure validator passes
-6. Layer H: 100% pass
+1. baseline (`typecheck`, `npm test`) fully passes
+2. headful chat UI E2E passes
+3. KR/assistantless/autonomous live runs pass when enabled
+4. live failures always generate evidence artifacts
+5. provider live matrix runs only with configured targets; otherwise explicit skip
+6. no blocker/major findings in review
 
-## 4. Recommended Run Order
+## 4. Evidence Requirements
 
-```bash
-cd runtime
-npm install
-npx playwright install chromium
-cp .env.example .env
-npm run test:automation:full
-npm run test:e2e:fixtures
-npm run test:e2e:assistantless:contract
-npm run test:e2e:assistantless:live
-npm run test:e2e:autonomous:live
-npm run test:provider:contract
-npm run test:e2e:kr
-npm run test:e2e:kr:headful
-npm run test:evolution
-npm run test:sdk
-# if live provider credentials exist:
-npm run test:e2e:provider:live
-cd ..
-./scripts/validate-run-artifacts.sh
-```
+1. command list with outcomes
+2. screenshot/json artifacts for live tests
+3. autonomous scenario folders and per-iteration logs
+4. review summary with remaining risks
+
+## 5. Operational Notes
+
+1. keep `PW_HEADLESS=0` for practical validation
+2. do not include captcha bypass scenarios
+3. quarantine flaky live scenarios with documentation instead of removing them

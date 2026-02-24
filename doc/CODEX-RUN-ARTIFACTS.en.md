@@ -2,20 +2,24 @@
 
 # CODEX RUN ARTIFACTS
 
+Last Updated: 2026-02-25 (KST)
+
 ## 0. Purpose
 
-Define minimal schema and path policy for reproducible run evidence.
+Define schema and storage policy for reproducible run evidence.
 
 ## 1. Storage Paths
 
-- root: `runs/`
-- samples: `runs/samples/`
-- recommended production: `runs/YYYY/MM/DD/`
-- evolution state/history (git-ignored): `testing/evolution/state/`
+1. root: `runs/`
+2. sample artifacts: `runs/samples/`
+3. recommended production layout: `runs/YYYY/MM/DD/`
+4. evolution state/history (gitignored): `testing/evolution/state/`
 
 ## 2. Naming Rule
 
 `YYYY-MM-DDTHH-mm-ssZ_<workflow_id>_<status>.json`
+
+Note: dates in examples are illustrative; use current run timestamp.
 
 ## 3. Required Fields
 
@@ -29,18 +33,30 @@ Define minimal schema and path policy for reproducible run evidence.
 8. `review`
 9. `evidence`
 
+Reference type:
+- `runtime/src/types/run-artifact.ts`
+
 ## 4. Status and Failure Codes
 
-Status: `pass`, `fail`, `blocked`
+Status:
+1. `pass`
+2. `fail`
+3. `blocked`
 
-Failure examples:
-- `SelectorNotFound`
-- `ActionNotApplied`
-- `ExpectationFailed`
-- `VisualAmbiguity`
-- `AuthBlocked`
-- `ReviewRejected`
-- `Unknown`
+Failure code set (current):
+1. `SelectorNotFound`
+2. `ActionNotApplied`
+3. `HiddenElement`
+4. `TimingTimeout`
+5. `NetworkTransient`
+6. `ExpectationFailed`
+7. `DataMismatch`
+8. `VisualAmbiguity`
+9. `RenderBlocked`
+10. `RuntimeCrash`
+11. `AuthBlocked`
+12. `ReviewRejected`
+13. `Unknown`
 
 ## 5. Validation
 
@@ -48,9 +64,10 @@ Failure examples:
 ./scripts/validate-run-artifacts.sh
 ```
 
-Evolution evidence checklist:
-1. `jobs/<job-id>/job.json`
-2. `jobs/<job-id>/events.json`
-3. `jobs/<job-id>/scenario-pack/*`
-4. `jobs/<job-id>/attempts/*`
-5. `active-versions/<workflow-id>.json`
+## 6. Evolution Evidence Checklist
+
+1. `testing/evolution/state/jobs/<job-id>/job.json`
+2. `testing/evolution/state/jobs/<job-id>/events.json`
+3. `testing/evolution/state/jobs/<job-id>/scenario-pack/*`
+4. `testing/evolution/state/jobs/<job-id>/attempts/*`
+5. `testing/evolution/state/active-versions/<workflow-id>.json`

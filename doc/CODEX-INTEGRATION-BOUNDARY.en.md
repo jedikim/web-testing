@@ -2,6 +2,8 @@
 
 # CODEX INTEGRATION BOUNDARY
 
+Last Updated: 2026-02-25 (KST)
+
 ## 0. Purpose
 
 Define a strict responsibility boundary between this repository and the external AI-assistant project.
@@ -36,6 +38,8 @@ External project must implement:
 3. sensitive actions require explicit `go`
 
 ## 5. Session/Event JSON Contracts
+
+Note: timestamps in examples are illustrative schema samples.
 
 ### 5.1 Backend Simple (`/backend/*`)
 

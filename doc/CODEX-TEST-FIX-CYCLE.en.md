@@ -18,13 +18,15 @@ Reduce regressions with a standard test-fix loop.
 
 | Code | Meaning | Action |
 |---|---|---|
-| SelectorNotFound | target missing | re-extract + patch |
-| ActionNotApplied | action did not stick | alternate action + verify |
-| ExpectationFailed | assertion failed | refine rule/branch |
-| VisualAmbiguity | DOM not enough | ROI vision/checkpoint |
-| AuthBlocked | captcha/2FA/security gate | immediate handoff |
+| SelectorNotFound | target missing | Similo selector recovery, then patch fallback |
+| ActionNotApplied / HiddenElement | click/input not applied or element hidden | interaction-healing pre-step + verify |
+| TimingTimeout / NetworkTransient | transient timing/network instability | bounded retry with wait policy |
+| ExpectationFailed / DataMismatch | assertion or extracted data mismatch | refine rule and data validation |
+| VisualAmbiguity / RenderBlocked | DOM not enough or render incomplete | ROI vision/checkpoint and re-verify |
+| RuntimeCrash | browser/runtime crash | restart context and resume checkpoint |
+| AuthBlocked | captcha/2FA/security gate | immediate human handoff |
 | ReviewRejected | review failed | patch + re-test + re-review |
-| EvolutionApprovalPending | candidate passed and waits for human approval | approve/reject and continue |
+| EvolutionApprovalPending | candidate passed and waits for approval | approve/reject and continue |
 
 ## 3. Fix Loop
 

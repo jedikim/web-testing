@@ -2,27 +2,26 @@
 
 # CODEX RUN ARTIFACTS
 
+최종 업데이트: 2026-02-25 (KST)
+
 ## 0. 목적
 
-실행 결과를 재현 가능하게 저장하기 위한 최소 스키마와 저장 규칙을 정의한다.
+실행 증적을 재현 가능하게 저장하기 위한 스키마/경로 규칙을 정의합니다.
 
-## 1. 저장 위치
+## 1. 저장 경로
 
-- 루트: `runs/`
-- 샘플: `runs/samples/`
-- 실운영(권장): `runs/YYYY/MM/DD/`
-- 진화 상태/버전 기록: `testing/evolution/state/` (Git 제외)
+1. 루트: `runs/`
+2. 샘플: `runs/samples/`
+3. 실운영 권장 구조: `runs/YYYY/MM/DD/`
+4. 진화 상태/이력(깃 제외): `testing/evolution/state/`
 
 ## 2. 파일명 규칙
 
 `YYYY-MM-DDTHH-mm-ssZ_<workflow_id>_<status>.json`
 
-예시:
+참고: 예시 날짜는 설명용이며 실제 실행 시점 타임스탬프를 사용합니다.
 
-- `2026-02-24T09-45-00Z_shopping_search_pass.json`
-- `2026-02-24T09-49-32Z_shopping_search_fail.json`
-
-## 3. 최소 필수 필드
+## 3. 필수 필드
 
 1. `runId`
 2. `workflowId`
@@ -34,43 +33,38 @@
 8. `review`
 9. `evidence`
 
-## 4. 상태와 실패 코드
+타입 정의:
+- `runtime/src/types/run-artifact.ts`
 
-### 4.1 status
+## 4. 상태/실패 코드
 
-- `pass`: 검증 + 리뷰 승인
-- `fail`: 테스트/검증 실패 또는 리뷰 반려
-- `blocked`: human handoff 필요
+status:
+1. `pass`
+2. `fail`
+3. `blocked`
 
-### 4.2 failure code
+현재 failure code 세트:
+1. `SelectorNotFound`
+2. `ActionNotApplied`
+3. `HiddenElement`
+4. `TimingTimeout`
+5. `NetworkTransient`
+6. `ExpectationFailed`
+7. `DataMismatch`
+8. `VisualAmbiguity`
+9. `RenderBlocked`
+10. `RuntimeCrash`
+11. `AuthBlocked`
+12. `ReviewRejected`
+13. `Unknown`
 
-- `SelectorNotFound`
-- `ActionNotApplied`
-- `ExpectationFailed`
-- `VisualAmbiguity`
-- `AuthBlocked`
-- `ReviewRejected`
-- `Unknown`
-
-## 5. 타입 정의 참조
-
-- TypeScript 타입: `runtime/src/types/run-artifact.ts`
-- 코드 리뷰 기준: `doc/CODEX-CODE-REVIEW.md`
-
-## 6. 샘플 데이터
-
-- 성공 샘플: `runs/samples/2026-02-24_sample-run-pass.json`
-- 실패 샘플: `runs/samples/2026-02-24_sample-run-fail.json`
-
-## 7. 검증 명령
-
-샘플/실행 아티팩트 구조 검증:
+## 5. 검증
 
 ```bash
 ./scripts/validate-run-artifacts.sh
 ```
 
-진화 백엔드 저장 구조 검증(수동):
+## 6. Evolution 증적 체크리스트
 
 1. `testing/evolution/state/jobs/<job-id>/job.json`
 2. `testing/evolution/state/jobs/<job-id>/events.json`

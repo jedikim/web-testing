@@ -18,10 +18,12 @@
 
 | 코드 | 의미 | 기본 대응 |
 |---|---|---|
-| `SelectorNotFound` | 타겟 탐색 실패 | 후보 재추출 + 패치 생성 |
-| `ActionNotApplied` | 클릭/입력 반영 실패 | 대체 액션 + 재검증 |
-| `ExpectationFailed` | 검증 실패 | 룰 보정 또는 분기 수정 |
-| `VisualAmbiguity` | DOM만으로 판단 불가 | ROI Vision 또는 사용자 질의 |
+| `SelectorNotFound` | 타겟 탐색 실패 | Similo selector 복구 후 patch fallback |
+| `ActionNotApplied` / `HiddenElement` | 클릭/입력 반영 실패 또는 숨김 요소 | interaction-healing 사전 스텝 + 재검증 |
+| `TimingTimeout` / `NetworkTransient` | 일시적 시간/네트워크 불안정 | 제한 재시도 + wait 정책 적용 |
+| `ExpectationFailed` / `DataMismatch` | 검증/데이터 불일치 | 룰/데이터 검증 로직 보정 |
+| `VisualAmbiguity` / `RenderBlocked` | DOM만으로 판단 불가 또는 렌더 미완료 | ROI Vision/checkpoint 후 재검증 |
+| `RuntimeCrash` | 브라우저/런타임 크래시 | 컨텍스트 재시작 후 체크포인트 재개 |
 | `AuthBlocked` | 캡차/2FA/보안 차단 | 즉시 handoff |
 | `ReviewRejected` | 코드 리뷰 반려 | 이슈 수정 + 재테스트 + 재리뷰 |
 | `EvolutionApprovalPending` | 후보 버전 테스트 통과 후 사용자 승인 대기 | approve/reject 결정 후 pointer 전환 또는 재시도 |

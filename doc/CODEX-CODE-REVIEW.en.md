@@ -2,6 +2,8 @@
 
 # CODEX CODE REVIEW
 
+Last Updated: 2026-02-25 (KST)
+
 ## 0. Purpose
 
 Standardize merge-quality review. Test pass alone is not enough.

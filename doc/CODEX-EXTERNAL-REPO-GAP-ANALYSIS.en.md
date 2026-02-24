@@ -9,7 +9,8 @@ Compared repositories:
 - Current project: `/home/jedi/code/web-agentic-codex`
 - External repo: `/home/jedi/code/web-agentic-codex/temp/web-agentic` (origin: `https://github.com/jedikim/web-agentic`)
 
-Analysis date: 2026-02-24 (external commit `34360a7`)  
+Original comparison date: 2026-02-24 (external commit `34360a7`)  
+Status refresh date: 2026-02-25 (KST)  
 Constraint: re-clone and compare first, then implement and verify prioritized adoption items
 
 ## 1. Executive Summary
@@ -130,7 +131,7 @@ This is the requested list of files/areas to modify later. No implementation is 
 2. Reflect selected items into implementation/test plan docs.
 3. Start implementation only after that, using the mandatory loop (Plan → Build → Test → Fix → Re-test → Review → Report).
 
-## 7. Implementation Status (2026-02-24)
+## 7. Implementation Status (refreshed 2026-02-25)
 
 Completed:
 
@@ -166,3 +167,5 @@ Completed:
 Remaining:
 
 1. `GAP-B1/B2` deeper runtime orchestration integration and finer failure taxonomy
+2. advanced interaction-healing pre-steps for hidden element recovery
+3. region-aware VLM routing for highly cluttered screens

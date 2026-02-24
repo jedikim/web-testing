@@ -2,42 +2,58 @@
 
 # Adaptive Web Automation Core
 
-Rule-first web automation runtime with controlled LLM fallback, screenshot checkpoints, and bug/exception-driven evolution.
+Last Updated: 2026-02-25 (KST)
 
-Legal-safe default: captcha/2FA/security challenge bypass automation is not provided; use human handoff.
+This repository provides the web-automation core for an external AI assistant project.
+It is designed for:
+1. deterministic-first web execution
+2. bounded LLM fallback
+3. screenshot-based human handoff for sensitive steps
+4. bug/exception-driven self-improvement (not per every new request)
 
-## Dual Usage Modes
+Legal-safe default:
+- no automatic captcha/2FA/security bypass
+- immediate handoff to human input on security challenges
 
-1. `backend_simple`: easiest HTTP backend mode with multi-turn session APIs
-2. `sdk_detailed`: embeddable SDK mode for fine-grained orchestration in your own service
+## Scope Boundary
+
+In scope:
+- web automation runtime, session contracts, fallback/recovery, E2E simulation
+- chat-style backend sample and SDK for embedding
+
+Out of scope:
+- production Slack/Telegram bot routing and webhook orchestration
+- credential vault/policy management for production assistants
+
+## Core Capabilities
+
+1. Deterministic workflow engine (`rules first`)
+2. Selector recovery with Similo-style fingerprints before LLM patch fallback
+3. Cascaded LLM routing (`flash-first -> uncertainty/sensitive gate -> pro -> rule fallback`)
+4. Semantic replay + plan cache reuse/adaptation for repeated tasks
+5. Self-healing taxonomy for failure classification and suggested action
+6. Repeated-item visual chain (`composite image -> YOLO26 -> VLM fallback -> reverse mapping`)
+7. Chat automation backend sample with:
+   - headful/headless switch
+   - live logs/progress stream (SSE)
+   - pause/resume/cancel
+   - captcha handoff input
+   - image attachments
+8. Evolution backend for isolated candidate versions (`git worktree`) and approval-based promotion
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    U[Operator / External Assistant] --> B[Backend Simple API]
-    B --> S[Session Store + Turn Engine]
-    S --> A[Automation Runtime]
-    A --> E[Evolution Backend]
-
-    X[Internal Service Code] --> D[SDK Detailed]
-    D --> S
-    D --> A
+    U[Operator / External Assistant] --> C[Chat or Backend API]
+    C --> S[Session Store]
+    C --> T[Turn Engine]
+    T --> D[Deterministic Runtime]
+    D --> F[Fallback and Recovery]
+    F --> H[Human Handoff]
+    D --> E[Evolution Trigger on Bug/Exception]
+    E --> W[Worktree Candidate + Test/Fix Loop]
 ```
-
-## What This Repository Does
-
-- deterministic workflow execution first, fallback only when needed
-- Similo-style selector fingerprint recovery before LLM patch fallback
-- cascaded LLM routing (`flash-first -> uncertainty/sensitive gate -> pro -> rule fallback`)
-- semantic replay retrieval + plan template cache/adaptation for repeated tasks
-- self-healing taxonomy classification (selector/timing/data/runtime/render/interaction)
-- multi-turn chat-like session state for automation planning/execution
-- repeated-item composite judgement (`merge -> YOLO26 -> same-image VLM fallback -> reverse trace`)
-- assistantless E2E simulation without implementing Slack/Telegram integration itself
-- chat automation backend sample (`/example/chat/*`) with live log stream, headful/headless switch, pause/resume/cancel, captcha handoff input
-- standardized session contract endpoints for screenshot/handoff (`/backend/*`, `/example/chat/*`)
-- chat UI image attachment support for requests like "find similar items on Naver using this photo"
-- evolution backend for isolated candidate versions (worktree + test/fix + approval)
-- evolution version/diff query APIs (`/evolution/versions*`, `/evolution/jobs/:id/diff`)
 
 ## Quick Start
 
@@ -50,45 +66,29 @@ npm run typecheck
 npm test
 ```
 
-## Mode A1: Backend Simple (HTTP + Sample UI)
+## How to Run
 
-Start backend:
+### Mode A: Backend Simple
 
 ```bash
 cd runtime
 npm run backend:simple:server
 ```
 
-Open:
+- Health: `http://127.0.0.1:4888/health`
+- UI sample: `http://127.0.0.1:4888/backend/ui`
 
-- API health: `http://127.0.0.1:4888/health`
-- sample UI: `http://127.0.0.1:4888/backend/ui`
-
-## Mode A2: Chat Automation Backend (HTTP + Chat UI Example)
-
-Start backend + chat UI:
+### Mode B: Chat Automation Example Backend
 
 ```bash
 cd runtime
 npm run example:chat-backend
 ```
 
-Open:
+- Health: `http://127.0.0.1:4999/example/chat/health`
+- Chat UI: `http://127.0.0.1:4999/example/chat/ui`
 
-- API health: `http://127.0.0.1:4999/example/chat/health`
-- chat UI: `http://127.0.0.1:4999/example/chat/ui`
-
-Key features:
-
-1. per-message browser mode (`headful`/`headless`)
-2. live execution status/logs through SSE stream
-3. user pause/resume/cancel controls
-4. captcha/security handoff input + continue
-5. auto-pause older session when another conversation starts (same operator)
-
-## Mode B: SDK Detailed (Embedded)
-
-Run examples:
+### Mode C: SDK Embedded Usage
 
 ```bash
 cd runtime
@@ -99,58 +99,54 @@ npm run example:sdk:human-handoff
 npm run example:repeated-item
 ```
 
-## Model Policy
+## Environment Essentials
 
-- supported LLM providers: `gemini`, `openai` (only)
-- default Gemini models: `gemini-3.1-pro-preview`, `gemini-3.0-flash`
-- default OpenAI models: `gpt-5.2-codex`, `gpt-5-mini`
-- default YOLO26 model: `yolo26l`
-- coding/self-improvement loops: `gemini-3.1-pro-preview`
-- automation interaction loops: `gemini-3.0-flash`
-- cascaded routing env:
-  - `BACKEND_AUTOMATION_MODEL` (default `gemini-3.0-flash`)
-  - `BACKEND_CASCADE_ESCALATION_MODEL` (default `gemini-3.1-pro-preview`)
-  - `BACKEND_CASCADE_THRESHOLD` (default `0.65`)
+- LLM providers supported: `gemini`, `openai` only
+- Default Gemini models: `gemini-3.1-pro-preview,gemini-3.0-flash`
+- Default OpenAI models: `gpt-5.2-codex,gpt-5-mini`
+- YOLO26 default model: `yolo26l`
 
-## Verification Commands
+Key variables:
+- `BACKEND_AUTOMATION_MODEL`
+- `BACKEND_CASCADE_ESCALATION_MODEL`
+- `BACKEND_CASCADE_THRESHOLD`
+- `PLAN_CACHE_ENABLED`
+- `PLAN_CACHE_SIMILARITY_THRESHOLD`
+- `SIMILO_ENABLED`
+
+Full setup:
+- [Environment Setup (EN)](./doc/CODEX-ENV-SETUP.en.md)
+- [환경설정 (KO)](./doc/CODEX-ENV-SETUP.md)
+
+## E2E Test Entry
+
+Main command groups:
 
 ```bash
 cd runtime
 npm run typecheck
-npm run test:e2e:fixtures
+npm test
 npm run test:e2e:chat-ui:headful
 npm run test:e2e:kr:headful
 npm run test:e2e:assistantless:live
 npm run test:e2e:provider:live
 npm run test:e2e:autonomous:live
-npm run test:sdk
-npm run test:evolution
-npm test
 ```
 
-## Latest Verification Snapshot (2026-02-25, KST)
+Meaning of live flags:
+1. `RUN_KR_E2E=1`: run Korea live smoke scenarios
+2. `RUN_ASSISTANTLESS_KR_E2E=1`: run assistantless live loop scenarios
+3. `RUN_PROVIDER_LIVE_E2E=1`: run real provider matrix (if model targets are configured)
+4. `RUN_AUTONOMOUS_BATCH_E2E=1`: run autonomous batch scenarios and save evidence under `testing/autonomous-batch/`
 
-- Branch state: `main`
-- Validation commands:
-  - `cd runtime && npm run typecheck` -> pass
-  - `cd runtime && npm test` -> 59 files passed, 160 tests passed, 9 skipped
-  - `cd runtime && npm run test:e2e:chat-ui:headful` -> 2 tests passed
-  - `cd runtime && npm run test:e2e:kr:headful` -> 7 tests passed
-  - `cd runtime && npm run test:e2e:assistantless:live` -> 2 tests passed
-  - `cd runtime && npm run test:e2e:provider:live` -> 3 tests passed, 1 skipped (no live provider matrix in env)
-  - `cd runtime && npm run test:e2e:autonomous:live` -> 2 tests passed (headful autonomous batch, 2 iterations)
-- Fix cycle result: no blocker/major issue found in this verification run.
+## Documentation Map
 
-## Artifacts and State Paths
+Start here:
+1. [Documentation Index (EN)](./doc/README.md)
+2. [문서 인덱스 (KO)](./doc/README.ko.md)
 
-- runtime artifacts: `runs/samples/artifacts/`
-- backend sessions: `testing/backend/state/`
-- evolution state: `testing/evolution/state/`
-- autonomous E2E evidence: `testing/autonomous-batch/`
-
-## Bilingual Documentation
-
-- Documentation index: [English](./doc/README.md) | [한국어](./doc/README.ko.md)
-- SDK + Backend usage: [English](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [한국어](./doc/CODEX-SDK-BACKEND-USAGE.md)
-- Practical usage guide: [English](./doc/CODEX-PRACTICAL-USAGE.en.md) | [한국어](./doc/CODEX-PRACTICAL-USAGE.md)
-- Environment setup: [English](./doc/CODEX-ENV-SETUP.en.md) | [한국어](./doc/CODEX-ENV-SETUP.md)
+Most-used docs:
+1. [Runbook (EN)](./doc/CODEX-RUNBOOK.en.md) | [런북 (KO)](./doc/CODEX-RUNBOOK.md)
+2. [Automation Test Plan (EN)](./doc/CODEX-AUTOMATION-TEST-PLAN.en.md) | [자동화 테스트 계획 (KO)](./doc/CODEX-AUTOMATION-TEST-PLAN.md)
+3. [E2E Testing Guide (EN)](./doc/CODEX-E2E-TESTING.en.md) | [E2E 테스트 가이드 (KO)](./doc/CODEX-E2E-TESTING.md)
+4. [SDK + Backend Usage (EN)](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [SDK + 백엔드 사용법 (KO)](./doc/CODEX-SDK-BACKEND-USAGE.md)

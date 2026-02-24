@@ -9,7 +9,8 @@
 - 현재 프로젝트: `/home/jedi/code/web-agentic-codex`
 - 외부 레포: `/home/jedi/code/web-agentic-codex/temp/web-agentic` (origin: `https://github.com/jedikim/web-agentic`)
 
-분석 시점: 2026-02-24 (external commit `34360a7`)  
+초기 비교 시점: 2026-02-24 (external commit `34360a7`)  
+상태 갱신 시점: 2026-02-25 (KST)  
 원칙: 외부 레포 재클론 후 비교 분석 → 우선 수용 항목 구현/검증 반영
 
 ## 1. 핵심 결론
@@ -130,7 +131,7 @@
 2. 확정된 항목을 `doc/CODEX-IMPLEMENTATION-PLAN.md`와 테스트 플랜에 반영
 3. 그 다음에만 구현 루프(Plan → Build → Test → Fix → Re-test → Review → Report) 시작
 
-## 7. 구현 반영 상태 (2026-02-24)
+## 7. 구현 반영 상태 (2026-02-25 갱신)
 
 완료:
 
@@ -166,3 +167,5 @@
 잔여:
 
 1. `GAP-B1/B2` (실 브라우저 오케스트레이션 연결 강화, 실패 taxonomy 정교화) 상세 구현
+2. hidden element 대응을 위한 interaction-healing 사전 스텝 자동 삽입
+3. cluttered 화면에서 region-aware VLM 라우팅 보강

@@ -2,135 +2,121 @@
 
 # CODEX ENV SETUP
 
+최종 업데이트: 2026-02-25 (KST)
+
 ## 0. 목적
 
-Dual 모드 운용을 위한 환경변수 기준을 고정한다.
-
-1. backend simple 모드 (HTTP 세션 API)
-2. sdk detailed 모드 (임베딩 실행)
+다음 실행 경로에 대한 환경설정을 표준화합니다:
+1. 런타임 테스트/라이브 E2E
+2. backend/chat 서버 운영
+3. evolution/SDK 워크플로우
 
 ## 1. Git Ignore 정책
 
-루트 `.gitignore`에 아래 패턴이 유지되어야 한다.
-
+루트 `.gitignore` 필수 항목:
 1. `.env`
 2. `.env.*`
 3. `runtime/.env`
 4. `runtime/.env.*`
 5. `!runtime/.env.example`
 6. `testing/`
+7. `temp/`
 
 ## 2. 설정 절차
 
 1. `cp runtime/.env.example runtime/.env`
-2. 키/경로 값을 채운다
-3. `runtime/` 기준으로 실행해 env 로딩 일관성을 유지한다
+2. 키/경로 값 입력
+3. `runtime/` 기준 실행으로 env 로딩 일관성 유지
 
-## 3. 주요 변수 그룹
+## 3. 주요 변수
 
-### 3.1 코어 런타임/테스트
+### 3.1 런타임/E2E 토글
 
 - `PW_HEADLESS`
 - `PLAYWRIGHT_TIMEOUT_MS`
-- `RUN_KR_E2E`, `RUN_ASSISTANTLESS_KR_E2E`, `RUN_AUTONOMOUS_BATCH_E2E`
+- `RUN_KR_E2E`
+- `RUN_ASSISTANTLESS_KR_E2E`
+- `RUN_PROVIDER_LIVE_E2E`
+- `RUN_AUTONOMOUS_BATCH_E2E`
+- `ASSISTANTLESS_KR_ITERATIONS`
+- `AUTONOMOUS_BATCH_ITERATIONS`
 - `AUTONOMOUS_BATCH_ROOT`
-- `SIMILO_ENABLED` (`1`: selector fingerprint 복구 활성, `0`: 비활성)
 
-### 3.2 Provider/모델 매트릭스
+### 3.2 LLM/모델
 
-- `LLM_ENABLED`, `LLM_PROVIDER`, `LLM_MODEL`
-- `GEMINI_API_KEY`, `OPENAI_API_KEY`
-- `GEMINI_MODELS`, `OPENAI_MODELS`
-- `LLM_VENDOR_ORDER`
-  - 기본 순서: `gemini,openai`
-  - 기본 Gemini 모델: `gemini-3.1-pro-preview,gemini-3.0-flash`
-  - 기본 OpenAI 모델: `gpt-5.2-codex,gpt-5-mini`
+- `GEMINI_API_KEY`
+- `OPENAI_API_KEY`
+- `GEMINI_MODELS` (기본 `gemini-3.1-pro-preview,gemini-3.0-flash`)
+- `OPENAI_MODELS` (기본 `gpt-5.2-codex,gpt-5-mini`)
+- `LLM_VENDOR_ORDER` (기본 `gemini,openai`)
 
 ### 3.3 YOLO26
 
 - `YOLO26_ENABLED`
 - `YOLO26_BASE_URL`
-- `YOLO26_MODELS`
+- `YOLO26_MODELS` (기본 `yolo26l`)
 - `YOLO26_API_KEY` (로컬 OSS 엔드포인트면 선택)
-  - 권장 모델 세트: `yolo26l`
 
-### 3.4 Evolution backend (자가개선)
+### 3.4 신뢰성/폴백 제어
 
-- `EVOLUTION_SERVER_HOST`, `EVOLUTION_SERVER_PORT`
-- `EVOLUTION_STATE_ROOT`
-- `EVOLUTION_BASE_BRANCH`, `EVOLUTION_TEST_COMMAND`
-- `EVOLUTION_MAX_AUTOFIX_ATTEMPTS`, `EVOLUTION_TEST_TIMEOUT_MS`
-- `EVOLUTION_CODING_MODEL` (권장 `gemini-3.1-pro-preview`)
-- `EVOLUTION_AUTOMATION_MODEL` (권장 `gemini-3.0-flash`)
-- `EVOLUTION_AUTOFIX_ENABLED`, `EVOLUTION_PROMOTE_MODE`
+- `SIMILO_ENABLED`
+- `BACKEND_AUTOMATION_MODEL` (기본 `gemini-3.0-flash`)
+- `BACKEND_CASCADE_ESCALATION_MODEL` (기본 `gemini-3.1-pro-preview`)
+- `BACKEND_CASCADE_THRESHOLD` (기본 `0.65`)
+- `PLAN_CACHE_ENABLED` (기본 `1`)
+- `PLAN_CACHE_SIMILARITY_THRESHOLD` (기본 `0.45`)
 
-### 3.5 Backend simple 모드
+### 3.5 backend/chat/evolution 경로
 
-- `BACKEND_SERVER_HOST`, `BACKEND_SERVER_PORT`
 - `BACKEND_SESSION_ROOT`
-- `BACKEND_LLM_ENABLED` (`1`: Gemini turn engine, `0`: rule-only)
-- `BACKEND_AUTOMATION_MODEL` (권장 `gemini-3.0-flash`)
-- `BACKEND_CASCADE_ESCALATION_MODEL` (권장 `gemini-3.1-pro-preview`)
-- `BACKEND_CASCADE_THRESHOLD` (권장 `0.65`)
-- `PLAN_CACHE_ENABLED` (`1`: 유사 플랜 재사용/적응 활성)
-- `PLAN_CACHE_SIMILARITY_THRESHOLD` (권장 `0.45`)
-
-### 3.6 Chat automation 예제 백엔드
-
-- `CHAT_AUTOMATION_SERVER_HOST`, `CHAT_AUTOMATION_SERVER_PORT`
 - `CHAT_AUTOMATION_SESSION_ROOT`
 - `CHAT_AUTOMATION_UPLOAD_ROOT`
-- 실행 명령: `npm run example:chat-backend`
+- `EVOLUTION_STATE_ROOT`
+- `EVOLUTION_BASE_BRANCH`
+- `EVOLUTION_TEST_COMMAND`
 
-## 4. 권장 모델 정책
+## 4. 권장 정책
 
-1. 코딩/패치 생성: `gemini-3.1-pro-preview`
-2. 자동화 턴 추론: `gemini-3.0-flash`
-3. 코딩 모델과 자동화 모델을 분리 운영
+1. 코딩 모델: `gemini-3.1-pro-preview`
+2. 자동화 상호작용 모델: `gemini-3.0-flash`
+3. 실전 라이브 검증은 headful 우선
+4. 테스트 산출물은 `testing/` 하위에 저장
 
-## 5. 예시 스니펫
+## 5. 최소 프로파일 예시
 
-### 5.1 Evolution backend
+### 5.1 로컬 품질 검증용
 
 ```bash
-EVOLUTION_SERVER_HOST=127.0.0.1
-EVOLUTION_SERVER_PORT=4777
-EVOLUTION_STATE_ROOT=/home/jedi/code/web-agentic-codex/testing/evolution/state
-EVOLUTION_BASE_BRANCH=main
-EVOLUTION_TEST_COMMAND=npm run test:automation:full
-EVOLUTION_MAX_AUTOFIX_ATTEMPTS=2
-EVOLUTION_TEST_TIMEOUT_MS=600000
-EVOLUTION_CODING_MODEL=gemini-3.1-pro-preview
-EVOLUTION_AUTOMATION_MODEL=gemini-3.0-flash
+PW_HEADLESS=1
+RUN_KR_E2E=0
+RUN_ASSISTANTLESS_KR_E2E=0
+RUN_PROVIDER_LIVE_E2E=0
+RUN_AUTONOMOUS_BATCH_E2E=0
 ```
 
-### 5.2 Backend simple 모드
+### 5.2 headful 라이브 검증용
 
 ```bash
-BACKEND_SERVER_HOST=127.0.0.1
-BACKEND_SERVER_PORT=4888
-BACKEND_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/backend/state
-BACKEND_LLM_ENABLED=1
-BACKEND_AUTOMATION_MODEL=gemini-3.0-flash
-BACKEND_CASCADE_ESCALATION_MODEL=gemini-3.1-pro-preview
-BACKEND_CASCADE_THRESHOLD=0.65
-PLAN_CACHE_ENABLED=1
-PLAN_CACHE_SIMILARITY_THRESHOLD=0.45
-GEMINI_API_KEY=your-key
+PW_HEADLESS=0
+RUN_KR_E2E=1
+RUN_ASSISTANTLESS_KR_E2E=1
+RUN_AUTONOMOUS_BATCH_E2E=1
+AUTONOMOUS_BATCH_ROOT=/home/jedi/code/web-agentic-codex/testing/autonomous-batch
 ```
 
-### 5.3 Chat automation 예제 백엔드
+### 5.3 provider live 검증용
 
 ```bash
-CHAT_AUTOMATION_SERVER_HOST=127.0.0.1
-CHAT_AUTOMATION_SERVER_PORT=4999
-CHAT_AUTOMATION_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/chat-automation/state
-CHAT_AUTOMATION_UPLOAD_ROOT=/home/jedi/code/web-agentic-codex/testing/chat-automation/state/uploads
+RUN_PROVIDER_LIVE_E2E=1
+GEMINI_API_KEY=...
+OPENAI_API_KEY=...
+YOLO26_ENABLED=1
+YOLO26_BASE_URL=http://127.0.0.1:9001
+YOLO26_MODELS=yolo26l
 ```
 
 ## 6. 안전 규칙
 
-1. runtime `.env` 파일은 절대 커밋하지 않는다
-2. 실전형 브라우저 검증은 `PW_HEADLESS=0`을 사용한다
-3. 캡차/2FA 우회 자동화는 하지 않고 즉시 human handoff로 전환한다
-4. 코딩 모델을 flash 계열로 낮추지 않는다
+1. runtime `.env` 파일 커밋 금지
+2. 캡차 우회 자동화 설정 금지
+3. 보안 챌린지는 human handoff 전용으로 처리

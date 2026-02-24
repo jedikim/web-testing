@@ -2,135 +2,121 @@
 
 # CODEX ENV SETUP
 
+Last Updated: 2026-02-25 (KST)
+
 ## 0. Purpose
 
-Set runtime variables consistently for dual-mode operation:
-
-1. backend simple mode (HTTP session API)
-2. sdk detailed mode (embedded execution)
+Standardize environment configuration for:
+1. runtime tests and live E2E
+2. backend/chat server operation
+3. evolution and SDK workflows
 
 ## 1. Git Ignore Policy
 
-Required root `.gitignore` patterns:
-
+Required root `.gitignore` entries:
 1. `.env`
 2. `.env.*`
 3. `runtime/.env`
 4. `runtime/.env.*`
 5. `!runtime/.env.example`
 6. `testing/`
+7. `temp/`
 
 ## 2. Setup Steps
 
 1. `cp runtime/.env.example runtime/.env`
-2. fill required keys/paths
-3. run from `runtime/` so env loading is consistent
+2. fill keys and paths
+3. run from `runtime/` for consistent env loading
 
-## 3. Key Variable Groups
+## 3. Key Variables
 
-### 3.1 Core runtime and tests
+### 3.1 Runtime and E2E toggles
 
 - `PW_HEADLESS`
 - `PLAYWRIGHT_TIMEOUT_MS`
-- `RUN_KR_E2E`, `RUN_ASSISTANTLESS_KR_E2E`, `RUN_AUTONOMOUS_BATCH_E2E`
+- `RUN_KR_E2E`
+- `RUN_ASSISTANTLESS_KR_E2E`
+- `RUN_PROVIDER_LIVE_E2E`
+- `RUN_AUTONOMOUS_BATCH_E2E`
+- `ASSISTANTLESS_KR_ITERATIONS`
+- `AUTONOMOUS_BATCH_ITERATIONS`
 - `AUTONOMOUS_BATCH_ROOT`
-- `SIMILO_ENABLED` (`1`: selector fingerprint recovery enabled, `0`: disabled)
 
-### 3.2 Provider and model matrix
+### 3.2 LLM and models
 
-- `LLM_ENABLED`, `LLM_PROVIDER`, `LLM_MODEL`
-- `GEMINI_API_KEY`, `OPENAI_API_KEY`
-- `GEMINI_MODELS`, `OPENAI_MODELS`
-- `LLM_VENDOR_ORDER`
-  - default order: `gemini,openai`
-  - default Gemini models: `gemini-3.1-pro-preview,gemini-3.0-flash`
-  - default OpenAI models: `gpt-5.2-codex,gpt-5-mini`
+- `GEMINI_API_KEY`
+- `OPENAI_API_KEY`
+- `GEMINI_MODELS` (default `gemini-3.1-pro-preview,gemini-3.0-flash`)
+- `OPENAI_MODELS` (default `gpt-5.2-codex,gpt-5-mini`)
+- `LLM_VENDOR_ORDER` (default `gemini,openai`)
 
 ### 3.3 YOLO26
 
 - `YOLO26_ENABLED`
 - `YOLO26_BASE_URL`
-- `YOLO26_MODELS`
+- `YOLO26_MODELS` (default `yolo26l`)
 - `YOLO26_API_KEY` (optional for local OSS endpoint)
-  - recommended model set: `yolo26l`
 
-### 3.4 Evolution backend (self-improvement)
+### 3.4 Reliability and fallback controls
 
-- `EVOLUTION_SERVER_HOST`, `EVOLUTION_SERVER_PORT`
-- `EVOLUTION_STATE_ROOT`
-- `EVOLUTION_BASE_BRANCH`, `EVOLUTION_TEST_COMMAND`
-- `EVOLUTION_MAX_AUTOFIX_ATTEMPTS`, `EVOLUTION_TEST_TIMEOUT_MS`
-- `EVOLUTION_CODING_MODEL` (recommended `gemini-3.1-pro-preview`)
-- `EVOLUTION_AUTOMATION_MODEL` (recommended `gemini-3.0-flash`)
-- `EVOLUTION_AUTOFIX_ENABLED`, `EVOLUTION_PROMOTE_MODE`
+- `SIMILO_ENABLED`
+- `BACKEND_AUTOMATION_MODEL` (default `gemini-3.0-flash`)
+- `BACKEND_CASCADE_ESCALATION_MODEL` (default `gemini-3.1-pro-preview`)
+- `BACKEND_CASCADE_THRESHOLD` (default `0.65`)
+- `PLAN_CACHE_ENABLED` (default `1`)
+- `PLAN_CACHE_SIMILARITY_THRESHOLD` (default `0.45`)
 
-### 3.5 Backend simple mode
+### 3.5 Backend/chat/evolution paths
 
-- `BACKEND_SERVER_HOST`, `BACKEND_SERVER_PORT`
 - `BACKEND_SESSION_ROOT`
-- `BACKEND_LLM_ENABLED` (`1` for Gemini turn engine, `0` for rule-only)
-- `BACKEND_AUTOMATION_MODEL` (recommended `gemini-3.0-flash`)
-- `BACKEND_CASCADE_ESCALATION_MODEL` (recommended `gemini-3.1-pro-preview`)
-- `BACKEND_CASCADE_THRESHOLD` (recommended `0.65`)
-- `PLAN_CACHE_ENABLED` (`1` to reuse/adapt similar plans)
-- `PLAN_CACHE_SIMILARITY_THRESHOLD` (recommended `0.45`)
-
-### 3.6 Chat automation example backend
-
-- `CHAT_AUTOMATION_SERVER_HOST`, `CHAT_AUTOMATION_SERVER_PORT`
 - `CHAT_AUTOMATION_SESSION_ROOT`
 - `CHAT_AUTOMATION_UPLOAD_ROOT`
-- start command: `npm run example:chat-backend`
+- `EVOLUTION_STATE_ROOT`
+- `EVOLUTION_BASE_BRANCH`
+- `EVOLUTION_TEST_COMMAND`
 
-## 4. Recommended Model Policy
+## 4. Recommended Policy
 
-1. coding and patch generation: `gemini-3.1-pro-preview`
-2. automation turn reasoning: `gemini-3.0-flash`
-3. keep coding model and automation model separated
+1. coding model: `gemini-3.1-pro-preview`
+2. automation interaction model: `gemini-3.0-flash`
+3. keep headful mode for practical live validation
+4. keep testing artifacts under `testing/`
 
-## 5. Example Snippets
+## 5. Minimal Profiles
 
-### 5.1 Evolution backend
+### 5.1 Local quality profile
 
 ```bash
-EVOLUTION_SERVER_HOST=127.0.0.1
-EVOLUTION_SERVER_PORT=4777
-EVOLUTION_STATE_ROOT=/home/jedi/code/web-agentic-codex/testing/evolution/state
-EVOLUTION_BASE_BRANCH=main
-EVOLUTION_TEST_COMMAND=npm run test:automation:full
-EVOLUTION_MAX_AUTOFIX_ATTEMPTS=2
-EVOLUTION_TEST_TIMEOUT_MS=600000
-EVOLUTION_CODING_MODEL=gemini-3.1-pro-preview
-EVOLUTION_AUTOMATION_MODEL=gemini-3.0-flash
+PW_HEADLESS=1
+RUN_KR_E2E=0
+RUN_ASSISTANTLESS_KR_E2E=0
+RUN_PROVIDER_LIVE_E2E=0
+RUN_AUTONOMOUS_BATCH_E2E=0
 ```
 
-### 5.2 Backend simple mode
+### 5.2 Headful live profile
 
 ```bash
-BACKEND_SERVER_HOST=127.0.0.1
-BACKEND_SERVER_PORT=4888
-BACKEND_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/backend/state
-BACKEND_LLM_ENABLED=1
-BACKEND_AUTOMATION_MODEL=gemini-3.0-flash
-BACKEND_CASCADE_ESCALATION_MODEL=gemini-3.1-pro-preview
-BACKEND_CASCADE_THRESHOLD=0.65
-PLAN_CACHE_ENABLED=1
-PLAN_CACHE_SIMILARITY_THRESHOLD=0.45
-GEMINI_API_KEY=your-key
+PW_HEADLESS=0
+RUN_KR_E2E=1
+RUN_ASSISTANTLESS_KR_E2E=1
+RUN_AUTONOMOUS_BATCH_E2E=1
+AUTONOMOUS_BATCH_ROOT=/home/jedi/code/web-agentic-codex/testing/autonomous-batch
 ```
 
-### 5.3 Chat automation example backend
+### 5.3 Provider live profile
 
 ```bash
-CHAT_AUTOMATION_SERVER_HOST=127.0.0.1
-CHAT_AUTOMATION_SERVER_PORT=4999
-CHAT_AUTOMATION_SESSION_ROOT=/home/jedi/code/web-agentic-codex/testing/chat-automation/state
-CHAT_AUTOMATION_UPLOAD_ROOT=/home/jedi/code/web-agentic-codex/testing/chat-automation/state/uploads
+RUN_PROVIDER_LIVE_E2E=1
+GEMINI_API_KEY=...
+OPENAI_API_KEY=...
+YOLO26_ENABLED=1
+YOLO26_BASE_URL=http://127.0.0.1:9001
+YOLO26_MODELS=yolo26l
 ```
 
 ## 6. Safety Rules
 
 1. never commit runtime `.env` files
-2. use headful (`PW_HEADLESS=0`) for practical browser validation
-3. do not automate captcha/2FA bypass; stop and switch to human handoff
-4. do not downgrade coding model to flash tier
+2. do not configure captcha bypass automation
+3. treat security challenge steps as human handoff only

@@ -2,134 +2,89 @@
 
 # CODEX 실사용 가이드
 
+최종 업데이트: 2026-02-25 (KST)
+
 ## 0. 목적
 
-실제 운영에서 바로 쓸 수 있도록 아래 두 가지 사용 패턴을 정리한다.
+실전 운영 관점에서 다음 사용 방식을 설명합니다:
+1. backend-simple 모드
+2. chat automation backend 모드
+3. SDK 임베딩 모드
 
-1. `backend_simple` (HTTP 서비스 형태)
-2. `chat_automation_example` (채팅형 제어 + 실시간 로그/진행 표시)
-3. `sdk_detailed` (SDK 임베딩 형태)
+## 1. 실전 안전 기준
 
-법적 안전 원칙에 따라 캡차/2FA 우회 자동화는 제외한다.
+1. 실제 검증은 headful(`PW_HEADLESS=0`) 우선
+2. 불확실 단계마다 스크린샷 저장
+3. 캡차/2FA/보안 챌린지 즉시 handoff
+4. 산출물은 gitignored `testing/`에 저장
 
-## 1. 법적 안전 원칙 (중요)
+## 2. 실전 워크플로우 템플릿
 
-1. 캡차/2FA/보안 챌린지 자동 풀이/우회 로직은 운영 경로에 넣지 않는다.
-2. 해당 게이트가 나오면 자동화는 즉시 중단하고 human decision을 요청한다.
-3. 사람 결정(`go`, `revise`, `not_go`) 후에만 재개/중단을 확정한다.
+다음 같은 목표에 동일하게 적용합니다:
+- "날씨 확인 후 판교 기준 아이와 갈만한 곳 탐색"
+- "첨부 이미지와 비슷한 상품 탐색"
 
-## 2. Backend Simple 실전 플로우
+루프:
+1. 현재 상태 스크린샷 캡처
+2. 목표/페이지 상태 분석
+3. 결정론 스텝 실행
+4. 결과 검증
+5. 실패 시 제한된 복구 경로 실행
+6. 보안/차단 구간이면 human handoff
+7. 완료까지 반복
 
-### 2.1 서버 실행
+## 3. Chat Backend 실전 예시
 
-```bash
-cd runtime
-npm run backend:simple:server
-```
-
-기본 주소: `http://127.0.0.1:4888`
-
-### 2.2 세션 생성
-
-```bash
-curl -s http://127.0.0.1:4888/backend/sessions \
-  -H 'content-type: application/json' \
-  -d '{
-    "mode": "backend_simple",
-    "title": "판교 기준 날씨+아이동선",
-    "workflowId": "wf-kr-planner",
-    "systemPrompt": "deterministic-first로 진행하고 불확실하면 screenshot checkpoint 요청"
-  }'
-```
-
-### 2.3 사용자 턴 전송
-
-```bash
-curl -s http://127.0.0.1:4888/backend/sessions/<SESSION_ID>/turns \
-  -H 'content-type: application/json' \
-  -d '{
-    "content": "오늘 날씨 확인 후 판교에서 갈만한 서울 근교 아이 장소를 3개 추려줘",
-    "screenshotPath": "testing/backend/state/example-step1.png"
-  }'
-```
-
-### 2.4 세션 기록 조회
-
-```bash
-curl -s http://127.0.0.1:4888/backend/sessions/<SESSION_ID>
-```
-
-### 2.5 세션 종료
-
-```bash
-curl -s -X POST http://127.0.0.1:4888/backend/sessions/<SESSION_ID>/close \
-  -H 'content-type: application/json' \
-  -d '{}'
-```
-
-## 3. Chat Automation Example Backend 실전 플로우
-
-### 3.1 백엔드 + 채팅 UI 실행
+### 3.1 서버 실행
 
 ```bash
 cd runtime
 npm run example:chat-backend
 ```
 
-기본 UI 주소: `http://127.0.0.1:4999/example/chat/ui`
-
-### 3.2 세션 생성 + 첫 목표 전송
+### 3.2 세션 생성
 
 ```bash
 curl -s http://127.0.0.1:4999/example/chat/sessions \
   -H 'content-type: application/json' \
-  -d '{
-    "title": "판교 자동화 플래너",
-    "operatorId": "operator-main"
-  }'
+  -d '{"title":"pangyo weather+map","operatorId":"operator-main"}'
 ```
+
+### 3.3 목표 메시지 전송
 
 ```bash
 curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/message \
   -H 'content-type: application/json' \
   -d '{
-    "content": "첨부한 사진과 비슷한 것을 네이버 이미지 검색에서 찾아줘",
-    "browserMode": "headful",
-    "operatorId": "operator-main",
-    "autoPauseOthers": true,
-    "attachments": [
-      {
-        "name": "reference-shoe.png",
-        "mimeType": "image/png",
-        "dataUrl": "data:image/png;base64,<BASE64>"
-      }
+    "content":"오늘 날씨 확인하고 판교 기준 아이와 갈만한 곳을 네이버 지도에서 찾아줘",
+    "browserMode":"headful",
+    "operatorId":"operator-main",
+    "autoPauseOthers":true
+  }'
+```
+
+### 3.4 이미지 첨부 메시지 전송
+
+```bash
+curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/message \
+  -H 'content-type: application/json' \
+  -d '{
+    "content":"첨부 이미지와 비슷한 상품을 네이버 이미지 검색에서 찾아줘",
+    "browserMode":"headful",
+    "operatorId":"operator-main",
+    "attachments":[
+      {"name":"reference.png","dataUrl":"data:image/png;base64,<BASE64>"}
     ]
   }'
 ```
 
-### 3.3 진행상태/로그 연속 확인
+### 3.5 실시간 로그 관찰
 
 ```bash
 curl -N http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/stream
 ```
 
-이 스트림은 실행 스텝과 로그를 지속적으로 내보내며, 예제 UI가 실시간으로 표시한다.
-스냅샷 payload에는 `schemaVersion=chat.session.snapshot.v1`가 포함된다.
-
-handoff/스크린샷 조회:
-
-```bash
-curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/handoffs
-curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/screenshot
-```
-
-### 3.4 새 대화 시작 시 이전 세션 일시정지
-
-같은 `operatorId`에서 다른 세션으로 새 메시지를 보내고 `autoPauseOthers=true`면 이전 실행 세션이 `paused`로 전환된다.
-
-### 3.5 캡차/보안 챌린지 사용자 입력
-
-상태가 `waiting_captcha`가 되면 사용자 입력을 제출한다.
+### 3.6 캡차 handoff 입력
 
 ```bash
 curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/captcha \
@@ -137,113 +92,38 @@ curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/captcha \
   -d '{"value":"A1B2C3"}'
 ```
 
-이후 재개:
-
-```bash
-curl -s http://127.0.0.1:4999/example/chat/sessions/<SESSION_ID>/resume \
-  -H 'content-type: application/json' \
-  -d '{}'
-```
-
-## 4. SDK Detailed 실전 플로우
-
-### 4.1 기본 멀티턴 사용
+## 4. SDK 실전 예시
 
 ```ts
-import { createMultiTurnAutomationSdk } from '../src/index';
+import { createWebAutomationSdk } from '../src/index';
 
-const sdk = createMultiTurnAutomationSdk();
-
-const session = await sdk.createSession({
-  mode: 'sdk_detailed',
-  title: 'kr multi-step planner',
-  workflowId: 'wf-kr-complex'
-});
-
-const turn = await sdk.sendUserTurn({
-  sessionId: session.id,
-  content: '날씨 확인 -> 지도 검색 -> 후보 3개 확정 순서로 진행해.'
-});
-
-console.log(turn.assistantTurn.content);
-```
-
-로컬 예제 실행:
-
-```bash
-cd runtime
-npm run example:sdk:multiturn
-```
-
-### 4.2 Human handoff 예제
-
-```bash
-cd runtime
-npm run example:sdk:human-handoff
-```
-
-이 예제는 민감/차단 상황에서 자동화가 `blocked` 상태로 멈추고 사람 결정을 기다리는 흐름을 보여준다.
-
-### 4.3 반복 리스트 이미지 합성 (YOLO -> VLM fallback)
-
-쇼핑몰 리스트처럼 아이템 이미지가 반복될 때 아래 체인을 사용한다.
-
-1. 아이템 이미지를 하나의 합성 이미지로 생성
-2. 합성 이미지 기준으로 YOLO26 1차 판단
-3. YOLO 판단이 약하면 동일 합성 이미지로 VLM 재판단
-4. 탐지 bbox를 원본 아이템 ID로 역추적
-
-```ts
-const result = await runAssistantlessChatE2E({
-  ...baseInput,
-  shouldRunRepeatedItemComposite: async () => true,
-  collectRepeatedItemImages: async () => itemImages,
-  judgeRepeatedItemsWithYolo: async ({ compositeImagePath, manifest }) => {
-    return yoloJudge(compositeImagePath, manifest);
-  },
-  judgeRepeatedItemsWithVlm: async ({ compositeImagePath, yolo, mappedDetections }) => {
-    return vlmJudge(compositeImagePath, yolo, mappedDetections);
+const sdk = createWebAutomationSdk();
+const result = await sdk.runWithImprovement({
+  workflowId: 'wf-kr-practical',
+  targetUrl: 'https://www.naver.com',
+  objective: 'weather then family-friendly nearby places',
+  run: async () => {
+    return {
+      status: 'fail',
+      failures: [{ code: 'SelectorNotFound', message: 'search input changed' }]
+    };
   }
 });
+
+console.log(result);
 ```
 
-관련 코드:
+## 5. 운영 검토 체크리스트
 
-- `runtime/src/vision/composite-sheet.ts`
-- `runtime/src/vision/repeated-item-judgement.ts`
-- `runtime/src/testing/assistantless-chat-e2e.ts`
+런 종료 후 확인:
+1. run 상태와 step trace
+2. screenshot/handoff 증적
+3. 실패 분류와 복구 액션
+4. evolution 트리거 적절성(버그/예외 기반)
+5. 안전 정책 위반 여부
 
-실행 예제:
+## 6. 다음 문서
 
-```bash
-cd runtime
-npm run example:repeated-item
-```
-
-## 5. Human Handoff 계약
-
-코어 계약:
-
-- integration 레이어의 `runHumanLoop(...)`
-- decision 요청 데이터: `workflowId`, `screenshotPath`, `question`
-- decision 결과: `go | revise | not_go | unknown`
-
-동작 규칙:
-
-1. `go`: 계속 진행
-2. `revise`: 수정 함수 실행 후 재시도
-3. `not_go` 또는 `unknown`: `blocked`로 중단
-
-## 6. 운영 체크리스트
-
-1. 실전 검증은 `PW_HEADLESS=0`으로 실행한다.
-2. 불확실 단계마다 스크린샷을 남긴다.
-3. 런타임/테스트 산출물은 gitignored `testing/`에 저장한다.
-4. 코딩 모델은 `gemini-3.1-pro-preview`를 유지한다.
-5. 자동화 상호작용 모델은 `gemini-3.0-flash`를 유지한다.
-
-## 7. 다음 문서
-
-- SDK + Backend 사용법: [CODEX-SDK-BACKEND-USAGE.md](./CODEX-SDK-BACKEND-USAGE.md)
-- 환경설정: [CODEX-ENV-SETUP.md](./CODEX-ENV-SETUP.md)
-- 런북: [CODEX-RUNBOOK.md](./CODEX-RUNBOOK.md)
+1. [SDK + Backend Usage](./CODEX-SDK-BACKEND-USAGE.md)
+2. [E2E Testing Guide](./CODEX-E2E-TESTING.md)
+3. [Environment Setup](./CODEX-ENV-SETUP.md)

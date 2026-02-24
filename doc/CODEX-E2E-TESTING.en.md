@@ -2,73 +2,94 @@
 
 # CODEX E2E TESTING
 
+Last Updated: 2026-02-25 (KST)
+
 ## 0. Purpose
 
-Provide reproducible E2E validation for real usage conditions.
+Provide practical, reproducible E2E validation for:
+1. deterministic runtime behavior
+2. recovery behavior under drift/failure
+3. chat-style automation operation
+4. provider/live integration readiness
 
-## 1. E2E Layers
+## 1. Layer Model
 
-1. contract tests
-2. KR live smoke
-3. assistantless chat-loop simulation
-4. provider matrix (LLM + YOLO26; gemini/openai only)
-5. evolution backend loop
-6. SDK/backend contract tests
-7. external assistant integration (external project)
+1. Contract layer: schema and test contracts
+2. Fixture deterministic E2E layer
+3. KR live smoke layer
+4. Assistantless live loop layer
+5. Autonomous batch layer
+6. Provider matrix layer
+7. Evolution backend and SDK layer
 
-## 2. KR Live Scenarios
-
-Defined in: `runtime/src/e2e/kr-scenarios.ts`
-
-Examples:
-- naver home + search box
-- naver weather query
-- daum home + search box
-- daum news query
-- naver news home
-- naver finance home
-
-## 3. Assistantless Complex Scenarios
-
-Defined in: `runtime/tests/assistantless-chat-e2e.test.ts` and `runtime/tests/e2e-autonomous-batch-kr-live.test.ts`
-
-Includes:
-- initial LLM then rule-first
-- revise and vision-assisted retry
-- captcha chain (`YOLO26 -> VLM -> LLM solve retry`)
-- blocked sensitive gate path
-- long-step multi-site planning scenarios
-
-## 4. Commands
+## 2. Command Map
 
 ```bash
 cd runtime
+npm run test:e2e:fixtures
 npm run test:e2e:kr:contract
-npm run test:e2e:kr
 npm run test:e2e:kr:headful
 npm run test:e2e:assistantless:contract
 npm run test:e2e:assistantless:live
 npm run test:e2e:autonomous:live
 npm run test:provider:contract
+npm run test:e2e:provider:live
 npm run test:evolution
 npm run test:sdk
-# optional with live credentials
-npm run test:e2e:provider:live
 ```
 
-## 5. Artifact Paths
+## 3. Live Flags Explained
 
-- KR smoke: `runs/samples/artifacts/e2e/YYYY-MM-DD/`
-- Autonomous batch: `testing/autonomous-batch/<run>/`
-- Evolution state: `testing/evolution/state/`
+1. `RUN_KR_E2E=1`
+- enables Korea live smoke scenarios
 
-Required autonomous run files:
-- `PLANNING.md`, `WORKFLOW.md`, `summary.md`, `summary.json`, `FINAL-OPTIMIZED-RESULT.md`
-- per scenario: `PLAN.md`, `WORKFLOW.md`, `process.md`, `result.json`, screenshots
+2. `RUN_ASSISTANTLESS_KR_E2E=1`
+- enables assistantless live chat-loop scenarios
 
-## 6. Operational Rules
+3. `RUN_PROVIDER_LIVE_E2E=1`
+- enables live provider matrix tests
+- matrix run executes only when provider/model targets are configured in env
 
-1. live tests are opt-in
-2. no login/payment/personal-data writing in default scenarios
-3. do not delete flaky scenarios; quarantine and document
-4. evolution is for bug/exception failures, not for every new feature request
+4. `RUN_AUTONOMOUS_BATCH_E2E=1`
+- enables autonomous multi-scenario batch runs
+- outputs evidence to `testing/autonomous-batch/`
+
+5. `PW_HEADLESS=0`
+- headful browser mode (recommended for practical validation)
+
+## 4. Core Scenario Sources
+
+1. KR live smoke: `runtime/src/e2e/kr-scenarios.ts`
+2. Assistantless simulation: `runtime/tests/assistantless-chat-e2e.test.ts`
+3. Autonomous batch: `runtime/tests/e2e-autonomous-batch-kr-live.test.ts`
+4. Provider live matrix: `runtime/tests/e2e-provider-live.test.ts`
+5. Chat UI E2E: `runtime/tests/chat-automation-ui-e2e.test.ts`
+
+## 5. Expected Evidence
+
+KR smoke:
+- `runs/samples/artifacts/e2e/YYYY-MM-DD/*.png|*.json`
+
+Assistantless live:
+- `runs/samples/artifacts/e2e-assistantless/YYYY-MM-DD/*`
+
+Autonomous batch:
+- `testing/autonomous-batch/<run>/PLANNING.md`
+- `testing/autonomous-batch/<run>/WORKFLOW.md`
+- `testing/autonomous-batch/<run>/summary.md`
+- `testing/autonomous-batch/<run>/summary.json`
+- `testing/autonomous-batch/<run>/FINAL-OPTIMIZED-RESULT.md`
+- per-scenario iteration folders with `process.md`, `result.json`, screenshots, `PLAN.md`, `WORKFLOW.md`
+
+## 6. Pass/Fail Policy
+
+1. contract/fixture/unit layers must pass fully
+2. live failures must include screenshot/json evidence
+3. flaky live cases should be quarantined and documented, not silently removed
+4. provider live matrix can be skipped only when env targets are not configured
+
+## 7. Safety Policy
+
+1. do not automate login/payment/personal-data write paths by default
+2. do not bypass captcha/2FA/security challenges
+3. use explicit human handoff for security checkpoints
