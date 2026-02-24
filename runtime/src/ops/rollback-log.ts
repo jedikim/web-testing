@@ -18,4 +18,8 @@ export class RollbackLog {
   byChangeId(changeId: string): RollbackEntry[] {
     return this.entries.filter((entry) => entry.changeId === changeId);
   }
+
+  all(): RollbackEntry[] {
+    return [...this.entries];
+  }
 }

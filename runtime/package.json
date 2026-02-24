@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:acceptance": "vitest run tests/phase-acceptance.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

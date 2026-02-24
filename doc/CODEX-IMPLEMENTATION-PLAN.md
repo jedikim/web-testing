@@ -41,7 +41,13 @@
 3. `runtime/src/workflow/build-execution-path.ts` 추가(Branch/Loop 실행 경로 생성)
 4. `runtime/src/engine/deterministic-runner.ts` 추가(DSL 노드 실행 + retry + branch/loop + handoff)
 5. `runtime/src/extractor/basic-extractor.ts` 추가(E_inputs/E_clickables/E_state)
-6. `runtime/tests/*` 기반 단위/시나리오 테스트 19건 통과
+6. `runtime/src/engine/playwright-executor.ts` 추가(필수 액션 집합 실행)
+7. `runtime/tests/*` 기반 단위/시나리오 테스트 통과
+
+완료 확인(2026-02-24):
+
+1. `runtime/tests/phase-acceptance.test.ts::phase1` 통과
+2. `runtime/tests/playwright-executor.test.ts` 통과
 
 ### Phase 2: Controlled AI Fallback
 
@@ -61,7 +67,12 @@
 1. `runtime/src/fallback/context-reducer.ts` 추가(후보 축약 컨텍스트 생성)
 2. `runtime/src/fallback/patch-validator.ts` 추가(patch-only 검증)
 3. `runtime/src/fallback/recipe-version.ts` 추가(레시피 버전업 + selector patch 적용)
-4. `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts` 통과
+4. `runtime/src/fallback/auto-recovery.ts` 추가(셀렉터 자동 복구 + 재실행)
+5. `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts`, `runtime/tests/auto-recovery.test.ts` 통과
+
+완료 확인(2026-02-24):
+
+1. `runtime/tests/phase-acceptance.test.ts::phase2` 통과
 
 ### Phase 3: Vision + Live Ops
 
@@ -81,7 +92,12 @@
 1. `runtime/src/vision/roi-batcher.ts` 추가(ROI 배칭 + 좌표 역매핑)
 2. `runtime/src/checkpoint/go-no-go.ts` 추가(go/not-go 정책 평가)
 3. `runtime/src/live/view-mode.ts` 추가(라이브/스크린샷 모드 선택)
-4. `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts` 통과
+4. `runtime/src/vision/visual-recovery.ts` 추가(VisualAmbiguity 자동 복구)
+5. `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`, `runtime/tests/visual-recovery.test.ts` 통과
+
+완료 확인(2026-02-24):
+
+1. `runtime/tests/phase-acceptance.test.ts::phase3` 통과
 
 ### Phase 4: Self-Improvement
 
@@ -100,7 +116,12 @@
 
 1. `runtime/src/learning/replay-store.ts` 추가(오프라인 리플레이 큐 저장/조회)
 2. `runtime/src/learning/rule-promotion.ts` 추가(카나리 게이트 + rule version 승격)
-3. `runtime/tests/replay-store.test.ts`, `runtime/tests/rule-promotion.test.ts` 통과
+3. `runtime/src/learning/adaptive-controller.ts` 추가(반복 실행 기반 자동 승격 반영)
+4. `runtime/tests/replay-store.test.ts`, `runtime/tests/rule-promotion.test.ts`, `runtime/tests/adaptive-controller.test.ts` 통과
+
+완료 확인(2026-02-24):
+
+1. `runtime/tests/phase-acceptance.test.ts::phase4` 통과
 
 ### Phase 5: Production Hardening
 
@@ -120,7 +141,12 @@
 1. `runtime/src/ops/session-manager.ts` 추가(멀티 세션 동시성 제어)
 2. `runtime/src/ops/metrics-dashboard.ts` 추가(비용/지연/실패율 집계)
 3. `runtime/src/ops/rollback-log.ts` 추가(롤백 로그 추적)
-4. `runtime/tests/session-manager.test.ts`, `runtime/tests/metrics-dashboard.test.ts`, `runtime/tests/rollback-log.test.ts` 통과
+4. `runtime/src/ops/resilience-orchestrator.ts` 추가(복수 시나리오 운영 + 복구 절차)
+5. `runtime/tests/session-manager.test.ts`, `runtime/tests/metrics-dashboard.test.ts`, `runtime/tests/rollback-log.test.ts`, `runtime/tests/resilience-orchestrator.test.ts` 통과
+
+완료 확인(2026-02-24):
+
+1. `runtime/tests/phase-acceptance.test.ts::phase5` 통과
 
 ## 2. 작업 우선순위
 
@@ -173,8 +199,8 @@ flowchart TD
 4. 결정론 실행기: `runtime/src/engine/deterministic-runner.ts`
 5. 기본 추출기: `runtime/src/extractor/basic-extractor.ts`
 6. Fallback 코어: `runtime/src/fallback/context-reducer.ts`, `runtime/src/fallback/patch-validator.ts`, `runtime/src/fallback/recipe-version.ts`
-7. Vision/Live 코어: `runtime/src/vision/roi-batcher.ts`, `runtime/src/checkpoint/go-no-go.ts`, `runtime/src/live/view-mode.ts`
-8. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`
-9. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`
-10. 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`, `runtime/tests/deterministic-runner.test.ts`, `runtime/tests/basic-extractor.test.ts`, `runtime/tests/context-reducer.test.ts`, `runtime/tests/patch-validator.test.ts`, `runtime/tests/recipe-version.test.ts`, `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`, `runtime/tests/replay-store.test.ts`, `runtime/tests/rule-promotion.test.ts`, `runtime/tests/session-manager.test.ts`, `runtime/tests/metrics-dashboard.test.ts`, `runtime/tests/rollback-log.test.ts`
-11. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-vision-liveops-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`
+7. Vision/Live 코어: `runtime/src/vision/roi-batcher.ts`, `runtime/src/vision/visual-recovery.ts`, `runtime/src/checkpoint/go-no-go.ts`, `runtime/src/live/view-mode.ts`
+8. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`, `runtime/src/learning/adaptive-controller.ts`
+9. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`, `runtime/src/ops/resilience-orchestrator.ts`
+10. 테스트: `runtime/tests/*` 22개 파일, 총 58 테스트 통과(phase acceptance 포함)
+11. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-vision-liveops-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`

@@ -27,6 +27,10 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - Vision/LiveOps 준비 단계로 ROI 배칭, 체크포인트 정책, view mode 선택기를 추가했다.
 - Self-improvement 준비 단계로 replay store와 rule promotion 게이트를 추가했다.
 - Production hardening 준비 단계로 session manager, metrics dashboard, rollback log를 추가했다.
+- Playwright 액션 어댑터(`src/engine/playwright-executor.ts`)를 추가했다.
+- Selector auto-recovery(`src/fallback/auto-recovery.ts`)와 visual auto-recovery(`src/vision/visual-recovery.ts`)를 추가했다.
+- Adaptive controller(`src/learning/adaptive-controller.ts`)와 resilience orchestrator(`src/ops/resilience-orchestrator.ts`)를 추가했다.
+- `tests/phase-acceptance.test.ts`로 Phase 1~5 완료 기준을 통합 검증한다.
 
 ## 로컬 검증
 
@@ -34,5 +38,6 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 cd runtime
 npm install
 npm test
+npm run test:acceptance
 npm run typecheck
 ```
