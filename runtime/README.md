@@ -10,4 +10,13 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 ## 현재 상태
 
 - Phase 0 기준 공통 run artifact 타입을 정의했다.
-- 실제 실행기(`Executor`)와 검증기(`Verifier`) 구현은 Phase 1 이후에 추가한다.
+- Phase 1 시작 단계로 워크플로우 검증기와 재시도 정책을 추가했다.
+
+## 로컬 검증
+
+```bash
+cd runtime
+npm install
+npm test
+npm run typecheck
+```

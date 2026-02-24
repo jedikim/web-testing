@@ -34,6 +34,12 @@
 1. 고정 시나리오 1개 LLM 없이 재현 성공
 2. 검증 실패 시 재시도 정책 동작
 
+진행 현황(2026-02-24):
+
+1. `runtime/src/workflow/validate-workflow.ts` 추가(노드 중복/참조 무결성 검증)
+2. `runtime/src/policies/retry-policy.ts` 추가(`AuthBlocked`, `ReviewRejected` 비재시도)
+3. `runtime/tests/*` 기반 단위 테스트 8건 통과
+
 ### Phase 2: Controlled AI Fallback
 
 목표:
@@ -126,3 +132,12 @@ flowchart TD
 3. 아티팩트 규칙 문서: `doc/CODEX-RUN-ARTIFACTS.md`
 4. 샘플 아티팩트: `runs/samples/2026-02-24_sample-run-pass.json`, `runs/samples/2026-02-24_sample-run-fail.json`
 5. 리뷰 증적: `runs/samples/2026-02-24_phase0-foundations-review.md`
+
+## 6. Phase 1 Working Deliverables
+
+현재 브랜치(`feature/phase1-deterministic-core`) 산출물:
+
+1. 워크플로우 검증기: `runtime/src/workflow/validate-workflow.ts`
+2. 재시도 정책: `runtime/src/policies/retry-policy.ts`
+3. 단위 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`
+4. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`
