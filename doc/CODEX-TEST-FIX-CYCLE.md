@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-TEST-FIX-CYCLE.en.md) | [한국어](./CODEX-TEST-FIX-CYCLE.md)
+
 # CODEX TEST & FIX CYCLE
 
 ## 0. 목적

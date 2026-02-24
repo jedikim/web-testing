@@ -64,6 +64,7 @@
 10. 실전형 자동 배치 테스트는 `/home/jedi/code/web-agentic-codex/testing/autonomous-batch` 시나리오 폴더에 `process.md`, `result.json`, 스크린샷, `PLAN.md`, `WORKFLOW.md`, `FINAL-OPTIMIZED-RESULT.md`를 저장한다.
 11. 진화(evolution) 파이프라인은 `bug/exception` 트리거에서만 시작하며 신규 요구마다 자동 실행하지 않는다.
 12. 진화 candidate는 반드시 `git worktree` 격리 경로에서 테스트/수정하고, 승인 전에는 active pointer를 교체하지 않는다.
+13. 문서 변경 시 `영어/한국어` 이중 문서를 유지하고, 각 문서 상단에 상호 언어 전환 링크를 제공한다.
 
 ## 6) Directory Conventions
 

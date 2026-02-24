@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-TASK-TEMPLATE.en.md) | [한국어](./CODEX-TASK-TEMPLATE.md)
+
 # CODEX TASK TEMPLATE
 
 ## 1) 요청 템플릿 (사용자 -> Codex)

@@ -1,3 +1,5 @@
+> Language: [English](./2026-02-24-web-automation-core-for-assistant.en.md) | [한국어](./2026-02-24-web-automation-core-for-assistant.md)
+
 # Web Automation Core For Assistant Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

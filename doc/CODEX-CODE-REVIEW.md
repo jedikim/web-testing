@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-CODE-REVIEW.en.md) | [한국어](./CODEX-CODE-REVIEW.md)
+
 # CODEX CODE REVIEW
 
 ## 0. 목적

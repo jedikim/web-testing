@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-EVOLUTION-BACKEND.en.md) | [한국어](./CODEX-EVOLUTION-BACKEND.md)
+
 # CODEX EVOLUTION BACKEND
 
 ## 0. 목적

@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-RUNBOOK.en.md) | [한국어](./CODEX-RUNBOOK.md)
+
 # CODEX RUNBOOK
 
 ## 0. 목적

@@ -1,3 +1,5 @@
+> Language: [English](./README.en.md) | [한국어](./README.md)
+
 # runtime
 
 TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원칙을 코드로 구현한다.

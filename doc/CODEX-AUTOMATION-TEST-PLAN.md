@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-AUTOMATION-TEST-PLAN.en.md) | [한국어](./CODEX-AUTOMATION-TEST-PLAN.md)
+
 # CODEX AUTOMATION TEST PLAN
 
 ## 0. 목표

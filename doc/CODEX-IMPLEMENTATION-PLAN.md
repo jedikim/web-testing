@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-IMPLEMENTATION-PLAN.en.md) | [한국어](./CODEX-IMPLEMENTATION-PLAN.md)
+
 # CODEX IMPLEMENTATION PLAN
 
 ## 0. 계획 원칙

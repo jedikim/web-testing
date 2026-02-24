@@ -1,3 +1,5 @@
+> Language: [English](./2026-02-24-chat-driven-web-automation-mvp.en.md) | [한국어](./2026-02-24-chat-driven-web-automation-mvp.md)
+
 # Chat-Driven Web Automation MVP Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

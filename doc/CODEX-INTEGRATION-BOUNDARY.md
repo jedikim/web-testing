@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-INTEGRATION-BOUNDARY.en.md) | [한국어](./CODEX-INTEGRATION-BOUNDARY.md)
+
 # CODEX INTEGRATION BOUNDARY
 
 ## 0. 목적

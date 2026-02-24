@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-ENV-SETUP.en.md) | [한국어](./CODEX-ENV-SETUP.md)
+
 # CODEX ENV SETUP
 
 ## 0. 목적

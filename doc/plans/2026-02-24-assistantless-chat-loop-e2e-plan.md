@@ -1,3 +1,5 @@
+> Language: [English](./2026-02-24-assistantless-chat-loop-e2e-plan.en.md) | [한국어](./2026-02-24-assistantless-chat-loop-e2e-plan.md)
+
 # Assistantless Chat-Loop E2E Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

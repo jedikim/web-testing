@@ -1,3 +1,5 @@
+> Language: [English](./PRD-v0.1.en.md) | [한국어](./PRD-v0.1.md)
+
 # Adaptive Web Automation PRD v0.1
 
 ## -1. Codex 실행 지시 프로필

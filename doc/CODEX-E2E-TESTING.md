@@ -1,3 +1,5 @@
+> Language: [English](./CODEX-E2E-TESTING.en.md) | [한국어](./CODEX-E2E-TESTING.md)
+
 # CODEX E2E TESTING
 
 ## 0. 목적
