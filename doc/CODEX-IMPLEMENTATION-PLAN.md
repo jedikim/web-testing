@@ -95,12 +95,14 @@
 4. `runtime/src/vision/visual-recovery.ts` 추가(VisualAmbiguity 자동 복구)
 5. `runtime/src/chat/platform-normalizer.ts`, `runtime/src/chat/screenshot-checkpoint.ts`, `runtime/src/chat/screenshot-chat-loop.ts` 추가(텔레그램/슬랙 대화형 질의)
 6. `runtime/src/integration/human-loop-runtime.ts` 추가(채널 비종속 human-loop 계약)
-7. `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`, `runtime/tests/visual-recovery.test.ts`, `runtime/tests/chat-platform.test.ts`, `runtime/tests/screenshot-checkpoint.test.ts`, `runtime/tests/screenshot-chat-loop.test.ts`, `runtime/tests/human-loop-runtime.test.ts` 통과
+7. `runtime/src/e2e/kr-scenarios.ts` 추가(한국 사이트 중심 라이브 스모크 시나리오)
+8. `runtime/tests/roi-batcher.test.ts`, `runtime/tests/checkpoint-policy.test.ts`, `runtime/tests/view-mode.test.ts`, `runtime/tests/visual-recovery.test.ts`, `runtime/tests/chat-platform.test.ts`, `runtime/tests/screenshot-checkpoint.test.ts`, `runtime/tests/screenshot-chat-loop.test.ts`, `runtime/tests/human-loop-runtime.test.ts`, `runtime/tests/kr-e2e-scenarios.test.ts`, `runtime/tests/e2e-kr-live.test.ts` 통과
 
 완료 확인(2026-02-24):
 
 1. `runtime/tests/phase-acceptance.test.ts::phase3` 통과
 2. `runtime/tests/screenshot-chat-loop.test.ts`, `runtime/tests/human-loop-runtime.test.ts` 통과
+3. `runtime/tests/e2e-kr-live.test.ts` 라이브 스모크(네이버/다음) 통과
 
 ### Phase 4: Self-Improvement
 
@@ -205,7 +207,8 @@ flowchart TD
 7. Vision/Screenshot 코어: `runtime/src/vision/roi-batcher.ts`, `runtime/src/vision/visual-recovery.ts`, `runtime/src/checkpoint/go-no-go.ts`, `runtime/src/view/view-mode.ts`
 8. Chat 코어: `runtime/src/chat/platform-normalizer.ts`, `runtime/src/chat/screenshot-checkpoint.ts`, `runtime/src/chat/screenshot-chat-loop.ts`
 9. Integration 코어: `runtime/src/integration/human-loop-runtime.ts`
-10. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`, `runtime/src/learning/adaptive-controller.ts`
-11. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`, `runtime/src/ops/resilience-orchestrator.ts`
-12. 테스트: `runtime/tests/*` 26개 파일, 총 66 테스트 통과(phase acceptance 포함)
-13. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-screenshot-chat-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`
+10. KR E2E 코어: `runtime/src/e2e/kr-scenarios.ts`, `runtime/tests/kr-e2e-scenarios.test.ts`, `runtime/tests/e2e-kr-live.test.ts`
+11. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`, `runtime/src/learning/adaptive-controller.ts`
+12. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`, `runtime/src/ops/resilience-orchestrator.ts`
+13. 테스트: `runtime/tests/*` 28개 파일, 기본 69 통과/6 스킵(라이브 1회 실행 시 75 통과)
+14. 리뷰/검증 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-screenshot-chat-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`, `runs/samples/2026-02-24_kr-live-e2e-report.md`

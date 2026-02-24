@@ -15,8 +15,9 @@
 6. 코드 리뷰: `doc/CODEX-CODE-REVIEW.md`
 7. 태스크 템플릿: `doc/CODEX-TASK-TEMPLATE.md`
 8. 외부 연동 경계: `doc/CODEX-INTEGRATION-BOUNDARY.md`
+9. E2E 테스트: `doc/CODEX-E2E-TESTING.md`
 
-충돌 시 우선순위: `PRD > RUNBOOK > PLAN > INTEGRATION-BOUNDARY > TEST/FIX > ARTIFACTS > REVIEW > TEMPLATE`
+충돌 시 우선순위: `PRD > RUNBOOK > PLAN > E2E > INTEGRATION-BOUNDARY > TEST/FIX > ARTIFACTS > REVIEW > TEMPLATE`
 
 ## 3) Multi-Agent Roles (Logical)
 

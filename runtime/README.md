@@ -45,3 +45,21 @@ npm test
 npm run test:acceptance
 npm run typecheck
 ```
+
+## 한국 사이트 E2E 스모크
+
+- 시나리오 정의: `src/e2e/kr-scenarios.ts`
+- 계약 테스트(오프라인): `tests/kr-e2e-scenarios.test.ts`
+- 라이브 스모크(옵트인): `tests/e2e-kr-live.test.ts`
+
+실행:
+
+```bash
+cd runtime
+npm run test:e2e:kr:contract
+npm run test:e2e:kr
+```
+
+아티팩트:
+
+- 스크린샷/리포트 JSON은 `runs/samples/artifacts/e2e/YYYY-MM-DD/`에 저장된다.

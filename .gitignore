@@ -1,2 +1,3 @@
 .worktrees/
 runtime/node_modules/
+runs/samples/artifacts/e2e/
