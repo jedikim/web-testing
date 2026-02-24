@@ -18,8 +18,9 @@
 9. E2E 테스트: `doc/CODEX-E2E-TESTING.md`
 10. 환경변수 설정: `doc/CODEX-ENV-SETUP.md`
 11. 자동화 테스트 플랜: `doc/CODEX-AUTOMATION-TEST-PLAN.md`
+12. 진화 백엔드: `doc/CODEX-EVOLUTION-BACKEND.md`
 
-충돌 시 우선순위: `PRD > RUNBOOK > PLAN > AUTOMATION-TEST-PLAN > ENV-SETUP > E2E > INTEGRATION-BOUNDARY > TEST/FIX > ARTIFACTS > REVIEW > TEMPLATE`
+충돌 시 우선순위: `PRD > RUNBOOK > PLAN > EVOLUTION-BACKEND > AUTOMATION-TEST-PLAN > ENV-SETUP > E2E > INTEGRATION-BOUNDARY > TEST/FIX > ARTIFACTS > REVIEW > TEMPLATE`
 
 ## 3) Multi-Agent Roles (Logical)
 
@@ -61,6 +62,8 @@
 8. Telegram/Slack webhook/세션 라우팅/비서 프롬프트는 외부 AI 비서 프로젝트 범위이며, 이 저장소는 `assistantless e2e 시뮬레이션 + 코어 계약`까지만 구현한다.
 9. 캡차는 `YOLO26 감지 → VLM 확인 → LLM 풀이/재시도` 순서로만 시도하며, 실패 시 human handoff로 중단한다.
 10. 실전형 자동 배치 테스트는 `/home/jedi/code/web-agentic-codex/testing/autonomous-batch` 시나리오 폴더에 `process.md`, `result.json`, 스크린샷, `PLAN.md`, `WORKFLOW.md`, `FINAL-OPTIMIZED-RESULT.md`를 저장한다.
+11. 진화(evolution) 파이프라인은 `bug/exception` 트리거에서만 시작하며 신규 요구마다 자동 실행하지 않는다.
+12. 진화 candidate는 반드시 `git worktree` 격리 경로에서 테스트/수정하고, 승인 전에는 active pointer를 교체하지 않는다.
 
 ## 6) Directory Conventions
 

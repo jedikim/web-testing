@@ -153,6 +153,35 @@
 
 1. `runtime/tests/phase-acceptance.test.ts::phase5` 통과
 
+### Phase 6: Exception-Driven Evolution Backend
+
+목표:
+
+1. 버그/예외 트리거 기반 진화 상태머신 구축
+2. `git worktree` 격리 후보 버전 생성 + 시나리오 팩 자동 확장
+3. 자동 수정 루프 + 승인 기반 active version 전환 포인터 구축
+4. 진행상황 통지를 위한 백엔드 API/SSE + 테스트 UI 제공
+
+완료 기준:
+
+1. 진화 잡 생성 시 `draft -> awaiting_approval/failed` 상태 전이 확인
+2. 승인 시 `active-versions/<workflow>.json` 포인터 갱신 확인
+3. 진화 테스트(`npm run test:evolution`) 통과
+4. 문서(`CODEX-EVOLUTION-BACKEND`, ENV/RUNBOOK/TEST PLAN) 동기화
+
+진행 현황(2026-02-24):
+
+1. `runtime/src/evolution/model-policy.ts` 추가(코딩: gemini-3.1-pro-preview, 자동화: flash 강제)
+2. `runtime/src/evolution/storage.ts` 추가(잡/이벤트/버전 포인터/히스토리 영속화)
+3. `runtime/src/evolution/git-sandbox.ts` 추가(`git worktree` 기반 격리 실행)
+4. `runtime/src/evolution/scenario-growth.ts` 추가(기본 + 예외 시나리오 팩 자동 생성)
+5. `runtime/src/evolution/gemini-autofix.ts` 추가(Gemini patch 시도/적용 훅)
+6. `runtime/src/evolution/service.ts` 추가(테스트-수정-승인 상태머신)
+7. `runtime/src/evolution/server.ts` 추가(HTTP API + SSE)
+8. `runtime/evolution-ui/*` 추가(백엔드 테스트 전용 UI)
+9. `runtime/tests/evolution-model-policy.test.ts`, `runtime/tests/evolution-service.test.ts`, `runtime/tests/evolution-server.test.ts` 추가 및 통과
+10. `runtime/package.json` 스크립트 추가(`test:evolution`, `evolution:server`)
+
 ## 2. 작업 우선순위
 
 ```mermaid
@@ -161,6 +190,7 @@ flowchart TD
     B --> C["Phase 3"]
     C --> D["Phase 4"]
     D --> E["Phase 5"]
+    E --> F["Phase 6"]
 ```
 
 선행 Phase가 완료되지 않으면 다음 Phase 기능을 본선 반영하지 않는다.
@@ -214,4 +244,6 @@ flowchart TD
 14. Learning 코어: `runtime/src/learning/replay-store.ts`, `runtime/src/learning/rule-promotion.ts`, `runtime/src/learning/adaptive-controller.ts`
 15. Ops 코어: `runtime/src/ops/session-manager.ts`, `runtime/src/ops/metrics-dashboard.ts`, `runtime/src/ops/rollback-log.ts`, `runtime/src/ops/resilience-orchestrator.ts`
 16. 테스트: `runtime/tests/*` 39개 파일, 기본 100 통과/8 스킵 (`RUN_KR_E2E=1` 또는 `RUN_ASSISTANTLESS_KR_E2E=1` 시 라이브 시나리오 추가 통과)
-17. 리뷰/검증 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-screenshot-chat-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`, `runs/samples/2026-02-24_assistantless-chat-loop-review.md`, `runs/samples/2026-02-24_assistantless-live-e2e-report.md`, `runs/samples/2026-02-24_kr-live-e2e-report.md`
+17. 리뷰/검증 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`, `runs/samples/2026-02-24_phase2-controlled-fallback-review.md`, `runs/samples/2026-02-24_phase3-screenshot-chat-review.md`, `runs/samples/2026-02-24_phase4-self-improvement-review.md`, `runs/samples/2026-02-24_phase5-production-hardening-review.md`, `runs/samples/2026-02-24_phase6-evolution-backend-review.md`, `runs/samples/2026-02-24_full-phase-completion-review.md`, `runs/samples/2026-02-24_assistantless-chat-loop-review.md`, `runs/samples/2026-02-24_assistantless-live-e2e-report.md`, `runs/samples/2026-02-24_kr-live-e2e-report.md`
+18. 진화 백엔드 코어: `runtime/src/evolution/*`, `runtime/evolution-ui/*`
+19. 진화 테스트 코어: `runtime/tests/evolution-model-policy.test.ts`, `runtime/tests/evolution-service.test.ts`, `runtime/tests/evolution-server.test.ts`

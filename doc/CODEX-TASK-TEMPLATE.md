@@ -98,3 +98,28 @@ flowchart LR
 1.
 2.
 ```
+
+## 5) Evolution(버그/예외) 템플릿
+
+```md
+## Evolution Trigger
+- type: bug|exception
+- source run:
+- why now:
+
+## Sandbox Candidate
+- base branch:
+- candidate branch:
+- worktree path:
+- scenario pack:
+
+## Test/Fix Loop
+- attempt-1:
+- attempt-2:
+- final status: awaiting_approval|failed
+
+## Promotion
+- approved by:
+- active pointer path:
+- version history path:
+```

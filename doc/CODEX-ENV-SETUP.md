@@ -44,6 +44,13 @@
 16. `GEMINI_MODELS`, `OPENAI_MODELS`, `ANTHROPIC_MODELS`: 회사별 모델 목록(csv)
 17. `LLM_VENDOR_ORDER`: 멀티 벤더 매트릭스 순서(csv)
 18. `YOLO26_ENABLED`, `YOLO26_API_KEY`, `YOLO26_BASE_URL`, `YOLO26_MODELS`: YOLO26 멀티 모델 설정(오픈소스 로컬 엔드포인트는 API 키 없이 가능)
+19. `EVOLUTION_SERVER_HOST`, `EVOLUTION_SERVER_PORT`: 진화 백엔드 서버 바인딩
+20. `EVOLUTION_STATE_ROOT`: 진화 상태 저장 루트(기본 `testing/evolution/state`)
+21. `EVOLUTION_BASE_BRANCH`, `EVOLUTION_TEST_COMMAND`: 후보 버전 생성 기준 브랜치/검증 명령
+22. `EVOLUTION_MAX_AUTOFIX_ATTEMPTS`, `EVOLUTION_TEST_TIMEOUT_MS`: 자동 수정/테스트 제한
+23. `EVOLUTION_CODING_MODEL`: 코딩/패치 생성 모델(기본 `gemini-3.1-pro-preview`)
+24. `EVOLUTION_AUTOMATION_MODEL`: 자동화 실행 판단 모델(기본 `gemini-3.0-flash`)
+25. `EVOLUTION_AUTOFIX_ENABLED`, `EVOLUTION_PROMOTE_MODE`: 자동수정 사용 및 promotion 전략
 
 ## 4. 안전 규칙
 
@@ -54,6 +61,8 @@
 5. `git status` 전에 `.env` 파일이 추적 대상이 아닌지 확인한다.
 6. headful 브라우저 검증은 `PW_HEADLESS=0`으로 실행한다.
 7. 캡차 대응 정책은 `YOLO26 -> VLM -> LLM 재시도 -> human handoff` 순서를 따른다.
+8. 진화 파이프라인에서 코딩 모델은 flash 계열을 사용하지 않는다.
+9. 진화 상태 저장 루트는 `testing/` 하위로 두어 Git 추적에서 제외한다.
 
 ## 5. Gemini + Multi-Model 예시
 
@@ -80,4 +89,20 @@ YOLO26_ENABLED=1
 YOLO26_API_KEY=
 YOLO26_BASE_URL=http://127.0.0.1:8080
 YOLO26_MODELS=yolo26n,yolo26s
+```
+
+## 7. Evolution Backend 예시
+
+```bash
+EVOLUTION_SERVER_HOST=127.0.0.1
+EVOLUTION_SERVER_PORT=4777
+EVOLUTION_STATE_ROOT=/home/jedi/code/web-agentic-codex/testing/evolution/state
+EVOLUTION_BASE_BRANCH=main
+EVOLUTION_TEST_COMMAND=npm run test:automation:full
+EVOLUTION_MAX_AUTOFIX_ATTEMPTS=2
+EVOLUTION_TEST_TIMEOUT_MS=600000
+EVOLUTION_CODING_MODEL=gemini-3.1-pro-preview
+EVOLUTION_AUTOMATION_MODEL=gemini-3.0-flash
+EVOLUTION_AUTOFIX_ENABLED=0
+EVOLUTION_PROMOTE_MODE=pointer
 ```

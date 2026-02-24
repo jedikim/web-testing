@@ -1,0 +1,14 @@
+## Code Review Report
+- Scope: Evolution backend state machine, sandbox, storage, API/SSE, test UI, env/docs sync
+- Reviewer: codex
+- Summary: 요구사항(버그/예외 트리거 한정, worktree 격리, 자동수정 루프, 승인 전환, 기록 구조, 진행 통지)을 코드/문서/테스트로 반영함.
+- Issues:
+  - severity: Minor
+  - file: runtime/src/evolution/gemini-autofix.ts
+  - comment: 실제 Gemini 응답 형식 편차로 patch 추출 실패 가능성이 있어 운영에서 프롬프트 튜닝이 추가로 필요함.
+  - action: follow-up
+- Decision: approve
+- Evidence:
+  - npm run typecheck
+  - npm run test:evolution
+  - npm test

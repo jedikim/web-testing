@@ -10,9 +10,10 @@
 2. 라이브 스모크(`live smoke`): 실제 한국 사이트 접속/기본 상호작용/검증
 3. assistantless loop(`chat-like simulation`): AI 비서 없이 스크린샷 공유/의사결정 루프 시뮬레이션
 4. provider matrix(`llm+vision`): Gemini/OpenAI/Anthropic + YOLO26 모델 매트릭스 검증
-5. 통합 E2E(`assistant integration`): 외부 비서 프로젝트에서 webhook/메시징 연동 포함 검증
+5. evolution backend(`bug/exception growth loop`): 격리 버전 진화 + 승인 전환 검증
+6. 통합 E2E(`assistant integration`): 외부 비서 프로젝트에서 webhook/메시징 연동 포함 검증
 
-이 저장소는 1~4를 담당하고, 5는 외부 AI 비서 프로젝트에서 담당한다.
+이 저장소는 1~5를 담당하고, 6은 외부 AI 비서 프로젝트에서 담당한다.
 
 ## 2. 한국 사이트 중심 스모크 시나리오
 
@@ -64,6 +65,7 @@ npm run test:e2e:assistantless:contract
 npm run test:e2e:assistantless:live
 npm run test:e2e:autonomous:live
 npm run test:provider:contract
+npm run test:evolution
 # 실제 키/엔드포인트가 있으면
 npm run test:e2e:provider:live
 ```
@@ -72,6 +74,7 @@ npm run test:e2e:provider:live
 실제 브라우저 동작 점검은 `test:e2e:kr:headful` 경로를 기본으로 사용한다.
 assistantless 반복 라이브 테스트는 `RUN_ASSISTANTLESS_KR_E2E=1`, `ASSISTANTLESS_KR_ITERATIONS=N`으로 제어한다.
 완전 자동 배치 라이브 테스트는 `RUN_AUTONOMOUS_BATCH_E2E=1`, `AUTONOMOUS_BATCH_ITERATIONS=N`으로 제어한다.
+진화 백엔드 검증은 `npm run evolution:server`로 서버 실행 후 API/SSE/UI를 통해 수동/자동 점검한다.
 
 ## 4. 결과 아티팩트
 
@@ -94,3 +97,4 @@ assistantless 반복 라이브 테스트는 `RUN_ASSISTANTLESS_KR_E2E=1`, `ASSIS
 2. 로그인/결제/개인정보 입력 시나리오는 포함하지 않는다.
 3. 사이트 변경으로 flaky가 발생하면 시나리오를 삭제하지 말고, selector/검증 규칙을 보수적으로 조정한다.
 4. 실패가 2회 이상 반복되면 해당 시나리오를 `quarantine` 목록으로 옮기고 원인 기록을 남긴다.
+5. 버그/예외가 아닌 신규 요구에 대해 evolution job을 생성하지 않는다.

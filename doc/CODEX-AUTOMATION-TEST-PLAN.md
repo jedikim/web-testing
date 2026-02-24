@@ -108,6 +108,22 @@ npm run test:provider:contract
 npm run test:e2e:provider:live
 ```
 
+### Layer G: Evolution Backend (bug/exception only)
+
+대상:
+
+1. 진화 상태머신(draft->testing->auto_fixing->awaiting_approval/promotion)
+2. 격리 worktree 생성/후보 버전 관리
+3. 승인 기반 active pointer 전환
+4. 진행 이벤트(SSE) 및 API 동작
+
+명령:
+
+```bash
+cd runtime
+npm run test:evolution
+```
+
 ## 2. 시나리오 매트릭스
 
 ### 2.1 시뮬레이션 플로우
@@ -172,6 +188,7 @@ npm run test:e2e:provider:live
 7. Layer F(live)는 matrix total의 80% 이상 pass
 8. Layer C/F 실패 시 screenshot/json 리포트가 남아야 함
 9. `scripts/validate-run-artifacts.sh` pass
+10. Layer G는 100% pass, 승인 전환 후 active pointer 파일 생성 확인
 
 ## 4. 실패 대응
 
@@ -196,6 +213,7 @@ npm run test:e2e:kr
 npm run test:e2e:kr:headful
 # 실제 키/엔드포인트가 있으면:
 npm run test:e2e:provider:live
+npm run test:evolution
 cd ..
 ./scripts/validate-run-artifacts.sh
 ```

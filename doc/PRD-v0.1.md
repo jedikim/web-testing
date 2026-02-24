@@ -16,6 +16,7 @@ Codex는 아래 규칙을 우선 적용한다.
    - `doc/CODEX-TEST-FIX-CYCLE.md`
    - `doc/CODEX-RUN-ARTIFACTS.md`
    - `doc/CODEX-CODE-REVIEW.md`
+   - `doc/CODEX-EVOLUTION-BACKEND.md`
 
 ## -0. 멀티에이전트 실행 규칙
 

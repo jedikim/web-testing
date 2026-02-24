@@ -1,7 +1,7 @@
 export type LlmProvider = 'gemini' | 'openai' | 'anthropic' | 'openai_compatible';
 
 const SUPPORTED_MODELS: Record<Exclude<LlmProvider, 'openai_compatible'>, string[]> = {
-  gemini: ['gemini-3.0-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'],
+  gemini: ['gemini-3.1-pro-preview', 'gemini-3.0-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'],
   openai: ['gpt-4.1-mini', 'gpt-4o-mini', 'gpt-4.1'],
   anthropic: ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest', 'claude-3-opus-latest']
 };

@@ -9,6 +9,7 @@
 - 루트: `runs/`
 - 샘플: `runs/samples/`
 - 실운영(권장): `runs/YYYY/MM/DD/`
+- 진화 상태/버전 기록: `testing/evolution/state/` (Git 제외)
 
 ## 2. 파일명 규칙
 
@@ -66,3 +67,11 @@
 ```bash
 ./scripts/validate-run-artifacts.sh
 ```
+
+진화 백엔드 저장 구조 검증(수동):
+
+1. `testing/evolution/state/jobs/<job-id>/job.json`
+2. `testing/evolution/state/jobs/<job-id>/events.json`
+3. `testing/evolution/state/jobs/<job-id>/scenario-pack/*`
+4. `testing/evolution/state/jobs/<job-id>/attempts/*`
+5. `testing/evolution/state/active-versions/<workflow-id>.json`

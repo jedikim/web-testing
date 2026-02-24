@@ -13,6 +13,7 @@
 2. 서비스 로직(`services/`)
 3. 정책/레시피(`recipes/`)
 4. 실행/운영 문서(`doc/`)의 규칙성 변경
+5. 진화 백엔드(`runtime/src/evolution/`, `runtime/evolution-ui/`) 변경
 
 ## 2. 리뷰 진입 조건
 
@@ -69,6 +70,7 @@ flowchart TD
 4. Observability: 로그/메트릭/아티팩트가 충분한가
 5. Scope Control: 불필요한 변경이 없는가
 6. Documentation: 관련 문서가 함께 갱신되었는가
+7. Evolution: bug/exception 트리거 제한, 승인 전환, 버전 포인터 기록이 일관적인가
 
 ## 6. 리뷰 보고 템플릿
 

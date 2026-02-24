@@ -12,6 +12,7 @@
 3. `doc/CODEX-RUN-ARTIFACTS.md`의 저장/스키마 규칙 확인
 4. `doc/CODEX-CODE-REVIEW.md`의 승인 기준 확인
 5. 이번 요청의 완료 조건(acceptance criteria) 3줄 이내로 명시
+6. bug/exception 대응 작업이면 `doc/CODEX-EVOLUTION-BACKEND.md` 절차 확인
 
 ## 2. 작업 모드
 
@@ -69,6 +70,8 @@ flowchart LR
 4. 실시간 스트리밍 대신 스크린샷 질의를 기본으로 사용
 5. Telegram/Slack 응답이 필요한 단계는 `go/not-go/revise` 결과를 기록
 6. 캡차/2FA/결제는 사람 승인 없이는 진행 금지
+7. 버그/예외가 아닌 신규 요구에는 evolution 파이프라인을 자동 시작하지 않는다
+8. evolution 후보 버전은 `git worktree` 격리 실행 후 승인 시에만 active pointer를 교체한다
 
 ## 5. 결과 보고 형식
 
@@ -82,3 +85,4 @@ flowchart LR
 6. 코드 리뷰 결과(이슈 등급/승인 여부)
 7. 남은 리스크
 8. 다음 권장 액션(선택)
+9. evolution 상태(없음/실행중/승인대기/전환완료)와 active version pointer 경로
