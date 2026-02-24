@@ -11,6 +11,7 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 
 - Phase 0 기준 공통 run artifact 타입을 정의했다.
 - Phase 1 시작 단계로 워크플로우 검증기와 재시도 정책을 추가했다.
+- Branch/Loop를 포함한 최소 실행 경로 빌더를 추가했다.
 
 ## 로컬 검증
 

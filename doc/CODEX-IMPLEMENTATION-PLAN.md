@@ -38,7 +38,8 @@
 
 1. `runtime/src/workflow/validate-workflow.ts` 추가(노드 중복/참조 무결성 검증)
 2. `runtime/src/policies/retry-policy.ts` 추가(`AuthBlocked`, `ReviewRejected` 비재시도)
-3. `runtime/tests/*` 기반 단위 테스트 8건 통과
+3. `runtime/src/workflow/build-execution-path.ts` 추가(Branch/Loop 실행 경로 생성)
+4. `runtime/tests/*` 기반 단위 테스트 12건 통과
 
 ### Phase 2: Controlled AI Fallback
 
@@ -139,5 +140,6 @@ flowchart TD
 
 1. 워크플로우 검증기: `runtime/src/workflow/validate-workflow.ts`
 2. 재시도 정책: `runtime/src/policies/retry-policy.ts`
-3. 단위 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`
-4. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`
+3. 실행 경로 빌더: `runtime/src/workflow/build-execution-path.ts`
+4. 단위 테스트: `runtime/tests/workflow-validation.test.ts`, `runtime/tests/retry-policy.test.ts`, `runtime/tests/execution-path.test.ts`
+5. 리뷰 증적: `runs/samples/2026-02-24_phase1-deterministic-core-review.md`
