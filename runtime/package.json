@@ -19,6 +19,8 @@
     "test:e2e:provider:live": "RUN_PROVIDER_LIVE_E2E=1 vitest run tests/e2e-provider-live.test.ts",
     "test:evolution": "vitest run tests/evolution-model-policy.test.ts tests/evolution-service.test.ts tests/evolution-server.test.ts",
     "test:sdk": "vitest run tests/auto-improvement-orchestrator.test.ts tests/sdk-automation.test.ts tests/sdk-evolution-api-client.test.ts tests/session-store.test.ts tests/backend-simple-service.test.ts tests/backend-simple-server.test.ts tests/chat-automation-service.test.ts tests/chat-automation-server.test.ts tests/sdk-multiturn.test.ts tests/composite-sheet.test.ts tests/repeated-item-judgement.test.ts",
+    "test:v3": "vitest run tests/v3-*.test.ts",
+    "test:v3:kr-live": "RUN_KR_E2E=1 vitest run tests/v3-kr-live-harness.test.ts",
     "evolution:server": "tsx src/evolution/server.ts",
     "backend:simple:server": "tsx src/backend/simple-backend-server.ts",
     "backend:chat:server": "tsx src/backend/chat-automation-server.ts",
@@ -41,6 +43,11 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
+    "@langfuse/otel": "^4.6.1",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
+    "@opentelemetry/sdk-trace-node": "^2.5.1",
+    "hnswlib-node": "^3.0.0",
     "jimp": "^0.22.12"
   }
 }

@@ -2,15 +2,15 @@
 
 ## Current Week Focus (from `doc/new_arch.md` §11)
 
-- Scope: `Week 5` only
+- Scope: `Week 6` only
 - Deliverables:
-  1. `Cache` (domain/url/task 기반 action memory)
-  2. `Orchestrator` 메인 루프 (cache-hit 우선, miss 시 full pipeline)
-  3. API/SDK에서 v3 orchestrator 호출 가능하도록 최소 통합
+  1. 재시도 정책 (`retry_policy`)과 step 실패시 재시도/재계획 분기
+  2. 한국 사이트 대상 E2E 하네스(기본 skip, env toggle 실행)
+  3. 실패 로그 구조 보강(몇 번째 시도/왜 실패했는지 추적 가능)
 - Validation target:
-  - 동일 태스크 2회차에서 planner 호출 없이 cache 재사용되는 테스트 통과
+  - 재시도로 단발성 실패를 복구하고, KR 하네스 테스트가 env 토글로 동작함을 검증
 - Non-goals this week:
-  - 배치 검증, Canvas 전용 경로
+  - 배치 검증, Canvas 전용 경로, Skill synthesis
 
 ## 1) Purpose
 

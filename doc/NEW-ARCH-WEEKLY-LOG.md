@@ -77,3 +77,23 @@
   - `typecheck` 통과
   - `vitest` cache/api 통합 테스트 통과
   - Validation target satisfied: 동일 태스크 2회차에서 planner 호출 0회(누적 호출 1회 유지)
+
+## Week 6
+
+- Focus
+  - `RetryPolicy` 추가 및 Orchestrator step 재시도 경로 통합
+  - 실패 추적 정보(`attempts`, `failureReason`)를 step trace에 기록
+  - KR live harness 테스트 추가 (env toggle 실행)
+- Code
+  - `runtime/src/v3/retry-policy.ts`
+  - `runtime/src/v3/orchestrator.ts` (retry loop 통합)
+  - `runtime/src/v3/index.ts`
+  - `runtime/package.json` (`test:v3`, `test:v3:kr-live`)
+- Tests
+  - `runtime/tests/v3-retry-policy.test.ts`
+  - `runtime/tests/v3-kr-live-harness.test.ts`
+  - `runtime/tests/v3-cache-orchestrator.test.ts` (retry 복구 케이스 확장)
+- Verification
+  - `typecheck` 통과
+  - `npm run test:v3` 통과 (26 passed, 1 skipped)
+  - Validation target satisfied: transient 실패에서 retry로 복구되는 경로 검증

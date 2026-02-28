@@ -7,9 +7,13 @@ import { createV3OrchestrationSdk } from '../src/sdk/v3-orchestration-sdk';
 
 class FakeRuntime implements OrchestratorRuntime {
   private url: string;
+  private clickFailuresRemaining: number;
+  private mouseFailuresRemaining: number;
 
-  constructor(initialUrl: string) {
+  constructor(initialUrl: string, clickFailures = 0, mouseFailures = 0) {
     this.url = initialUrl;
+    this.clickFailuresRemaining = clickFailures;
+    this.mouseFailuresRemaining = mouseFailures;
   }
 
   async getUrl(): Promise<string> {
@@ -82,6 +86,10 @@ class FakeRuntime implements OrchestratorRuntime {
   }
 
   async clickSelector(selector: string): Promise<void> {
+    if (this.clickFailuresRemaining > 0) {
+      this.clickFailuresRemaining -= 1;
+      throw new Error('Timeout while waiting for selector');
+    }
     if (selector === '#query') {
       this.url = 'https://shopping.naver.com/search?q=등산복';
       return;
@@ -98,6 +106,10 @@ class FakeRuntime implements OrchestratorRuntime {
   }
 
   async mouseClick(_x: number, _y: number): Promise<void> {
+    if (this.mouseFailuresRemaining > 0) {
+      this.mouseFailuresRemaining -= 1;
+      throw new Error('Timeout while waiting for selector');
+    }
     this.url = 'https://shopping.naver.com/search?q=등산복';
   }
 
@@ -182,5 +194,34 @@ describe('Week5 cache + orchestrator integration', () => {
       runtime: new FakeRuntime('https://shopping.naver.com/')
     });
     expect(result.ok).toBe(true);
+  });
+
+  it('recovers from transient first failure via retry policy', async () => {
+    const planner = new Planner({
+      model: {
+        async generate(): Promise<string> {
+          return JSON.stringify({
+            screen_state: { has_obstacle: false },
+            steps: [
+              {
+                action_type: 'click',
+                target_description: '검색창',
+                keyword_weights: { 검색창: 1.0 },
+                target_viewport_xy: [0.3, 0.15],
+                expected_result: 'URL 변경: /search'
+              }
+            ]
+          });
+        }
+      }
+    });
+    const orchestrator = new Orchestrator({
+      planner,
+      maxStepAttempts: 3
+    });
+    const result = await orchestrator.run('등산복 찾기', new FakeRuntime('https://shopping.naver.com/', 1, 1));
+
+    expect(result.ok).toBe(true);
+    expect(result.traces[0]?.attempts).toBeGreaterThanOrEqual(2);
   });
 });

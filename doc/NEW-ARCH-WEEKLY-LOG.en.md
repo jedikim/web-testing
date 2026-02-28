@@ -77,3 +77,23 @@
   - `typecheck` passed
   - `vitest` cache/api integration tests passed
   - Validation target satisfied: second run of the same task reuses plan cache (planner call count remains 1)
+
+## Week 6
+
+- Focus
+  - Add `RetryPolicy` and integrate step-level retry loop into Orchestrator
+  - Persist retry diagnostics (`attempts`, `failureReason`) in step traces
+  - Add KR live harness tests with env toggle execution
+- Code
+  - `runtime/src/v3/retry-policy.ts`
+  - `runtime/src/v3/orchestrator.ts` (retry loop integration)
+  - `runtime/src/v3/index.ts`
+  - `runtime/package.json` (`test:v3`, `test:v3:kr-live`)
+- Tests
+  - `runtime/tests/v3-retry-policy.test.ts`
+  - `runtime/tests/v3-kr-live-harness.test.ts`
+  - `runtime/tests/v3-cache-orchestrator.test.ts` (retry recovery case)
+- Verification
+  - `typecheck` passed
+  - `npm run test:v3` passed (26 passed, 1 skipped)
+  - Validation target satisfied: transient failure is recovered through retry path

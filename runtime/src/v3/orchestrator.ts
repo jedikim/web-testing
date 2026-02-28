@@ -6,6 +6,7 @@ import { Actor } from './actor';
 import { Executor, type ExecutorBrowser } from './executor';
 import { Planner, type PlannerImageInput } from './planner';
 import { ResultVerifier } from './result-verifier';
+import { RetryPolicy } from './retry-policy';
 import type { Action, CacheEntry, StepPlan } from './types';
 
 export interface OrchestratorRuntime extends ExecutorBrowser {
@@ -27,6 +28,8 @@ export interface OrchestratorOptions {
   verifier?: ResultVerifier;
   actionCache?: ActionCache;
   planCache?: PlanCache;
+  retryPolicy?: RetryPolicy;
+  maxStepAttempts?: number;
   filterScoreThreshold?: number;
 }
 
@@ -35,6 +38,8 @@ export interface StepExecutionTrace {
   targetDescription: string;
   usedPlanCache: boolean;
   usedActionCache: boolean;
+  attempts: number;
+  failureReason?: string;
   verification: 'ok' | 'wrong' | 'failed';
 }
 
@@ -53,6 +58,8 @@ export class Orchestrator {
   private readonly verifier: ResultVerifier;
   private readonly actionCache: ActionCache;
   private readonly planCache: PlanCache;
+  private readonly retryPolicy: RetryPolicy;
+  private readonly maxStepAttempts: number;
   private readonly filterScoreThreshold: number;
 
   constructor(options: OrchestratorOptions) {
@@ -64,6 +71,8 @@ export class Orchestrator {
     this.verifier = options.verifier ?? new ResultVerifier();
     this.actionCache = options.actionCache ?? new ActionCache();
     this.planCache = options.planCache ?? new PlanCache();
+    this.retryPolicy = options.retryPolicy ?? new RetryPolicy();
+    this.maxStepAttempts = Math.max(1, options.maxStepAttempts ?? 3);
     this.filterScoreThreshold = options.filterScoreThreshold ?? 0.5;
   }
 
@@ -106,66 +115,107 @@ export class Orchestrator {
     domain: string,
     usedPlanCache: boolean
   ): Promise<StepExecutionTrace> {
-    const preUrl = await runtime.getUrl();
-    const preVisualHash = await runtime.getVisualHash();
+    let attempt = 0;
+    let usedActionCache = false;
+    let failureReason: string | undefined;
+    let lastVerification: 'ok' | 'wrong' | 'failed' = 'failed';
 
+    const initialUrl = await runtime.getUrl();
     const cached = this.actionCache.lookup({
       domain,
-      url: preUrl,
+      url: initialUrl,
       taskType: step.targetDescription
     });
 
-    let action: Action;
-    let usedActionCache = false;
-    if (cached) {
-      action = this.actionCache.toAction(cached);
+    let action: Action | undefined = cached ? this.actionCache.toAction(cached) : undefined;
+    if (action) {
       usedActionCache = true;
-    } else {
-      const nodes = await this.extractor.extract(runtime.getDOMClient());
-      const candidates = this.filter.filter(nodes, step.keywordWeights, 20);
-      if ((candidates[0]?.score ?? 0) >= this.filterScoreThreshold) {
-        action = await this.actor.decide(step, candidates);
-      } else {
-        action = {
-          selector: null,
-          actionType: step.actionType,
-          value: step.value,
-          viewportXY: step.targetViewportXY
-        };
-      }
     }
 
-    await this.executor.executeAction(action, runtime);
-    await runtime.wait(300);
+    while (attempt < this.maxStepAttempts) {
+      attempt += 1;
+      const preUrl = await runtime.getUrl();
+      const preVisualHash = await runtime.getVisualHash();
 
-    const postUrl = await runtime.getUrl();
-    const postVisualHash = await runtime.getVisualHash();
-    const verification = await this.verifier.verify({
-      expectedResult: step.expectedResult,
-      preUrl,
-      postUrl,
-      preVisualHash,
-      postVisualHash,
-      domExists: (selector) => runtime.domExists(selector),
-      expectedVisualHash: cached?.postScreenshotPhash
-    });
+      if (!action) {
+        action = await this.resolveAction(step, runtime);
+      }
 
-    if (verification === 'ok') {
-      const entry: CacheEntry = {
-        domain,
-        urlPattern: preUrl,
-        taskType: step.targetDescription,
-        selector: action.selector,
-        actionType: action.actionType,
-        value: action.value,
-        keywordWeights: step.keywordWeights,
-        viewportXY: action.viewportXY,
-        viewportBbox: action.viewportBbox,
+      try {
+        await this.executor.executeAction(action, runtime);
+      } catch (error) {
+        const retry = this.retryPolicy.decide({
+          attempt,
+          maxAttempts: this.maxStepAttempts,
+          error
+        });
+        failureReason = retry.reason;
+        if (!retry.shouldRetry) {
+          return {
+            stepIndex: step.stepIndex,
+            targetDescription: step.targetDescription,
+            usedPlanCache,
+            usedActionCache,
+            attempts: attempt,
+            failureReason,
+            verification: 'failed'
+          };
+        }
+        action = await this.resolveAction(step, runtime);
+        continue;
+      }
+
+      await runtime.wait(300);
+
+      const postUrl = await runtime.getUrl();
+      const postVisualHash = await runtime.getVisualHash();
+      const verification = await this.verifier.verify({
         expectedResult: step.expectedResult,
-        postScreenshotPhash: postVisualHash,
-        successCount: 1
-      };
-      this.actionCache.store(entry);
+        preUrl,
+        postUrl,
+        preVisualHash,
+        postVisualHash,
+        domExists: (selector) => runtime.domExists(selector),
+        expectedVisualHash: cached?.postScreenshotPhash
+      });
+      lastVerification = verification;
+
+      if (verification === 'ok') {
+        const entry: CacheEntry = {
+          domain,
+          urlPattern: preUrl,
+          taskType: step.targetDescription,
+          selector: action.selector,
+          actionType: action.actionType,
+          value: action.value,
+          keywordWeights: step.keywordWeights,
+          viewportXY: action.viewportXY,
+          viewportBbox: action.viewportBbox,
+          expectedResult: step.expectedResult,
+          postScreenshotPhash: postVisualHash,
+          successCount: 1
+        };
+        this.actionCache.store(entry);
+        return {
+          stepIndex: step.stepIndex,
+          targetDescription: step.targetDescription,
+          usedPlanCache,
+          usedActionCache,
+          attempts: attempt,
+          verification
+        };
+      }
+
+      const retry = this.retryPolicy.decide({
+        attempt,
+        maxAttempts: this.maxStepAttempts,
+        verification
+      });
+      failureReason = retry.reason;
+      if (!retry.shouldRetry) {
+        break;
+      }
+      action = await this.resolveAction(step, runtime);
     }
 
     return {
@@ -173,7 +223,23 @@ export class Orchestrator {
       targetDescription: step.targetDescription,
       usedPlanCache,
       usedActionCache,
-      verification
+      attempts: attempt,
+      failureReason,
+      verification: lastVerification
+    };
+  }
+
+  private async resolveAction(step: StepPlan, runtime: OrchestratorRuntime): Promise<Action> {
+    const nodes = await this.extractor.extract(runtime.getDOMClient());
+    const candidates = this.filter.filter(nodes, step.keywordWeights, 20);
+    if ((candidates[0]?.score ?? 0) >= this.filterScoreThreshold) {
+      return this.actor.decide(step, candidates);
+    }
+    return {
+      selector: null,
+      actionType: step.actionType,
+      value: step.value,
+      viewportXY: step.targetViewportXY
     };
   }
 }
