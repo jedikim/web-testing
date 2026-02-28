@@ -97,3 +97,22 @@
   - `typecheck` 통과
   - `npm run test:v3` 통과 (26 passed, 1 skipped)
   - Validation target satisfied: transient 실패에서 retry로 복구되는 경로 검증
+
+## Week 7
+
+- Focus
+  - 성공 trajectory를 Python skill 코드로 합성
+  - Skill 보안 검증(금지 패턴/브라우저 API 화이트리스트)
+  - Orchestrator에서 skill 재사용 경로 활성화
+- Code
+  - `runtime/src/v3/skill-synthesis.ts`
+  - `runtime/src/v3/orchestrator.ts` (skill find/synthesize 통합)
+  - `runtime/src/v3/types.ts` (`Skill` 타입)
+  - `runtime/src/v3/index.ts`
+- Tests
+  - `runtime/tests/v3-skill-synthesis.test.ts`
+  - `runtime/tests/v3-cache-orchestrator.test.ts` (skill 경로 호환)
+- Verification
+  - `typecheck` 통과
+  - `npm run test:v3` 통과 (29 passed, 1 skipped)
+  - Validation target satisfied: 2회차 동일 태스크에서 planner 대신 skill 경로 사용

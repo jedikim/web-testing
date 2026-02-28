@@ -97,3 +97,22 @@
   - `typecheck` passed
   - `npm run test:v3` passed (26 passed, 1 skipped)
   - Validation target satisfied: transient failure is recovered through retry path
+
+## Week 7
+
+- Focus
+  - Synthesize successful trajectories into Python skill code
+  - Skill safety validation (blocked patterns + browser API whitelist)
+  - Enable skill-first reuse path inside Orchestrator
+- Code
+  - `runtime/src/v3/skill-synthesis.ts`
+  - `runtime/src/v3/orchestrator.ts` (skill find/synthesize integration)
+  - `runtime/src/v3/types.ts` (`Skill` type)
+  - `runtime/src/v3/index.ts`
+- Tests
+  - `runtime/tests/v3-skill-synthesis.test.ts`
+  - `runtime/tests/v3-cache-orchestrator.test.ts` (skill-path compatibility)
+- Verification
+  - `typecheck` passed
+  - `npm run test:v3` passed (29 passed, 1 skipped)
+  - Validation target satisfied: second run uses skill path instead of planner for same-domain similar task

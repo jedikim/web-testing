@@ -72,3 +72,14 @@ export interface CacheEntry {
   successCount: number;
   lastSuccess?: string;
 }
+
+export interface Skill {
+  name: string;
+  domain: string;
+  taskPattern: string;
+  code: string;
+  plan: StepPlan[];
+  successCount: number;
+  lastSuccess?: string;
+  createdAt: string;
+}

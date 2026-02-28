@@ -9,3 +9,4 @@ export * from './planner';
 export * from './cache';
 export * from './orchestrator';
 export * from './retry-policy';
+export * from './skill-synthesis';

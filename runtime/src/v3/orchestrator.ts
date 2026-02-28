@@ -7,6 +7,7 @@ import { Executor, type ExecutorBrowser } from './executor';
 import { Planner, type PlannerImageInput } from './planner';
 import { ResultVerifier } from './result-verifier';
 import { RetryPolicy } from './retry-policy';
+import { SkillRegistry, SkillSynthesizer } from './skill-synthesis';
 import type { Action, CacheEntry, StepPlan } from './types';
 
 export interface OrchestratorRuntime extends ExecutorBrowser {
@@ -30,6 +31,8 @@ export interface OrchestratorOptions {
   planCache?: PlanCache;
   retryPolicy?: RetryPolicy;
   maxStepAttempts?: number;
+  skillRegistry?: SkillRegistry;
+  skillSynthesizer?: SkillSynthesizer;
   filterScoreThreshold?: number;
 }
 
@@ -45,6 +48,7 @@ export interface StepExecutionTrace {
 
 export interface OrchestratorRunResult {
   ok: boolean;
+  usedSkill: boolean;
   usedPlanCache: boolean;
   traces: StepExecutionTrace[];
 }
@@ -60,6 +64,8 @@ export class Orchestrator {
   private readonly planCache: PlanCache;
   private readonly retryPolicy: RetryPolicy;
   private readonly maxStepAttempts: number;
+  private readonly skillRegistry: SkillRegistry;
+  private readonly skillSynthesizer: SkillSynthesizer;
   private readonly filterScoreThreshold: number;
 
   constructor(options: OrchestratorOptions) {
@@ -73,14 +79,18 @@ export class Orchestrator {
     this.planCache = options.planCache ?? new PlanCache();
     this.retryPolicy = options.retryPolicy ?? new RetryPolicy();
     this.maxStepAttempts = Math.max(1, options.maxStepAttempts ?? 3);
+    this.skillRegistry = options.skillRegistry ?? new SkillRegistry();
+    this.skillSynthesizer = options.skillSynthesizer ?? new SkillSynthesizer();
     this.filterScoreThreshold = options.filterScoreThreshold ?? 0.5;
   }
 
   async run(task: string, runtime: OrchestratorRuntime): Promise<OrchestratorRunResult> {
     const domain = await runtime.getDomain();
+    const skill = this.skillRegistry.find(domain, task);
+    const usedSkill = Boolean(skill);
     const cachedPlan = this.planCache.lookup(domain, task);
-    const usedPlanCache = Boolean(cachedPlan);
-    const steps = cachedPlan ?? (await this.plan(task, domain, runtime));
+    const usedPlanCache = !skill && Boolean(cachedPlan);
+    const steps = skill?.plan ?? cachedPlan ?? (await this.plan(task, domain, runtime));
 
     const traces: StepExecutionTrace[] = [];
     for (const step of steps) {
@@ -89,14 +99,25 @@ export class Orchestrator {
       if (trace.verification !== 'ok') {
         return {
           ok: false,
+          usedSkill,
           usedPlanCache,
           traces
         };
       }
     }
 
+    if (!skill && steps.length > 0) {
+      const synthesized = this.skillSynthesizer.synthesize({
+        domain,
+        task,
+        plan: steps
+      });
+      this.skillRegistry.upsert(synthesized);
+    }
+
     return {
       ok: true,
+      usedSkill,
       usedPlanCache,
       traces
     };

@@ -158,7 +158,7 @@ describe('Week5 cache + orchestrator integration', () => {
 
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
-    expect(second.usedPlanCache).toBe(true);
+    expect(second.usedPlanCache || second.usedSkill).toBe(true);
     expect(second.traces[0]?.usedActionCache).toBe(true);
     expect(plannerCalls).toBe(1);
   });

@@ -2,15 +2,15 @@
 
 ## Current Week Focus (from `doc/new_arch.md` §11)
 
-- Scope: `Week 6` only
+- Scope: `Week 7` only
 - Deliverables:
-  1. 재시도 정책 (`retry_policy`)과 step 실패시 재시도/재계획 분기
-  2. 한국 사이트 대상 E2E 하네스(기본 skip, env toggle 실행)
-  3. 실패 로그 구조 보강(몇 번째 시도/왜 실패했는지 추적 가능)
+  1. 성공 trajectory -> `Skill` 합성 (Python 함수 문자열 + plan metadata)
+  2. skill registry 저장/조회/버전 기록
+  3. orchestrator에서 skill 우선 재사용 경로 통합
 - Validation target:
-  - 재시도로 단발성 실패를 복구하고, KR 하네스 테스트가 env 토글로 동작함을 검증
+  - 동일 도메인/유사 태스크 재실행 시 planner 대신 skill 경로를 사용할 수 있음
 - Non-goals this week:
-  - 배치 검증, Canvas 전용 경로, Skill synthesis
+  - 배치 검증, Canvas 전용 경로
 
 ## 1) Purpose
 
