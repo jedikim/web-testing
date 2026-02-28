@@ -134,3 +134,21 @@
   - `typecheck` 통과
   - `npm run test:v3` 통과 (30 passed, 1 skipped)
   - Validation target satisfied: 20개 아이템 그리드 + VLM 1회 판단 경로 검증
+
+## Week 9
+
+- Focus
+  - `CanvasDetector`로 canvas-heavy 페이지 자동 감지
+  - `CanvasExecutor`에서 로컬 검출 우선 클릭 + VLM 좌표 fallback
+  - Orchestrator에 Canvas 전용 실행 경로 연결
+- Code
+  - `runtime/src/v3/canvas-detector.ts`
+  - `runtime/src/v3/canvas-executor.ts`
+  - `runtime/src/v3/orchestrator.ts` (canvas mode `auto` 통합)
+  - `runtime/src/v3/index.ts`
+- Tests
+  - `runtime/tests/v3-canvas-path.test.ts`
+- Verification
+  - `typecheck` 통과
+  - `npm run test:v3` 통과 (33 passed, 1 skipped)
+  - Validation target satisfied: detector 성공/실패 양 경로 모두 좌표 클릭 fallback 검증

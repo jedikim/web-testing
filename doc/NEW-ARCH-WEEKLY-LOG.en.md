@@ -134,3 +134,21 @@
   - `typecheck` passed
   - `npm run test:v3` passed (30 passed, 1 skipped)
   - Validation target satisfied: 20-item grid judged with a single VLM call
+
+## Week 9
+
+- Focus
+  - Auto-detect canvas-heavy pages with `CanvasDetector`
+  - Use local detection first and VLM coordinate fallback in `CanvasExecutor`
+  - Wire canvas-only execution path into Orchestrator (`canvasMode: auto`)
+- Code
+  - `runtime/src/v3/canvas-detector.ts`
+  - `runtime/src/v3/canvas-executor.ts`
+  - `runtime/src/v3/orchestrator.ts` (canvas mode integration)
+  - `runtime/src/v3/index.ts`
+- Tests
+  - `runtime/tests/v3-canvas-path.test.ts`
+- Verification
+  - `typecheck` passed
+  - `npm run test:v3` passed (33 passed, 1 skipped)
+  - Validation target satisfied: both detector-success and VLM-fallback click paths are verified

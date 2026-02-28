@@ -8,6 +8,8 @@ import { Planner, type PlannerImageInput } from './planner';
 import { ResultVerifier } from './result-verifier';
 import { RetryPolicy } from './retry-policy';
 import { SkillRegistry, SkillSynthesizer } from './skill-synthesis';
+import { CanvasDetector } from './canvas-detector';
+import { CanvasExecutor } from './canvas-executor';
 import type { Action, CacheEntry, StepPlan } from './types';
 
 export interface OrchestratorRuntime extends ExecutorBrowser {
@@ -33,6 +35,9 @@ export interface OrchestratorOptions {
   maxStepAttempts?: number;
   skillRegistry?: SkillRegistry;
   skillSynthesizer?: SkillSynthesizer;
+  canvasMode?: 'off' | 'auto';
+  canvasDetector?: CanvasDetector;
+  canvasExecutor?: CanvasExecutor;
   filterScoreThreshold?: number;
 }
 
@@ -66,6 +71,9 @@ export class Orchestrator {
   private readonly maxStepAttempts: number;
   private readonly skillRegistry: SkillRegistry;
   private readonly skillSynthesizer: SkillSynthesizer;
+  private readonly canvasMode: 'off' | 'auto';
+  private readonly canvasDetector?: CanvasDetector;
+  private readonly canvasExecutor?: CanvasExecutor;
   private readonly filterScoreThreshold: number;
 
   constructor(options: OrchestratorOptions) {
@@ -81,6 +89,9 @@ export class Orchestrator {
     this.maxStepAttempts = Math.max(1, options.maxStepAttempts ?? 3);
     this.skillRegistry = options.skillRegistry ?? new SkillRegistry();
     this.skillSynthesizer = options.skillSynthesizer ?? new SkillSynthesizer();
+    this.canvasMode = options.canvasMode ?? 'off';
+    this.canvasDetector = options.canvasDetector;
+    this.canvasExecutor = options.canvasExecutor;
     this.filterScoreThreshold = options.filterScoreThreshold ?? 0.5;
   }
 
@@ -157,33 +168,61 @@ export class Orchestrator {
       attempt += 1;
       const preUrl = await runtime.getUrl();
       const preVisualHash = await runtime.getVisualHash();
+      const nodes = await this.extractor.extract(runtime.getDOMClient());
 
-      if (!action) {
-        action = await this.resolveAction(step, runtime);
+      const canvasMode = this.shouldUseCanvasPath(step, nodes);
+      if (canvasMode) {
+        try {
+          action = await this.executeCanvasAction(step, runtime);
+        } catch (error) {
+          const retry = this.retryPolicy.decide({
+            attempt,
+            maxAttempts: this.maxStepAttempts,
+            error
+          });
+          failureReason = retry.reason;
+          if (!retry.shouldRetry) {
+            return {
+              stepIndex: step.stepIndex,
+              targetDescription: step.targetDescription,
+              usedPlanCache,
+              usedActionCache,
+              attempts: attempt,
+              failureReason,
+              verification: 'failed'
+            };
+          }
+          action = undefined;
+          continue;
+        }
+      } else if (!action) {
+        action = await this.resolveAction(step, runtime, nodes);
       }
 
-      try {
-        await this.executor.executeAction(action, runtime);
-      } catch (error) {
-        const retry = this.retryPolicy.decide({
-          attempt,
-          maxAttempts: this.maxStepAttempts,
-          error
-        });
-        failureReason = retry.reason;
-        if (!retry.shouldRetry) {
-          return {
-            stepIndex: step.stepIndex,
-            targetDescription: step.targetDescription,
-            usedPlanCache,
-            usedActionCache,
-            attempts: attempt,
-            failureReason,
-            verification: 'failed'
-          };
+      if (!canvasMode) {
+        try {
+          await this.executor.executeAction(action, runtime);
+        } catch (error) {
+          const retry = this.retryPolicy.decide({
+            attempt,
+            maxAttempts: this.maxStepAttempts,
+            error
+          });
+          failureReason = retry.reason;
+          if (!retry.shouldRetry) {
+            return {
+              stepIndex: step.stepIndex,
+              targetDescription: step.targetDescription,
+              usedPlanCache,
+              usedActionCache,
+              attempts: attempt,
+              failureReason,
+              verification: 'failed'
+            };
+          }
+          action = await this.resolveAction(step, runtime, nodes);
+          continue;
         }
-        action = await this.resolveAction(step, runtime);
-        continue;
       }
 
       await runtime.wait(300);
@@ -236,7 +275,7 @@ export class Orchestrator {
       if (!retry.shouldRetry) {
         break;
       }
-      action = await this.resolveAction(step, runtime);
+      action = await this.resolveAction(step, runtime, nodes);
     }
 
     return {
@@ -250,9 +289,9 @@ export class Orchestrator {
     };
   }
 
-  private async resolveAction(step: StepPlan, runtime: OrchestratorRuntime): Promise<Action> {
-    const nodes = await this.extractor.extract(runtime.getDOMClient());
-    const candidates = this.filter.filter(nodes, step.keywordWeights, 20);
+  private async resolveAction(step: StepPlan, runtime: OrchestratorRuntime, nodes?: Awaited<ReturnType<DOMExtractor['extract']>>): Promise<Action> {
+    const sourceNodes = nodes ?? (await this.extractor.extract(runtime.getDOMClient()));
+    const candidates = this.filter.filter(sourceNodes, step.keywordWeights, 20);
     if ((candidates[0]?.score ?? 0) >= this.filterScoreThreshold) {
       return this.actor.decide(step, candidates);
     }
@@ -261,6 +300,32 @@ export class Orchestrator {
       actionType: step.actionType,
       value: step.value,
       viewportXY: step.targetViewportXY
+    };
+  }
+
+  private shouldUseCanvasPath(step: StepPlan, nodes: Awaited<ReturnType<DOMExtractor['extract']>>): boolean {
+    if (this.canvasMode !== 'auto' || !this.canvasDetector || !this.canvasExecutor) {
+      return false;
+    }
+    if (step.actionType !== 'click') {
+      return false;
+    }
+    const signal = this.canvasDetector.analyze(nodes);
+    return this.canvasDetector.isCanvasHeavy(signal);
+  }
+
+  private async executeCanvasAction(step: StepPlan, runtime: OrchestratorRuntime): Promise<Action> {
+    if (!this.canvasExecutor) {
+      throw new Error('canvas executor is not configured');
+    }
+    const plannerImage = await runtime.getPlannerImage();
+    const imageBuffer = Buffer.from(plannerImage.bytesBase64, 'base64');
+    const canvasResult = await this.canvasExecutor.execute(runtime, imageBuffer, step.targetDescription, plannerImage.mimeType);
+    const viewport = await runtime.getViewportSize();
+    return {
+      selector: null,
+      actionType: 'click',
+      viewportXY: [canvasResult.clickedXY[0] / viewport.width, canvasResult.clickedXY[1] / viewport.height]
     };
   }
 }

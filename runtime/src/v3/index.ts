@@ -13,3 +13,5 @@ export * from './skill-synthesis';
 export * from './grid-composer';
 export * from './local-detector';
 export * from './batch-verifier';
+export * from './canvas-detector';
+export * from './canvas-executor';

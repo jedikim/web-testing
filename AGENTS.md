@@ -2,15 +2,15 @@
 
 ## Current Week Focus (from `doc/new_arch.md` §11)
 
-- Scope: `Week 8` only
+- Scope: `Week 9` only
 - Deliverables:
-  1. `GridComposer` (N개 아이템 -> 1장 그리드)
-  2. `LocalDetector` 인터페이스 (로컬 검출 결과/개수 검증)
-  3. `BatchVerifier` (그리드 기반 VLM 1회 판단 + 결과 파싱)
+  1. `CanvasDetector` (DOM 신호 기반 canvas-heavy 페이지 감지)
+  2. `CanvasExecutor` (로컬 검출 우선, 실패 시 VLM 좌표 fallback)
+  3. Orchestrator에서 Canvas 전용 경로를 선택 가능한 구조
 - Validation target:
-  - 20개 아이템 입력 시 VLM 호출 1회로 Y/N 결과를 반환하는 테스트 통과
+  - detector 성공/실패 두 경우 모두 좌표 클릭 실행 경로가 테스트로 검증됨
 - Non-goals this week:
-  - Canvas 전용 경로
+  - 신규 외부 연동 확장
 
 ## 1) Purpose
 
