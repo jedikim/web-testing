@@ -16,6 +16,8 @@ export interface PlannerModelClient {
 
 export interface PlannerOptions {
   model: PlannerModelClient;
+  expansionEnabled?: boolean;
+  minComplexSteps?: number;
 }
 
 export interface PlannerResult {
@@ -76,7 +78,7 @@ function normalizeXY(raw: unknown): [number, number] | undefined {
 }
 
 function sanitizeActionType(raw: unknown): StepActionType {
-  if (raw === 'click' || raw === 'type' || raw === 'wait' || raw === 'navigate' || raw === 'summarize') {
+  if (raw === 'click' || raw === 'type' || raw === 'wait') {
     return raw;
   }
   return 'click';
@@ -169,15 +171,114 @@ export function buildPlannerPrompt(task: string): string {
     '- 화면 변화',
     `task: ${normalizedTask}`,
     'response schema:',
-    '{"screen_state":{"has_obstacle":bool,"obstacle_type":"...","obstacle_close_xy":[x,y],"obstacle_description":"..."},"steps":[{"action_type":"click|type|wait|navigate|summarize","target_description":"...","value":"...","keyword_weights":{"keyword":0.0},"target_viewport_xy":[0.0,0.0],"expected_result":"..."}]}'
+    '{"screen_state":{"has_obstacle":bool,"obstacle_type":"...","obstacle_close_xy":[x,y],"obstacle_description":"..."},"steps":[{"action_type":"click|type|wait","target_description":"...","value":"...","keyword_weights":{"keyword":0.0},"target_viewport_xy":[0.0,0.0],"expected_result":"..."}]}'
   ].join('\n');
+}
+
+export function buildPlannerExpansionPrompt(task: string, draftSteps: StepPlan[], minComplexSteps: number): string {
+  const normalizedTask = normalizePromptTask(task);
+  const draft = draftSteps
+    .map((step) => `${step.stepIndex}. ${step.actionType} - ${step.targetDescription}${step.value ? ` (${step.value})` : ''}`)
+    .join('\n');
+  return [
+    '당신은 웹 자동화 Planner입니다. 기존 draft를 더 세밀한 multi-step으로 확장하세요.',
+    '규칙:',
+    `- 최소 ${minComplexSteps}개, 최대 7개 step`,
+    '- action_type은 click|type|wait만 사용',
+    '- 중간 카테고리/필터/검증 단계를 생략하지 말 것',
+    '- 각 step은 keyword_weights와 target_viewport_xy를 반드시 포함',
+    '- 반드시 JSON만 반환',
+    `task: ${normalizedTask}`,
+    `draft:\n${draft}`,
+    'response schema:',
+    '{"steps":[{"action_type":"click|type|wait","target_description":"...","value":"...","keyword_weights":{"keyword":0.0},"target_viewport_xy":[0.0,0.0],"expected_result":"..."}]}'
+  ].join('\n');
+}
+
+function parsePlannerPayload(raw: string): RawPlannerPayload {
+  const payloadText = extractJsonBlock(raw);
+  try {
+    return JSON.parse(payloadText) as RawPlannerPayload;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`planner returned invalid json: ${message}`);
+  }
+}
+
+function parsePlannerSteps(raw: string): StepPlan[] {
+  const payloadText = extractJsonBlock(raw);
+  const parsed = JSON.parse(payloadText) as unknown;
+  if (Array.isArray(parsed)) {
+    return normalizeSteps(parsed);
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const payload = parsed as RawPlannerPayload;
+    return normalizeSteps(payload.steps);
+  }
+  return [];
+}
+
+function isComplexTask(task: string): boolean {
+  const normalized = task.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (normalized.length >= 28) {
+    return true;
+  }
+  return /(그리고|다음|그 후|중에서|이후|정렬|필터|카테고리|요약|menu|filter|sort|then|and)/i.test(normalized);
+}
+
+function ensureComplexFallbackSteps(steps: StepPlan[], minComplexSteps: number): StepPlan[] {
+  if (steps.length >= minComplexSteps) {
+    return steps;
+  }
+  const seed = steps[0];
+  if (!seed) {
+    return steps;
+  }
+
+  const prefix: StepPlan = {
+    stepIndex: 1,
+    actionType: 'click',
+    targetDescription: '상위 메뉴/카테고리 진입',
+    keywordWeights: {
+      메뉴: 0.6,
+      카테고리: 0.4
+    },
+    targetViewportXY: [0.18, 0.12],
+    expectedResult: '화면 변화'
+  };
+
+  const middle: StepPlan = {
+    ...seed,
+    stepIndex: 2
+  };
+
+  const suffix: StepPlan = {
+    stepIndex: 3,
+    actionType: 'click',
+    targetDescription: '조건/결과 영역 검증',
+    keywordWeights: {
+      결과: 0.5,
+      필터: 0.5
+    },
+    targetViewportXY: seed.targetViewportXY ?? [0.5, 0.5],
+    expectedResult: seed.expectedResult ?? '화면 변화'
+  };
+
+  return [prefix, middle, suffix].slice(0, minComplexSteps);
 }
 
 export class Planner {
   private readonly model: PlannerModelClient;
+  private readonly expansionEnabled: boolean;
+  private readonly minComplexSteps: number;
 
   constructor(options: PlannerOptions) {
     this.model = options.model;
+    this.expansionEnabled = options.expansionEnabled ?? true;
+    this.minComplexSteps = Math.max(3, Math.floor(options.minComplexSteps ?? 3));
   }
 
   async plan(task: string, screenshot: PlannerImageInput): Promise<PlannerResult> {
@@ -187,20 +288,32 @@ export class Planner {
       image: screenshot
     });
 
-    const payloadText = extractJsonBlock(raw);
-    let parsed: RawPlannerPayload;
-    try {
-      parsed = JSON.parse(payloadText) as RawPlannerPayload;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`planner returned invalid json: ${message}`);
-    }
+    const parsed = parsePlannerPayload(raw);
 
     const screenState = normalizeScreenState(parsed.screen_state);
-    const steps = normalizeSteps(parsed.steps);
+    let steps = normalizeSteps(parsed.steps);
     if (steps.length === 0) {
       throw new Error('planner returned no executable steps');
     }
+
+    if (this.expansionEnabled && isComplexTask(task) && steps.length < this.minComplexSteps) {
+      try {
+        const expandPrompt = buildPlannerExpansionPrompt(task, steps, this.minComplexSteps);
+        const expandedRaw = await this.model.generate({
+          prompt: expandPrompt,
+          image: screenshot
+        });
+        const expanded = parsePlannerSteps(expandedRaw);
+        if (expanded.length >= this.minComplexSteps) {
+          steps = expanded;
+        } else {
+          steps = ensureComplexFallbackSteps(steps, this.minComplexSteps);
+        }
+      } catch {
+        steps = ensureComplexFallbackSteps(steps, this.minComplexSteps);
+      }
+    }
+
     return { screenState, steps };
   }
 }
