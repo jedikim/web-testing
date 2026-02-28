@@ -152,3 +152,20 @@
   - `typecheck` 통과
   - `npm run test:v3` 통과 (33 passed, 1 skipped)
   - Validation target satisfied: detector 성공/실패 양 경로 모두 좌표 클릭 fallback 검증
+
+## Dependency Refresh (Post Week 9)
+
+- Updated to latest versions
+  - `vitest`: `2.1.9` -> `4.0.18`
+  - `jimp`: `0.22.12` -> `1.6.0`
+  - `@types/node`: `25.3.0` -> `25.3.2`
+- Compatibility fixes
+  - Jimp ESM import 변경 (`import { Jimp } from 'jimp'`)
+  - Jimp v1 API 반영 (`cover/contain/print` object 시그니처, `write/getBuffer` async API)
+- Regression verification
+  - `typecheck` 통과
+  - Jimp 관련 회귀 테스트 통과:
+    - `tests/composite-sheet.test.ts`
+    - `tests/repeated-item-judgement.test.ts`
+    - `tests/assistantless-chat-e2e.test.ts`
+    - `tests/v3-batch-verifier.test.ts`

@@ -152,3 +152,20 @@
   - `typecheck` passed
   - `npm run test:v3` passed (33 passed, 1 skipped)
   - Validation target satisfied: both detector-success and VLM-fallback click paths are verified
+
+## Dependency Refresh (Post Week 9)
+
+- Updated to latest versions
+  - `vitest`: `2.1.9` -> `4.0.18`
+  - `jimp`: `0.22.12` -> `1.6.0`
+  - `@types/node`: `25.3.0` -> `25.3.2`
+- Compatibility fixes
+  - Jimp ESM import migration (`import { Jimp } from 'jimp'`)
+  - Jimp v1 API updates (`cover/contain/print` object signatures, `write/getBuffer` async API)
+- Regression verification
+  - `typecheck` passed
+  - Jimp regression tests passed:
+    - `tests/composite-sheet.test.ts`
+    - `tests/repeated-item-judgement.test.ts`
+    - `tests/assistantless-chat-e2e.test.ts`
+    - `tests/v3-batch-verifier.test.ts`

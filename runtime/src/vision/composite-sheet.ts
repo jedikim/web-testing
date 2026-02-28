@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
-import Jimp from 'jimp';
+import { Jimp } from 'jimp';
 
 import type { BBox } from './roi-batcher';
 
@@ -126,7 +126,11 @@ export async function buildCompositeSheet(
   const outputImagePath = resolve(input.outputImagePath);
   const outputManifestPath = resolve(input.outputManifestPath ?? defaultManifestPath(outputImagePath));
 
-  const canvas = await new Jimp(width, height, input.backgroundColor ?? 0xffffffff);
+  const canvas = new Jimp({
+    width,
+    height,
+    color: input.backgroundColor ?? 0xffffffff
+  });
   const tiles: CompositeSheetTile[] = [];
 
   for (let index = 0; index < input.images.length; index += 1) {
@@ -138,7 +142,7 @@ export async function buildCompositeSheet(
     const y = row * cellHeight;
 
     const tileImage = await Jimp.read(source.imagePath);
-    tileImage.contain(cellWidth, cellHeight);
+    tileImage.contain({ w: cellWidth, h: cellHeight });
     canvas.composite(tileImage, x, y);
 
     tiles.push({
@@ -151,7 +155,7 @@ export async function buildCompositeSheet(
   }
 
   await mkdir(dirname(outputImagePath), { recursive: true });
-  await canvas.writeAsync(outputImagePath);
+  await canvas.write(outputImagePath as `${string}.${string}`);
 
   const manifest: CompositeSheetManifest = {
     imagePath: outputImagePath,

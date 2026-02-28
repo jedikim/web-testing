@@ -2,14 +2,14 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
-import Jimp from 'jimp';
+import { Jimp } from 'jimp';
 import { describe, expect, it } from 'vitest';
 
 import { executeRepeatedItemJudgement } from '../src/vision/repeated-item-judgement';
 
 async function makeImage(path: string, color: number): Promise<void> {
-  const image = await new Jimp(64, 64, color);
-  await image.writeAsync(path);
+  const image = new Jimp({ width: 64, height: 64, color });
+  await image.write(path as `${string}.${string}`);
 }
 
 describe('executeRepeatedItemJudgement', () => {

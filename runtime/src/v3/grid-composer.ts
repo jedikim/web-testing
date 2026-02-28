@@ -1,4 +1,5 @@
-import Jimp from 'jimp';
+import { Jimp, JimpMime, loadFont } from 'jimp';
+import { SANS_16_BLACK } from 'jimp/fonts';
 
 export interface GridItemImage {
   id: string;
@@ -42,8 +43,8 @@ export class GridComposer {
     const width = cols * cellWidth;
     const height = rows * cellHeight;
 
-    const canvas = await Jimp.create(width, height, '#ffffff');
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_16_BLACK);
+    const canvas = new Jimp({ width, height, color: '#ffffff' });
+    const font = await loadFont(SANS_16_BLACK);
 
     const mapping: GridCellMapping[] = [];
     for (let index = 0; index < items.length; index += 1) {
@@ -54,11 +55,11 @@ export class GridComposer {
       const y = row * cellHeight;
 
       const image = await Jimp.read(item.imageBuffer);
-      image.cover(cellWidth, cellHeight);
+      image.cover({ w: cellWidth, h: cellHeight });
       canvas.composite(image, x, y);
 
       const label = item.label?.trim().length ? item.label!.trim() : String(index + 1);
-      canvas.print(font, x + 8, y + 8, `${label}`);
+      canvas.print({ font, x: x + 8, y: y + 8, text: `${label}` });
       mapping.push({
         index,
         id: item.id,
@@ -69,7 +70,7 @@ export class GridComposer {
       });
     }
 
-    const imageBuffer = await canvas.getBufferAsync(Jimp.MIME_PNG);
+    const imageBuffer = await canvas.getBuffer(JimpMime.png);
     return {
       imageBuffer,
       mimeType: 'image/png',

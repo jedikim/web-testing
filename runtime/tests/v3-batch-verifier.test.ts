@@ -1,4 +1,4 @@
-import Jimp from 'jimp';
+import { Jimp, JimpMime } from 'jimp';
 import { describe, expect, it } from 'vitest';
 
 import { BatchVerifier } from '../src/v3/batch-verifier';
@@ -6,8 +6,8 @@ import { GridComposer } from '../src/v3/grid-composer';
 import { LocalDetector } from '../src/v3/local-detector';
 
 async function makeImage(color: string): Promise<Buffer> {
-  const image = await Jimp.create(80, 80, color);
-  return image.getBufferAsync(Jimp.MIME_PNG);
+  const image = new Jimp({ width: 80, height: 80, color });
+  return image.getBuffer(JimpMime.png);
 }
 
 describe('Week8 batch verification', () => {

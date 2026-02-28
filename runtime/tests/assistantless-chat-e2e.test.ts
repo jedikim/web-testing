@@ -3,13 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
-import Jimp from 'jimp';
+import { Jimp } from 'jimp';
 
 import { runAssistantlessChatE2E } from '../src/testing/assistantless-chat-e2e';
 
 async function makeImage(path: string, color: number): Promise<void> {
-  const image = await new Jimp(48, 48, color);
-  await image.writeAsync(path);
+  const image = new Jimp({ width: 48, height: 48, color });
+  await image.write(path as `${string}.${string}`);
 }
 
 describe('runAssistantlessChatE2E', () => {
