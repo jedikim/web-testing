@@ -41,6 +41,13 @@ export interface StepPlan {
   expectedResult?: string;
 }
 
+export interface ScreenState {
+  hasObstacle: boolean;
+  obstacleType?: 'popup' | 'ad_banner' | 'cookie_consent' | 'event_splash' | string;
+  obstacleCloseXY?: [number, number];
+  obstacleDescription?: string;
+}
+
 export interface Action {
   selector: string | null;
   actionType: StepActionType;

@@ -40,3 +40,19 @@
 - Verification
   - `vitest` 13 tests passed (v3 suite)
   - Validation target satisfied: action generation/execution/verification for `search input + type value` scenario
+
+## Week 4
+
+- Focus
+  - Screenshot-first `Planner` prompt/response contract
+  - Robust JSON parsing for `screen_state` + `steps`
+  - Deterministic backfill for missing `keyword_weights` and `target_viewport_xy`
+- Code
+  - `runtime/src/v3/planner.ts`
+  - `runtime/src/v3/types.ts` (`ScreenState` type)
+  - `runtime/src/v3/index.ts`
+- Tests
+  - `runtime/tests/v3-planner.test.ts`
+- Verification
+  - `vitest` 17 tests passed (v3 suite)
+  - Validation target satisfied: `find hiking wear` request is converted into structured step plans reliably

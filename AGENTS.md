@@ -2,15 +2,15 @@
 
 ## Current Week Focus (from `doc/new_arch.md` §11)
 
-- Scope: `Week 3` only
+- Scope: `Week 4` only
 - Deliverables:
-  1. `Actor` (candidate 기반 액션 선택 + viewport 좌표 생성)
-  2. `Executor` (selector 우선, viewport fallback 실행)
-  3. 기본 `ResultVerifier` (URL/DOM/화면변화 3단 검증)
+  1. `Planner` (screenshot-first + obstacle analysis + step decomposition)
+  2. VLM prompt contract + strict JSON parsing/validation
+  3. `keyword_weights` + `target_viewport_xy` + `expected_result` 항상 생성
 - Validation target:
-  - `검색창에 등산복 입력` 시나리오에서 액션 생성/실행/검증 단위 테스트 통과
+  - `등산복 찾기` 요청이 단계별 StepPlan으로 안정 변환되고 형식 오류를 방어하는 테스트 통과
 - Non-goals this week:
-  - Planner 통합, 캐시 오케스트레이션, 배치 검증, Canvas 전용 경로
+  - 캐시 오케스트레이션, 배치 검증, Canvas 전용 경로
 
 ## 1) Purpose
 
