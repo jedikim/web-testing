@@ -2,15 +2,15 @@
 
 ## Current Week Focus (from `doc/new_arch.md` §11)
 
-- Scope: `Week 1-2` only
+- Scope: `Week 3` only
 - Deliverables:
-  1. `DOM Extractor` (DOM + AX merge; snapshot call 금지)
-  2. `TextMatcher` (exact/phrase/word/synonym/fuzzy)
-  3. `Element Filter` (keyword weight scoring + top-N)
+  1. `Actor` (candidate 기반 액션 선택 + viewport 좌표 생성)
+  2. `Executor` (selector 우선, viewport fallback 실행)
+  3. 기본 `ResultVerifier` (URL/DOM/화면변화 3단 검증)
 - Validation target:
-  - 네이버 쇼핑 계열 페이지에서 keyword 기반으로 `검색창` 후보를 상위권으로 찾는 단위/통합 테스트
+  - `검색창에 등산복 입력` 시나리오에서 액션 생성/실행/검증 단위 테스트 통과
 - Non-goals this week:
-  - Actor/Executor/Planner 통합, 캐시/재시도/스킬 합성, Canvas 전용 경로
+  - Planner 통합, 캐시 오케스트레이션, 배치 검증, Canvas 전용 경로
 
 ## 1) Purpose
 

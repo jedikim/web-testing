@@ -28,3 +28,40 @@ export interface ScoredNode {
   score: number;
   matches: ScoredNodeMatch[];
 }
+
+export type StepActionType = 'click' | 'type' | 'wait' | 'navigate' | 'summarize';
+
+export interface StepPlan {
+  stepIndex: number;
+  actionType: StepActionType;
+  targetDescription: string;
+  value?: string;
+  keywordWeights: Record<string, number>;
+  targetViewportXY?: [number, number];
+  expectedResult?: string;
+}
+
+export interface Action {
+  selector: string | null;
+  actionType: StepActionType;
+  value?: string;
+  viewportXY?: [number, number];
+  viewportBbox?: [number, number, number, number];
+}
+
+export interface CacheEntry {
+  domain: string;
+  urlPattern: string;
+  taskType: string;
+  selector: string | null;
+  actionType: StepActionType;
+  value?: string;
+  keywordWeights: Record<string, number>;
+  viewportXY?: [number, number];
+  viewportBbox?: [number, number, number, number];
+  expectedResult?: string;
+  postScreenshotPath?: string;
+  postScreenshotPhash?: string;
+  successCount: number;
+  lastSuccess?: string;
+}

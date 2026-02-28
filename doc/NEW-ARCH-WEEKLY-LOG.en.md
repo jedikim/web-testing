@@ -22,3 +22,21 @@
 - Verification
   - `vitest` 8 tests passed
   - Validation target satisfied: keyword `검색창` ranks a naver-shopping-like search input candidate at top
+
+## Week 3
+
+- Focus
+  - `Actor` (candidate -> action + selector synthesis + viewport coordinates)
+  - `Executor` (selector-first execution with viewport fallback)
+  - `ResultVerifier` (URL > DOM > visual fallback validation order)
+- Code
+  - `runtime/src/v3/actor.ts`
+  - `runtime/src/v3/executor.ts`
+  - `runtime/src/v3/result-verifier.ts`
+  - `runtime/src/v3/types.ts` (StepPlan/Action extensions)
+  - `runtime/src/v3/index.ts`
+- Tests
+  - `runtime/tests/v3-actor-executor-verifier.test.ts`
+- Verification
+  - `vitest` 13 tests passed (v3 suite)
+  - Validation target satisfied: action generation/execution/verification for `search input + type value` scenario
