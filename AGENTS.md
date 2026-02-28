@@ -1,5 +1,17 @@
 # AGENTS.md
 
+## Current Week Focus (from `doc/new_arch.md` §11)
+
+- Scope: `Week 1-2` only
+- Deliverables:
+  1. `DOM Extractor` (DOM + AX merge; snapshot call 금지)
+  2. `TextMatcher` (exact/phrase/word/synonym/fuzzy)
+  3. `Element Filter` (keyword weight scoring + top-N)
+- Validation target:
+  - 네이버 쇼핑 계열 페이지에서 keyword 기반으로 `검색창` 후보를 상위권으로 찾는 단위/통합 테스트
+- Non-goals this week:
+  - Actor/Executor/Planner 통합, 캐시/재시도/스킬 합성, Canvas 전용 경로
+
 ## 1) Purpose
 
 이 저장소의 목표는 `Adaptive Web Automation`을 실제 구현 가능한 형태로 점진적으로 완성하는 것이다.  
@@ -68,6 +80,10 @@
 12. 진화 candidate는 반드시 `git worktree` 격리 경로에서 테스트/수정하고, 승인 전에는 active pointer를 교체하지 않는다.
 13. 문서 변경 시 `영어/한국어` 이중 문서를 유지하고, 각 문서 상단에 상호 언어 전환 링크를 제공한다.
 14. 운영 모드는 `backend_simple`(HTTP)과 `sdk_detailed`(임베딩)로 구분하되, 세션 스키마/턴 기록 계약은 공통으로 유지한다.
+15. 모델명 정책은 아래를 기본값으로 고정한다. 자동화(저비용): `gemini-3-flash-preview`, 코딩/진화(고성능): `gemini-3.1-pro-preview`, OpenAI: `gpt-5-codex`, `gpt-5-mini`.
+16. `gemini-3.0-flash` 같은 구버전/미지원 모델은 금지한다. 발견 시 즉시 최신 지원 모델로 교체하고 테스트를 다시 수행한다.
+17. `chat_automation.llm_call` 텔레메트리는 프롬프트/결과 fallback 필드를 항상 남겨야 한다: `llm_prompt_preview`, `llm_response_preview`, `llm_model`, `llm_provider`.
+18. Langfuse 텔레메트리 구조/속성 변경 후에는 백엔드 프로세스를 반드시 재시작하고, 최근 trace에서 `llm_call` 관측치가 실제로 남는지 확인한다.
 
 ## 6) Directory Conventions
 
