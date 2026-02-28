@@ -56,3 +56,24 @@
 - Verification
   - `vitest` 17 tests passed (v3 suite)
   - Validation target satisfied: `등산복 찾기` 요청이 structured step plan으로 안정 변환됨
+
+## Week 5
+
+- Focus
+  - `PlanCache` + `ActionCache`
+  - `Orchestrator` 메인 루프(캐시 히트 우선, miss 시 extractor/filter/actor/executor/verifier 파이프라인)
+  - v3 API/SDK 연결 훅 추가
+- Code
+  - `runtime/src/v3/cache.ts`
+  - `runtime/src/v3/orchestrator.ts`
+  - `runtime/src/sdk/v3-orchestration-sdk.ts`
+  - `runtime/src/backend/v3-orchestrator-service.ts`
+  - `runtime/src/backend/v3-orchestrator-server.ts`
+  - export wiring: `runtime/src/v3/index.ts`, `runtime/src/backend/index.ts`, `runtime/src/sdk/index.ts`, `runtime/src/index.ts`
+- Tests
+  - `runtime/tests/v3-cache-orchestrator.test.ts`
+  - `runtime/tests/v3-api-sdk.test.ts`
+- Verification
+  - `typecheck` 통과
+  - `vitest` cache/api 통합 테스트 통과
+  - Validation target satisfied: 동일 태스크 2회차에서 planner 호출 0회(누적 호출 1회 유지)

@@ -56,3 +56,24 @@
 - Verification
   - `vitest` 17 tests passed (v3 suite)
   - Validation target satisfied: `find hiking wear` request is converted into structured step plans reliably
+
+## Week 5
+
+- Focus
+  - `PlanCache` + `ActionCache`
+  - Main `Orchestrator` loop (cache-hit first, full pipeline on miss)
+  - Minimal v3 API/SDK integration hooks
+- Code
+  - `runtime/src/v3/cache.ts`
+  - `runtime/src/v3/orchestrator.ts`
+  - `runtime/src/sdk/v3-orchestration-sdk.ts`
+  - `runtime/src/backend/v3-orchestrator-service.ts`
+  - `runtime/src/backend/v3-orchestrator-server.ts`
+  - export wiring: `runtime/src/v3/index.ts`, `runtime/src/backend/index.ts`, `runtime/src/sdk/index.ts`, `runtime/src/index.ts`
+- Tests
+  - `runtime/tests/v3-cache-orchestrator.test.ts`
+  - `runtime/tests/v3-api-sdk.test.ts`
+- Verification
+  - `typecheck` passed
+  - `vitest` cache/api integration tests passed
+  - Validation target satisfied: second run of the same task reuses plan cache (planner call count remains 1)

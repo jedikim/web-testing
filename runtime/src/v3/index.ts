@@ -6,3 +6,5 @@ export * from './actor';
 export * from './executor';
 export * from './result-verifier';
 export * from './planner';
+export * from './cache';
+export * from './orchestrator';

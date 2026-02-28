@@ -2,15 +2,15 @@
 
 ## Current Week Focus (from `doc/new_arch.md` §11)
 
-- Scope: `Week 4` only
+- Scope: `Week 5` only
 - Deliverables:
-  1. `Planner` (screenshot-first + obstacle analysis + step decomposition)
-  2. VLM prompt contract + strict JSON parsing/validation
-  3. `keyword_weights` + `target_viewport_xy` + `expected_result` 항상 생성
+  1. `Cache` (domain/url/task 기반 action memory)
+  2. `Orchestrator` 메인 루프 (cache-hit 우선, miss 시 full pipeline)
+  3. API/SDK에서 v3 orchestrator 호출 가능하도록 최소 통합
 - Validation target:
-  - `등산복 찾기` 요청이 단계별 StepPlan으로 안정 변환되고 형식 오류를 방어하는 테스트 통과
+  - 동일 태스크 2회차에서 planner 호출 없이 cache 재사용되는 테스트 통과
 - Non-goals this week:
-  - 캐시 오케스트레이션, 배치 검증, Canvas 전용 경로
+  - 배치 검증, Canvas 전용 경로
 
 ## 1) Purpose
 

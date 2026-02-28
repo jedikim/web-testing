@@ -13,3 +13,4 @@ export * from './evolution/types';
 export * from './evolution/service';
 export * from './evolution/auto-improvement-orchestrator';
 export * from './sdk';
+export * from './v3';
