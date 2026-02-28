@@ -116,3 +116,21 @@
   - `typecheck` passed
   - `npm run test:v3` passed (29 passed, 1 skipped)
   - Validation target satisfied: second run uses skill path instead of planner for same-domain similar task
+
+## Week 8
+
+- Focus
+  - Compose multiple item screenshots into a single grid image with `GridComposer`
+  - Separate local detection/count path via `LocalDetector` interface
+  - Execute one-shot multi-item Y/N judgement with `BatchVerifier` (single VLM call)
+- Code
+  - `runtime/src/v3/grid-composer.ts`
+  - `runtime/src/v3/local-detector.ts`
+  - `runtime/src/v3/batch-verifier.ts`
+  - `runtime/src/v3/index.ts`
+- Tests
+  - `runtime/tests/v3-batch-verifier.test.ts`
+- Verification
+  - `typecheck` passed
+  - `npm run test:v3` passed (30 passed, 1 skipped)
+  - Validation target satisfied: 20-item grid judged with a single VLM call

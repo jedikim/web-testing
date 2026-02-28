@@ -116,3 +116,21 @@
   - `typecheck` 통과
   - `npm run test:v3` 통과 (29 passed, 1 skipped)
   - Validation target satisfied: 2회차 동일 태스크에서 planner 대신 skill 경로 사용
+
+## Week 8
+
+- Focus
+  - `GridComposer`로 다중 아이템 스크린샷을 단일 그리드 이미지로 합성
+  - `LocalDetector` 인터페이스로 로컬 검출/개수 확인 경로 분리
+  - `BatchVerifier`에서 VLM 1회 호출로 다중 아이템 Y/N 판단
+- Code
+  - `runtime/src/v3/grid-composer.ts`
+  - `runtime/src/v3/local-detector.ts`
+  - `runtime/src/v3/batch-verifier.ts`
+  - `runtime/src/v3/index.ts`
+- Tests
+  - `runtime/tests/v3-batch-verifier.test.ts`
+- Verification
+  - `typecheck` 통과
+  - `npm run test:v3` 통과 (30 passed, 1 skipped)
+  - Validation target satisfied: 20개 아이템 그리드 + VLM 1회 판단 경로 검증

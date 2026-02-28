@@ -10,3 +10,6 @@ export * from './cache';
 export * from './orchestrator';
 export * from './retry-policy';
 export * from './skill-synthesis';
+export * from './grid-composer';
+export * from './local-detector';
+export * from './batch-verifier';

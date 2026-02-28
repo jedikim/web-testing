@@ -2,15 +2,15 @@
 
 ## Current Week Focus (from `doc/new_arch.md` §11)
 
-- Scope: `Week 7` only
+- Scope: `Week 8` only
 - Deliverables:
-  1. 성공 trajectory -> `Skill` 합성 (Python 함수 문자열 + plan metadata)
-  2. skill registry 저장/조회/버전 기록
-  3. orchestrator에서 skill 우선 재사용 경로 통합
+  1. `GridComposer` (N개 아이템 -> 1장 그리드)
+  2. `LocalDetector` 인터페이스 (로컬 검출 결과/개수 검증)
+  3. `BatchVerifier` (그리드 기반 VLM 1회 판단 + 결과 파싱)
 - Validation target:
-  - 동일 도메인/유사 태스크 재실행 시 planner 대신 skill 경로를 사용할 수 있음
+  - 20개 아이템 입력 시 VLM 호출 1회로 Y/N 결과를 반환하는 테스트 통과
 - Non-goals this week:
-  - 배치 검증, Canvas 전용 경로
+  - Canvas 전용 경로
 
 ## 1) Purpose
 
