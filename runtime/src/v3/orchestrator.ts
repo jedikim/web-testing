@@ -20,6 +20,8 @@ export interface OrchestratorRuntime extends ExecutorBrowser {
   domExists(selector: string): Promise<boolean>;
   wait(ms: number): Promise<void>;
   getDOMClient(): DOMExtractClient;
+  gotoUrl?(url: string): Promise<void>;
+  goBack?(): Promise<void>;
 }
 
 export interface OrchestratorOptions {
@@ -38,6 +40,9 @@ export interface OrchestratorOptions {
   canvasMode?: 'off' | 'auto';
   canvasDetector?: CanvasDetector;
   canvasExecutor?: CanvasExecutor;
+  traversalEnabled?: boolean;
+  traversalMaxDepth?: number;
+  traversalBranchWidth?: number;
   filterScoreThreshold?: number;
 }
 
@@ -47,6 +52,8 @@ export interface StepExecutionTrace {
   usedPlanCache: boolean;
   usedActionCache: boolean;
   attempts: number;
+  traversalAttempts?: number;
+  traversalUsed?: boolean;
   failureReason?: string;
   verification: 'ok' | 'wrong' | 'failed';
 }
@@ -74,6 +81,9 @@ export class Orchestrator {
   private readonly canvasMode: 'off' | 'auto';
   private readonly canvasDetector?: CanvasDetector;
   private readonly canvasExecutor?: CanvasExecutor;
+  private readonly traversalEnabled: boolean;
+  private readonly traversalMaxDepth: number;
+  private readonly traversalBranchWidth: number;
   private readonly filterScoreThreshold: number;
 
   constructor(options: OrchestratorOptions) {
@@ -92,6 +102,9 @@ export class Orchestrator {
     this.canvasMode = options.canvasMode ?? 'off';
     this.canvasDetector = options.canvasDetector;
     this.canvasExecutor = options.canvasExecutor;
+    this.traversalEnabled = options.traversalEnabled ?? true;
+    this.traversalMaxDepth = Math.max(1, Math.floor(options.traversalMaxDepth ?? 3));
+    this.traversalBranchWidth = Math.max(1, Math.floor(options.traversalBranchWidth ?? 3));
     this.filterScoreThreshold = options.filterScoreThreshold ?? 0.5;
   }
 
@@ -151,6 +164,8 @@ export class Orchestrator {
     let usedActionCache = false;
     let failureReason: string | undefined;
     let lastVerification: 'ok' | 'wrong' | 'failed' = 'failed';
+    let traversalUsed = false;
+    let traversalAttempts = 0;
 
     const initialUrl = await runtime.getUrl();
     const cached = this.actionCache.lookup({
@@ -241,29 +256,44 @@ export class Orchestrator {
       lastVerification = verification;
 
       if (verification === 'ok') {
-        const entry: CacheEntry = {
-          domain,
-          urlPattern: preUrl,
-          taskType: step.targetDescription,
-          selector: action.selector,
-          actionType: action.actionType,
-          value: action.value,
-          keywordWeights: step.keywordWeights,
-          viewportXY: action.viewportXY,
-          viewportBbox: action.viewportBbox,
-          expectedResult: step.expectedResult,
-          postScreenshotPhash: postVisualHash,
-          successCount: 1
-        };
-        this.actionCache.store(entry);
+        this.storeSuccessfulAction(domain, step, preUrl, postVisualHash, action);
         return {
           stepIndex: step.stepIndex,
           targetDescription: step.targetDescription,
           usedPlanCache,
           usedActionCache,
           attempts: attempt,
+          traversalAttempts,
+          traversalUsed,
           verification
         };
+      }
+
+      const traversal = await this.tryTraversalSearch({
+        step,
+        runtime,
+        domain,
+        anchorUrl: preUrl,
+        currentAttempts: attempt
+      });
+      if (traversal.ok && traversal.action && traversal.postVisualHash) {
+        traversalUsed = true;
+        traversalAttempts += traversal.traversalAttempts;
+        this.storeSuccessfulAction(domain, step, preUrl, traversal.postVisualHash, traversal.action);
+        return {
+          stepIndex: step.stepIndex,
+          targetDescription: step.targetDescription,
+          usedPlanCache,
+          usedActionCache,
+          attempts: attempt,
+          traversalAttempts,
+          traversalUsed,
+          verification: 'ok'
+        };
+      }
+      if (traversal.traversalAttempts > 0) {
+        traversalUsed = true;
+        traversalAttempts += traversal.traversalAttempts;
       }
 
       const retry = this.retryPolicy.decide({
@@ -284,6 +314,8 @@ export class Orchestrator {
       usedPlanCache,
       usedActionCache,
       attempts: attempt,
+      traversalAttempts,
+      traversalUsed,
       failureReason,
       verification: lastVerification
     };
@@ -301,6 +333,131 @@ export class Orchestrator {
       value: step.value,
       viewportXY: step.targetViewportXY
     };
+  }
+
+  private async resolveActionCandidates(
+    step: StepPlan,
+    runtime: OrchestratorRuntime
+  ): Promise<Action[]> {
+    const nodes = await this.extractor.extract(runtime.getDOMClient());
+    const candidates = this.filter.filter(nodes, step.keywordWeights, Math.max(10, this.traversalBranchWidth * 3));
+    const actions: Action[] = [];
+    for (const candidate of candidates) {
+      const action = await this.actor.decide(step, [candidate]);
+      actions.push(action);
+    }
+    return actions;
+  }
+
+  private async tryTraversalSearch(input: {
+    step: StepPlan;
+    runtime: OrchestratorRuntime;
+    domain: string;
+    anchorUrl: string;
+    currentAttempts: number;
+  }): Promise<{ ok: boolean; action?: Action; postVisualHash?: string; traversalAttempts: number }> {
+    if (!this.traversalEnabled || input.step.actionType !== 'click') {
+      return { ok: false, traversalAttempts: 0 };
+    }
+
+    const candidates = await this.resolveActionCandidates(input.step, input.runtime);
+    if (candidates.length <= 1) {
+      return { ok: false, traversalAttempts: 0 };
+    }
+
+    const tried = new Set<string>();
+    const toKey = (action: Action): string => `${action.selector ?? 'none'}::${action.viewportXY?.join(',') ?? 'none'}`;
+    let traversalAttempts = 0;
+
+    for (let depth = 0; depth < this.traversalMaxDepth; depth += 1) {
+      const layer = candidates.filter((action) => !tried.has(toKey(action))).slice(0, this.traversalBranchWidth);
+      if (layer.length === 0) {
+        break;
+      }
+
+      for (const branchAction of layer) {
+        tried.add(toKey(branchAction));
+        traversalAttempts += 1;
+
+        const preUrl = await input.runtime.getUrl();
+        const preVisualHash = await input.runtime.getVisualHash();
+
+        try {
+          await this.executor.executeAction(branchAction, input.runtime);
+        } catch {
+          await this.restoreTraversalAnchor(input.runtime, input.anchorUrl);
+          continue;
+        }
+
+        await input.runtime.wait(300);
+        const postUrl = await input.runtime.getUrl();
+        const postVisualHash = await input.runtime.getVisualHash();
+        const verification = await this.verifier.verify({
+          expectedResult: input.step.expectedResult,
+          preUrl,
+          postUrl,
+          preVisualHash,
+          postVisualHash,
+          domExists: (selector) => input.runtime.domExists(selector)
+        });
+
+        if (verification === 'ok') {
+          return {
+            ok: true,
+            action: branchAction,
+            postVisualHash,
+            traversalAttempts
+          };
+        }
+
+        await this.restoreTraversalAnchor(input.runtime, input.anchorUrl);
+      }
+    }
+
+    return { ok: false, traversalAttempts };
+  }
+
+  private async restoreTraversalAnchor(runtime: OrchestratorRuntime, anchorUrl: string): Promise<void> {
+    const currentUrl = await runtime.getUrl();
+    if (currentUrl === anchorUrl) {
+      return;
+    }
+    if (runtime.goBack) {
+      try {
+        await runtime.goBack();
+        return;
+      } catch {
+        // fallthrough to gotoUrl
+      }
+    }
+    if (runtime.gotoUrl) {
+      await runtime.gotoUrl(anchorUrl);
+      return;
+    }
+  }
+
+  private storeSuccessfulAction(
+    domain: string,
+    step: StepPlan,
+    preUrl: string,
+    postVisualHash: string,
+    action: Action
+  ): void {
+    const entry: CacheEntry = {
+      domain,
+      urlPattern: preUrl,
+      taskType: step.targetDescription,
+      selector: action.selector,
+      actionType: action.actionType,
+      value: action.value,
+      keywordWeights: step.keywordWeights,
+      viewportXY: action.viewportXY,
+      viewportBbox: action.viewportBbox,
+      expectedResult: step.expectedResult,
+      postScreenshotPhash: postVisualHash,
+      successCount: 1
+    };
+    this.actionCache.store(entry);
   }
 
   private shouldUseCanvasPath(step: StepPlan, nodes: Awaited<ReturnType<DOMExtractor['extract']>>): boolean {

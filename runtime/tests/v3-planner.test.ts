@@ -26,11 +26,12 @@ describe('Week4 Planner', () => {
           keywordWeights: { 검색창: 1.0 }
         }
       ],
-      3
+      5,
+      9
     );
 
     expect(prompt).toContain('multi-step');
-    expect(prompt).toContain('최소 3개');
+    expect(prompt).toContain('최소 5개');
     expect(prompt).toContain('action_type은 click|type|wait');
   });
 
@@ -169,9 +170,11 @@ describe('Week4 Planner', () => {
       fakeScreenshot
     );
 
-    expect(calls.length).toBe(2);
-    expect(result.steps.length).toBeGreaterThanOrEqual(3);
-    expect(result.steps[0]?.targetDescription).toContain('스포츠');
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    expect(result.steps.length).toBeGreaterThanOrEqual(5);
+    expect(
+      /(스포츠|메뉴|카테고리)/.test(result.steps[0]?.targetDescription ?? '')
+    ).toBe(true);
   });
 
   it('uses deterministic multi-step fallback when expansion JSON is invalid', async () => {
@@ -198,7 +201,7 @@ describe('Week4 Planner', () => {
     });
 
     const result = await planner.plan('카테고리 이동 후 필터 적용하고 결과 확인해줘', fakeScreenshot);
-    expect(result.steps.length).toBe(3);
+    expect(result.steps.length).toBeGreaterThanOrEqual(5);
     expect(result.steps[0]?.targetDescription).toContain('상위 메뉴');
   });
 });

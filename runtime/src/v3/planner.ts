@@ -18,6 +18,8 @@ export interface PlannerOptions {
   model: PlannerModelClient;
   expansionEnabled?: boolean;
   minComplexSteps?: number;
+  maxComplexSteps?: number;
+  expansionRounds?: number;
 }
 
 export interface PlannerResult {
@@ -175,7 +177,12 @@ export function buildPlannerPrompt(task: string): string {
   ].join('\n');
 }
 
-export function buildPlannerExpansionPrompt(task: string, draftSteps: StepPlan[], minComplexSteps: number): string {
+export function buildPlannerExpansionPrompt(
+  task: string,
+  draftSteps: StepPlan[],
+  minComplexSteps: number,
+  maxComplexSteps: number
+): string {
   const normalizedTask = normalizePromptTask(task);
   const draft = draftSteps
     .map((step) => `${step.stepIndex}. ${step.actionType} - ${step.targetDescription}${step.value ? ` (${step.value})` : ''}`)
@@ -183,7 +190,7 @@ export function buildPlannerExpansionPrompt(task: string, draftSteps: StepPlan[]
   return [
     '당신은 웹 자동화 Planner입니다. 기존 draft를 더 세밀한 multi-step으로 확장하세요.',
     '규칙:',
-    `- 최소 ${minComplexSteps}개, 최대 7개 step`,
+    `- 최소 ${minComplexSteps}개, 최대 ${maxComplexSteps}개 step`,
     '- action_type은 click|type|wait만 사용',
     '- 중간 카테고리/필터/검증 단계를 생략하지 말 것',
     '- 각 step은 keyword_weights와 target_viewport_xy를 반드시 포함',
@@ -218,15 +225,31 @@ function parsePlannerSteps(raw: string): StepPlan[] {
   return [];
 }
 
-function isComplexTask(task: string): boolean {
+function taskComplexityScore(task: string): number {
   const normalized = task.replace(/\s+/g, ' ').trim().toLowerCase();
   if (!normalized) {
-    return false;
+    return 0;
   }
+  let score = 0;
   if (normalized.length >= 28) {
-    return true;
+    score += 1;
   }
-  return /(그리고|다음|그 후|중에서|이후|정렬|필터|카테고리|요약|menu|filter|sort|then|and)/i.test(normalized);
+  if (/(그리고|다음|그 후|중에서|이후|then|and)/i.test(normalized)) {
+    score += 2;
+  }
+  if (/(정렬|필터|가격|색상|조건|이하|이상|최저|최고|붉은색|빨강|red|sort|filter|price|color)/i.test(normalized)) {
+    score += 2;
+  }
+  if (/(카테고리|메뉴|경로|탭|category|menu|path|tab)/i.test(normalized)) {
+    score += 2;
+  }
+  if (/(요약|검증|비교|summary|verify|compare)/i.test(normalized)) {
+    score += 1;
+  }
+  if (/\b[a-z0-9-]+\.(com|net|kr|co\.kr)\b/i.test(normalized)) {
+    score += 1;
+  }
+  return score;
 }
 
 function ensureComplexFallbackSteps(steps: StepPlan[], minComplexSteps: number): StepPlan[] {
@@ -267,18 +290,65 @@ function ensureComplexFallbackSteps(steps: StepPlan[], minComplexSteps: number):
     expectedResult: seed.expectedResult ?? '화면 변화'
   };
 
-  return [prefix, middle, suffix].slice(0, minComplexSteps);
+  const tail: StepPlan[] = [
+    {
+      stepIndex: 4,
+      actionType: 'wait',
+      targetDescription: '결과 렌더링 대기',
+      keywordWeights: {
+        결과: 0.5,
+        로딩: 0.5
+      },
+      targetViewportXY: [0.5, 0.5],
+      expectedResult: '화면 변화'
+    },
+    {
+      stepIndex: 5,
+      actionType: 'click',
+      targetDescription: '결과 후보 확인 및 선택',
+      keywordWeights: {
+        결과: 0.5,
+        상품: 0.5
+      },
+      targetViewportXY: [0.55, 0.62],
+      expectedResult: '화면 변화'
+    },
+    {
+      stepIndex: 6,
+      actionType: 'click',
+      targetDescription: '최종 조건 충족 항목 검증',
+      keywordWeights: {
+        조건: 0.5,
+        검증: 0.5
+      },
+      targetViewportXY: [0.72, 0.2],
+      expectedResult: seed.expectedResult ?? '화면 변화'
+    }
+  ];
+
+  return [prefix, middle, suffix, ...tail].slice(0, minComplexSteps);
+}
+
+function reindexSteps(steps: StepPlan[], maxComplexSteps: number): StepPlan[] {
+  return steps.slice(0, Math.max(1, maxComplexSteps)).map((step, index) => ({
+    ...step,
+    stepIndex: index + 1
+  }));
 }
 
 export class Planner {
   private readonly model: PlannerModelClient;
   private readonly expansionEnabled: boolean;
   private readonly minComplexSteps: number;
+  private readonly maxComplexSteps: number;
+  private readonly expansionRounds: number;
 
   constructor(options: PlannerOptions) {
     this.model = options.model;
     this.expansionEnabled = options.expansionEnabled ?? true;
-    this.minComplexSteps = Math.max(3, Math.floor(options.minComplexSteps ?? 3));
+    this.minComplexSteps = Math.max(3, Math.floor(options.minComplexSteps ?? 5));
+    this.maxComplexSteps = Math.max(this.minComplexSteps, Math.floor(options.maxComplexSteps ?? 9));
+    this.expansionRounds = Math.max(1, Math.floor(options.expansionRounds ?? 2));
   }
 
   async plan(task: string, screenshot: PlannerImageInput): Promise<PlannerResult> {
@@ -296,24 +366,34 @@ export class Planner {
       throw new Error('planner returned no executable steps');
     }
 
-    if (this.expansionEnabled && isComplexTask(task) && steps.length < this.minComplexSteps) {
-      try {
-        const expandPrompt = buildPlannerExpansionPrompt(task, steps, this.minComplexSteps);
-        const expandedRaw = await this.model.generate({
-          prompt: expandPrompt,
-          image: screenshot
-        });
-        const expanded = parsePlannerSteps(expandedRaw);
-        if (expanded.length >= this.minComplexSteps) {
-          steps = expanded;
-        } else {
-          steps = ensureComplexFallbackSteps(steps, this.minComplexSteps);
+    const complexity = taskComplexityScore(task);
+    const desiredMinSteps =
+      complexity >= 6 ? Math.max(this.minComplexSteps, 6) : complexity >= 4 ? Math.max(this.minComplexSteps, 5) : complexity >= 2 ? 4 : 2;
+
+    const shouldExpand = this.expansionEnabled && (complexity >= 2 || (steps.length <= 1 && task.length >= 20));
+
+    if (shouldExpand && steps.length < desiredMinSteps) {
+      for (let round = 0; round < this.expansionRounds && steps.length < desiredMinSteps; round += 1) {
+        try {
+          const expandPrompt = buildPlannerExpansionPrompt(task, steps, desiredMinSteps, this.maxComplexSteps);
+          const expandedRaw = await this.model.generate({
+            prompt: expandPrompt,
+            image: screenshot
+          });
+          const expanded = parsePlannerSteps(expandedRaw);
+          if (expanded.length > steps.length) {
+            steps = expanded;
+          }
+        } catch {
+          // keep current draft and continue to deterministic fallback
         }
-      } catch {
-        steps = ensureComplexFallbackSteps(steps, this.minComplexSteps);
+      }
+
+      if (steps.length < desiredMinSteps) {
+        steps = ensureComplexFallbackSteps(steps, desiredMinSteps);
       }
     }
 
-    return { screenState, steps };
+    return { screenState, steps: reindexSteps(steps, this.maxComplexSteps) };
   }
 }

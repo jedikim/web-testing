@@ -166,6 +166,19 @@
   - `typecheck` 통과
   - Jimp 관련 회귀 테스트 통과:
     - `tests/composite-sheet.test.ts`
-    - `tests/repeated-item-judgement.test.ts`
-    - `tests/assistantless-chat-e2e.test.ts`
-    - `tests/v3-batch-verifier.test.ts`
+  - `tests/repeated-item-judgement.test.ts`
+  - `tests/assistantless-chat-e2e.test.ts`
+  - `tests/v3-batch-verifier.test.ts`
+
+## Post Week 9 Enhancement: Multi-Step + Tree Traversal
+
+- Planner
+  - 복잡 태스크에서 최소 step 수를 고정 3이 아니라 동적으로 산정(최대 9)
+  - 1차 LVM 응답이 짧으면 2차 이상 확장 호출로 재분해
+  - 확장 실패 시에도 결정론적 5+ step fallback 생성
+- Orchestrator
+  - step 실패 시 대체 후보를 트리 형태(브랜치 폭/깊이 제한)로 탐색
+  - 가능한 경우 `goBack`/`gotoUrl`로 앵커 URL 복귀 후 다음 브랜치 시도
+- Tests
+  - `runtime/tests/v3-planner.test.ts` 확장
+  - `runtime/tests/v3-tree-traversal.test.ts` 신규

@@ -166,6 +166,19 @@
   - `typecheck` passed
   - Jimp regression tests passed:
     - `tests/composite-sheet.test.ts`
-    - `tests/repeated-item-judgement.test.ts`
-    - `tests/assistantless-chat-e2e.test.ts`
-    - `tests/v3-batch-verifier.test.ts`
+  - `tests/repeated-item-judgement.test.ts`
+  - `tests/assistantless-chat-e2e.test.ts`
+  - `tests/v3-batch-verifier.test.ts`
+
+## Post Week 9 Enhancement: Multi-Step + Tree Traversal
+
+- Planner
+  - Dynamic minimum step target for complex tasks (not fixed to 3; up to 9)
+  - Multi-pass expansion when first LVM output is too short
+  - Deterministic 5+ step fallback when expansion parsing fails
+- Orchestrator
+  - Tree-style branch traversal on unresolved click steps (bounded depth/width)
+  - Anchor restoration via `goBack`/`gotoUrl` when available
+- Tests
+  - Extended `runtime/tests/v3-planner.test.ts`
+  - Added `runtime/tests/v3-tree-traversal.test.ts`
