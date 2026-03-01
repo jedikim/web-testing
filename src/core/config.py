@@ -1,0 +1,418 @@
+"""Unified configuration loader — YAML → dataclass mapping.
+
+Aggregates all engine configuration (stealth, behavior, navigation, retry)
+into a single ``EngineConfig`` that can be loaded from ``config/settings.yaml``
+or constructed programmatically.
+"""
+from __future__ import annotations
+
+import logging
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from src.core.checkpoint import CheckpointConfig
+from src.learning.replay_store import AdaptiveConfig
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_SETTINGS_PATH = "config/settings.yaml"
+
+
+# ── Stealth ──────────────────────────────────────────
+
+_VALID_STEALTH_LEVELS = ("minimal", "standard", "aggressive")
+
+
+@dataclass(frozen=True)
+class StealthConfig:
+    """Browser stealth configuration.
+
+    Attributes:
+        enabled: Whether stealth patches are applied.
+        level: Stealth level — minimal | standard | aggressive.
+        suppress_webdriver: Remove ``navigator.webdriver`` flag.
+        suppress_chrome_runtime: Spoof ``chrome.runtime``.
+        randomize_viewport: Add small viewport jitter.
+        viewport_jitter_px: Maximum jitter pixels (each axis).
+        user_agent: Custom user-agent string (None = auto-rotate).
+        locale: Browser locale.
+        timezone_id: Browser timezone.
+    """
+
+    enabled: bool = True
+    level: str = "standard"
+    suppress_webdriver: bool = True
+    suppress_chrome_runtime: bool = True
+    randomize_viewport: bool = True
+    viewport_jitter_px: int = 10
+    user_agent: str | None = None
+    locale: str = "ko-KR"
+    timezone_id: str = "Asia/Seoul"
+
+    def __post_init__(self) -> None:
+        if self.level not in _VALID_STEALTH_LEVELS:
+            raise ValueError(
+                f"Invalid stealth level {self.level!r}; "
+                f"must be one of {_VALID_STEALTH_LEVELS}"
+            )
+
+
+# ── Human Behavior ───────────────────────────────────
+
+
+@dataclass(frozen=True)
+class BehaviorConfig:
+    """Human-like behavior simulation configuration.
+
+    Attributes:
+        enabled: Whether human-behavior simulation is active.
+        mouse_movement: Enable Bézier-curve mouse movement.
+        typing_delay_ms: Per-character typing delay range (min, max).
+        click_delay_ms: Pre-click hover delay range (min, max).
+        step_delay_jitter: Fractional jitter applied to inter-step waits.
+        scroll_smooth: Enable smooth incremental scrolling.
+        scroll_step_px: Pixels per scroll increment.
+    """
+
+    enabled: bool = True
+    mouse_movement: bool = True
+    typing_delay_ms: tuple[int, int] = (50, 150)
+    click_delay_ms: tuple[int, int] = (100, 300)
+    step_delay_jitter: float = 0.3
+    scroll_smooth: bool = True
+    scroll_step_px: int = 100
+
+
+# ── Navigation ───────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class NavigationConfig:
+    """Navigation intelligence configuration.
+
+    Attributes:
+        homepage_first: Visit root domain before deep URLs.
+        respect_robots_txt: Honour robots.txt rules.
+        rate_limit_ms: Minimum ms between navigations to the same domain.
+        referrer_chain: Set previous page as Referer header.
+    """
+
+    homepage_first: bool = True
+    respect_robots_txt: bool = True
+    rate_limit_ms: int = 2000
+    referrer_chain: bool = True
+
+
+# ── Retry ────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class RetryConfig:
+    """Adaptive retry and replanning configuration.
+
+    Attributes:
+        backoff_base_ms: Base delay for exponential backoff.
+        backoff_max_ms: Maximum backoff delay.
+        jitter_ratio: Fractional jitter (± ratio * delay).
+        max_consecutive_failures: Circuit-breaker threshold.
+        enable_replanning: Allow LLM to replan remaining steps on failure.
+    """
+
+    backoff_base_ms: int = 500
+    backoff_max_ms: int = 10_000
+    jitter_ratio: float = 0.3
+    max_consecutive_failures: int = 3
+    enable_replanning: bool = True
+
+
+# ── LLM ─────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class LLMConfig:
+    """LLM provider and model configuration.
+
+    Attributes:
+        provider: LLM provider name ('gemini' or 'openai').
+        flash_model: Tier-1 (fast/cheap) model name.
+        pro_model: Tier-2 (capable) model name.
+    """
+
+    provider: str = "gemini"
+    flash_model: str = field(
+        default_factory=lambda: os.environ.get("GEMINI_FLASH_MODEL", "gemini-3-flash-preview"),
+    )
+    pro_model: str = field(
+        default_factory=lambda: os.environ.get("GEMINI_PRO_MODEL", "gemini-3.1-pro-preview"),
+    )
+
+
+# ── Candidate Filter ────────────────────────────────
+
+
+@dataclass(frozen=True)
+class CandidateFilterStage1Config:
+    """Stage 1 (structural) filter configuration.
+
+    Attributes:
+        enabled: Whether structural filtering is active.
+        max_candidates: Maximum candidates after Stage 1.
+    """
+
+    enabled: bool = True
+    max_candidates: int = 80
+
+
+@dataclass(frozen=True)
+class CandidateFilterStage2Config:
+    """Stage 2 (vector) ranker configuration.
+
+    Attributes:
+        enabled: Whether vector ranking is active.
+        embedder: Embedder backend name.
+        model: HuggingFace model ID for embeddings.
+        top_k: Number of results to return from vector search.
+        vector_threshold: Minimum candidate count to trigger Stage 2.
+    """
+
+    enabled: bool = False
+    embedder: str = "fastembed"
+    model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    top_k: int = 10
+    vector_threshold: int = 15
+
+
+@dataclass(frozen=True)
+class CandidateFilterConfig:
+    """2-stage candidate filter configuration.
+
+    Attributes:
+        stage1: Structural filter settings.
+        stage2: Vector ranker settings.
+    """
+
+    stage1: CandidateFilterStage1Config = field(
+        default_factory=CandidateFilterStage1Config,
+    )
+    stage2: CandidateFilterStage2Config = field(
+        default_factory=CandidateFilterStage2Config,
+    )
+
+
+# ── V3 Pipeline ────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class V3PipelineConfig:
+    """V3 pipeline configuration.
+
+    Attributes:
+        enabled: Use v3 pipeline instead of legacy LLMFirstOrchestrator.
+        filter_score_threshold: Score threshold for Actor vs viewport path.
+        max_retry_per_step: Maximum retries per step.
+        max_replan: Maximum replan attempts.
+        cache_ttl_days: Cache entry time-to-live in days.
+    """
+
+    enabled: bool = True
+    filter_score_threshold: float = 0.5
+    max_retry_per_step: int = 3
+    max_replan: int = 2
+    cache_ttl_days: int = 30
+
+
+# ── Canvas ─────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class CanvasConfig:
+    """Canvas vision-only path configuration.
+
+    Attributes:
+        enabled: Enable Canvas page detection and vision-only execution.
+        canvas_threshold: DOM element count threshold for Canvas detection.
+    """
+
+    enabled: bool = True
+    canvas_threshold: int = 5
+
+
+# ── Aggregate Config ─────────────────────────────────
+
+
+@dataclass
+class EngineConfig:
+    """Root configuration aggregating all sub-configs."""
+
+    stealth: StealthConfig = field(default_factory=StealthConfig)
+    behavior: BehaviorConfig = field(default_factory=BehaviorConfig)
+    navigation: NavigationConfig = field(default_factory=NavigationConfig)
+    retry: RetryConfig = field(default_factory=RetryConfig)
+    checkpoint: CheckpointConfig = field(default_factory=CheckpointConfig)
+    adaptive: AdaptiveConfig = field(default_factory=AdaptiveConfig)
+    llm: LLMConfig = field(default_factory=LLMConfig)
+    candidate_filter: CandidateFilterConfig = field(
+        default_factory=CandidateFilterConfig,
+    )
+    v3_pipeline: V3PipelineConfig = field(
+        default_factory=V3PipelineConfig,
+    )
+    canvas: CanvasConfig = field(default_factory=CanvasConfig)
+
+
+# ── Loader ───────────────────────────────────────────
+
+
+def _to_tuple_int(val: Any) -> tuple[int, int]:
+    """Convert a list/tuple value to a ``tuple[int, int]``."""
+    if isinstance(val, (list, tuple)) and len(val) == 2:
+        return (int(val[0]), int(val[1]))
+    return (int(val), int(val))
+
+
+def load_config(path: str = _DEFAULT_SETTINGS_PATH) -> EngineConfig:
+    """Load engine configuration from a YAML file.
+
+    Missing sections fall back to dataclass defaults.
+
+    Args:
+        path: Path to the YAML settings file.
+
+    Returns:
+        A populated ``EngineConfig`` instance.
+    """
+    config_path = Path(path)
+    if not config_path.exists():
+        logger.warning("Settings file not found: %s — using defaults", path)
+        return EngineConfig()
+
+    with config_path.open("r", encoding="utf-8") as f:
+        raw: dict[str, Any] = yaml.safe_load(f) or {}
+
+    return _parse_config(raw)
+
+
+def _parse_config(raw: dict[str, Any]) -> EngineConfig:
+    """Parse raw YAML dict into EngineConfig."""
+    stealth_raw = raw.get("stealth", {})
+    behavior_raw = raw.get("human_behavior", {})
+    nav_raw = raw.get("navigation", {})
+    retry_raw = raw.get("retry", {})
+    checkpoint_raw = raw.get("checkpoint", {})
+
+    stealth = StealthConfig(
+        enabled=stealth_raw.get("enabled", True),
+        level=stealth_raw.get("level", "standard"),
+        suppress_webdriver=stealth_raw.get("suppress_webdriver", True),
+        suppress_chrome_runtime=stealth_raw.get("suppress_chrome_runtime", True),
+        randomize_viewport=stealth_raw.get("randomize_viewport", True),
+        viewport_jitter_px=stealth_raw.get("viewport_jitter_px", 10),
+        user_agent=stealth_raw.get("user_agent"),
+        locale=stealth_raw.get("locale", "ko-KR"),
+        timezone_id=stealth_raw.get("timezone_id", "Asia/Seoul"),
+    ) if stealth_raw else StealthConfig()
+
+    behavior = BehaviorConfig(
+        enabled=behavior_raw.get("enabled", True),
+        mouse_movement=behavior_raw.get("mouse_movement", True),
+        typing_delay_ms=_to_tuple_int(
+            behavior_raw.get("typing_delay_ms", [50, 150])
+        ),
+        click_delay_ms=_to_tuple_int(
+            behavior_raw.get("click_delay_ms", [100, 300])
+        ),
+        step_delay_jitter=float(behavior_raw.get("step_delay_jitter_ratio", 0.3)),
+        scroll_smooth=behavior_raw.get("scroll_smooth", True),
+        scroll_step_px=behavior_raw.get("scroll_step_px", 100),
+    ) if behavior_raw else BehaviorConfig()
+
+    navigation = NavigationConfig(
+        homepage_first=nav_raw.get("homepage_first", True),
+        respect_robots_txt=nav_raw.get("respect_robots_txt", True),
+        rate_limit_ms=nav_raw.get("rate_limit_per_domain_ms", 2000),
+        referrer_chain=nav_raw.get("referrer_chain", True),
+    ) if nav_raw else NavigationConfig()
+
+    retry = RetryConfig(
+        backoff_base_ms=retry_raw.get("backoff_base_ms", 500),
+        backoff_max_ms=retry_raw.get("backoff_max_ms", 10_000),
+        jitter_ratio=float(retry_raw.get("jitter_ratio", 0.3)),
+        max_consecutive_failures=retry_raw.get("max_consecutive_failures", 3),
+        enable_replanning=retry_raw.get("enable_replanning", True),
+    ) if retry_raw else RetryConfig()
+
+    checkpoint = CheckpointConfig(
+        go_threshold=float(checkpoint_raw.get("go_threshold", 0.8)),
+        ask_threshold=float(checkpoint_raw.get("ask_threshold", 0.5)),
+        enabled=checkpoint_raw.get("enabled", True),
+    ) if checkpoint_raw else CheckpointConfig()
+
+    adaptive_raw = raw.get("adaptive", {})
+    adaptive = AdaptiveConfig(
+        min_successes=adaptive_raw.get("min_successes", 3),
+        enabled=adaptive_raw.get("enabled", True),
+    ) if adaptive_raw else AdaptiveConfig()
+
+    llm_raw = raw.get("llm", {})
+    llm = LLMConfig(
+        provider=llm_raw.get("provider", "gemini"),
+        flash_model=llm_raw.get("tier1_model", "gemini-3-flash-preview"),
+        pro_model=llm_raw.get("tier2_model", "gemini-3.1-pro-preview"),
+    ) if llm_raw else LLMConfig()
+
+    cf_raw = raw.get("candidate_filter", {})
+    if cf_raw:
+        s1_raw = cf_raw.get("stage1", {})
+        s2_raw = cf_raw.get("stage2", {})
+        candidate_filter = CandidateFilterConfig(
+            stage1=CandidateFilterStage1Config(
+                enabled=s1_raw.get("enabled", True),
+                max_candidates=s1_raw.get("max_candidates", 80),
+            ),
+            stage2=CandidateFilterStage2Config(
+                enabled=s2_raw.get("enabled", False),
+                embedder=s2_raw.get("embedder", "fastembed"),
+                model=s2_raw.get(
+                    "model",
+                    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                ),
+                top_k=s2_raw.get("top_k", 10),
+                vector_threshold=s2_raw.get("vector_threshold", 15),
+            ),
+        )
+    else:
+        candidate_filter = CandidateFilterConfig()
+
+    v3_raw = raw.get("v3_pipeline", {})
+    v3_pipeline = V3PipelineConfig(
+        enabled=v3_raw.get("enabled", True),
+        filter_score_threshold=float(
+            v3_raw.get("filter_score_threshold", 0.5),
+        ),
+        max_retry_per_step=v3_raw.get("max_retry_per_step", 3),
+        max_replan=v3_raw.get("max_replan", 2),
+        cache_ttl_days=v3_raw.get("cache_ttl_days", 30),
+    ) if v3_raw else V3PipelineConfig()
+
+    canvas_raw = raw.get("canvas", {})
+    canvas = CanvasConfig(
+        enabled=canvas_raw.get("enabled", True),
+        canvas_threshold=canvas_raw.get("canvas_threshold", 5),
+    ) if canvas_raw else CanvasConfig()
+
+    return EngineConfig(
+        stealth=stealth,
+        behavior=behavior,
+        navigation=navigation,
+        retry=retry,
+        checkpoint=checkpoint,
+        adaptive=adaptive,
+        llm=llm,
+        candidate_filter=candidate_filter,
+        v3_pipeline=v3_pipeline,
+        canvas=canvas,
+    )

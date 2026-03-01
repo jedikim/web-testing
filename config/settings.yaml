@@ -1,0 +1,155 @@
+# Engine settings for the adaptive web automation engine
+# See docs/PRD.md and docs/ARCHITECTURE.md for design context.
+
+environment: development  # development | staging | production
+
+# Engine-level settings
+engine:
+  max_retries: 3
+  step_timeout_ms: 30000
+  budget_limit_usd: 0.05
+
+# Browser settings
+browser:
+  headless: true
+  viewport:
+    width: 1920
+    height: 1080
+  viewport_width: 1920
+  viewport_height: 1080
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  default_timeout_ms: 30000
+  navigation_timeout_ms: 60000
+
+# LLM settings
+llm:
+  provider: "gemini"  # gemini | openai
+  tier1_model: "gemini-3-flash-preview"
+  tier2_model: "gemini-3.1-pro-preview"
+  confidence_threshold: 0.7
+  max_tokens: 4096
+  tier1:
+    model: "gemini-3-flash-preview"
+    max_tokens: 1000
+    temperature: 0.1
+    timeout_ms: 10000
+  tier2:
+    model: "gemini-3.1-pro-preview"
+    max_tokens: 2000
+    temperature: 0.2
+    timeout_ms: 20000
+
+# Vision settings
+vision:
+  yolo_model: "yolo26l.pt"
+  yolo_confidence: 0.5
+  vlm_tier1: "gemini-3-flash-preview"
+  vlm_tier2: "gemini-3.1-pro-preview"
+  yolo:
+    model_size: "l"  # s|m|l|x
+    confidence_threshold: 0.5
+    iou_threshold: 0.5
+  vlm_flash:
+    model: "gemini-3-flash-preview"
+    timeout_ms: 15000
+  vlm_pro:
+    model: "gemini-3.1-pro-preview"
+    timeout_ms: 30000
+
+# Escalation settings
+escalation:
+  max_retries_per_step: 3
+  max_retries_per_task: 10
+
+# Learning / rule promotion settings
+learning:
+  pattern_min_success: 3
+  pattern_min_ratio: 0.8
+  promotion_check_interval: 5
+
+rule_promotion:
+  success_threshold: 3
+  confidence_min: 0.8
+
+# Cost budget
+budget:
+  per_task_usd: 0.05
+  per_step_usd: 0.01
+  monthly_tier2_usd: 50.0
+
+# Memory settings
+memory:
+  data_dir: "data"
+  artifact_ttl_hours: 24
+  max_episode_size_mb: 10
+  working_max_tokens: 2000
+  episode_max_tokens: 5000
+
+# Image batching settings
+image_batching:
+  max_tiles: 16
+  canvas_max_size: [2400, 1600]
+  default_strategy: "grid"  # grid|strip|focus_crop
+
+# Database
+database:
+  type: "sqlite"  # sqlite | postgresql
+  path: "data/patterns.db"
+
+# Stealth settings (browser anti-detection)
+stealth:
+  enabled: true
+  level: "standard"  # minimal | standard | aggressive
+  locale: "ko-KR"
+  timezone_id: "Asia/Seoul"
+
+# Human-like behavior simulation
+human_behavior:
+  enabled: true
+  mouse_movement: true
+  typing_delay_ms: [50, 150]
+  click_delay_ms: [100, 300]
+  step_delay_jitter_ratio: 0.3
+
+# Navigation intelligence
+navigation:
+  homepage_first: true
+  respect_robots_txt: true
+  rate_limit_per_domain_ms: 2000
+
+# Retry & replanning
+retry:
+  backoff_base_ms: 500
+  backoff_max_ms: 10000
+  jitter_ratio: 0.3
+  max_consecutive_failures: 3
+  enable_replanning: true
+
+# Screenshot checkpoint gating
+checkpoint:
+  go_threshold: 0.8
+  ask_threshold: 0.5
+  enabled: true
+
+# Adaptive replay caching
+adaptive:
+  min_successes: 3
+  enabled: true
+
+# Candidate filter — 2-stage element reduction
+candidate_filter:
+  stage1:
+    enabled: true
+    max_candidates: 80
+  stage2:
+    enabled: false  # set true after: pip install -e ".[embeddings]"
+    embedder: "fastembed"
+    model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    top_k: 10
+    vector_threshold: 15
+
+# Logging
+logging:
+  level: "INFO"
+  format: "json"
+  pii_masking: true

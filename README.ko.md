@@ -1,152 +1,292 @@
-> Language: [English](./README.md) | [한국어](./README.ko.md)
+# Web-Agentic — 자가 진화형 적응형 웹 자동화 엔진
 
-# Adaptive Web Automation Core
+> **[English Version](./README.md)**
 
-최종 업데이트: 2026-02-25 (KST)
+**LLM이 의사결정의 주체**인 적응형 웹 자동화 엔진입니다. LLM이 사용자 의도를 분석하고, 실행 계획을 수립하며, DOM 요소를 선택합니다. 성공한 셀렉터는 캐시되어 반복 실행 시 비용이 발생하지 않습니다. 자동화가 실패하면 **자가 진화 엔진**이 실패 패턴을 자동으로 분석하고, 코드 수정을 생성한 후, 사람의 승인을 거쳐 머지합니다.
 
-이 저장소는 외부 AI 비서 프로젝트가 호출하는 웹 자동화 코어를 제공합니다.
-핵심 방향:
-1. 결정론 우선 실행
-2. 제한된 LLM 폴백
-3. 민감 구간 스크린샷 기반 human handoff
-4. 버그/예외 트리거 기반 자가개선(신규 요구마다 자동 실행 아님)
+### 핵심 차별점
 
-법적 안전 기본값:
-- 캡차/2FA/보안 챌린지 자동 우회 금지
-- 보안 챌린지 발생 시 즉시 사람 입력으로 전환
+- **LLM-First**: LLM이 의도 분석, 실행 계획, 요소 선택의 주체입니다. 규칙은 캐시 역할을 하며, 의사결정의 주 경로가 아닙니다.
+- **자가 진화**: 자동화 실패 시 시스템이 자동으로 실패 패턴을 분석하고, Gemini Pro를 통해 코드 수정을 생성하며, Git 샌드박스에서 테스트한 후, 사람의 승인을 대기합니다.
+- **스마트 캐싱**: 첫 실행은 LLM을 사용(~$0.02/태스크)하고, 반복 실행은 캐시를 히트(~$0.005/태스크)합니다.
+- **비전 폴백**: LLM 신뢰도가 0.7 미만이면 YOLO/VLM 시각적 그라운딩이 작동합니다.
+- **스텔스 & 휴먼 시뮬레이션**: 봇 탐지 방어 JS 패치 (3단계), 베지어 곡선 마우스 이동, 자연스러운 타이핑 딜레이, 스마트 네비게이션으로 봇 감지를 우회합니다.
+- **적응형 재시도**: FallbackRouter 기반 지수 백오프와 에스컬레이션 체인(재시도 → LLM → 비전 → Human Handoff) 및 연속 실패 시 자동 재계획을 지원합니다.
+- **인간 참여형**: CAPTCHA, 인증, 진화 승인은 반드시 사람의 개입이 필요합니다.
 
-## 범위 경계
+---
 
-이 저장소가 담당하는 것:
-- 웹 자동화 런타임, 세션 계약, 복구/폴백, E2E 시뮬레이션
-- 채팅형 백엔드 샘플, SDK 임베딩 API
-
-이 저장소가 담당하지 않는 것:
-- 운영용 Slack/Telegram webhook 라우팅
-- 운영 계정/비밀키 정책 관리 체계
-
-## 핵심 기능
-
-1. 결정론 워크플로우 엔진(`rule-first`)
-2. Similo fingerprint 기반 selector 선행 복구(LLM patch 이전)
-3. Cascaded LLM 라우팅(`flash 우선 -> 불확실/민감 게이트 -> pro -> rule fallback`)
-4. 반복 태스크용 semantic replay + plan cache 재사용/적응
-5. self-healing taxonomy 기반 실패 분류 + 제안 액션
-6. 반복 아이템 시각 체인(`합성 이미지 -> YOLO26 -> VLM fallback -> 역매핑`)
-7. 채팅 자동화 백엔드 샘플:
-   - headful/headless 선택
-   - SSE 실시간 진행 로그
-   - pause/resume/cancel
-   - captcha handoff 입력
-   - 이미지 첨부
-8. 진화 백엔드(`git worktree` 격리 + 승인 기반 승격)
-
-## 아키텍처
+## 시스템 개요
 
 ```mermaid
-flowchart LR
-    U[사용자 / 외부 AI 비서] --> C[Chat 또는 Backend API]
-    C --> S[Session Store]
-    C --> T[Turn Engine]
-    T --> D[Deterministic Runtime]
-    D --> F[Fallback and Recovery]
-    F --> H[Human Handoff]
-    D --> E[Bug/Exception 기반 Evolution Trigger]
-    E --> W[Worktree Candidate + Test/Fix Loop]
+graph TB
+    A["사용자 의도"] --> B["LLM 플래너"]
+    B --> C{"셀렉터 캐시"}
+    C -->|히트| F["실행 (Playwright)"]
+    C -->|미스| D["DOM 추출"]
+    D --> E["LLM 요소 선택"]
+    E --> F
+    F --> G{"검증"}
+    G -->|성공| H["캐시 저장"]
+    G -->|실패| I["비전 폴백 (YOLO/VLM)"]
+    I --> F
+    H --> J["시나리오 결과"]
+    J --> K["진화 엔진"]
+
+    subgraph Evolution ["자가 진화 파이프라인"]
+        K --> L["실패 분석"]
+        L --> M["수정 생성 (Gemini Pro)"]
+        M --> N["샌드박스 테스트"]
+        N --> O{"사람 검토"}
+        O -->|승인| P["머지 + 태그"]
+        O -->|거절| Q["브랜치 삭제"]
+    end
+
+    style Evolution fill:#f0f4ff,stroke:#4a6fa5
 ```
+
+---
 
 ## 빠른 시작
 
+### 사전 요구사항
+
+- Python 3.11+
+- Node.js 18+ (진화 UI용)
+- Google Gemini API 키
+
+### 설치 및 실행
+
 ```bash
-cd runtime
+# 클론
+git clone https://github.com/jedikim/web-agentic.git
+cd web-agentic
+
+# 백엔드 설치 (모든 선택적 의존성 포함)
+pip install -e ".[dev,server,vision,learning]"
+python -m playwright install chromium
+
+# API 키 설정
+export GEMINI_API_KEY="your-key"
+
+# API 서버 시작
+python scripts/start_server.py  # localhost:8000
+
+# 진화 UI 시작 (별도 터미널)
+cd evolution-ui
 npm install
-npx playwright install chromium
-cp .env.example .env
-npm run typecheck
-npm test
+npm run dev  # localhost:5173
 ```
 
-## 실행 방법
-
-### 모드 A: Backend Simple
+### 최소 설치 (자동화만, 진화 엔진 없이)
 
 ```bash
-cd runtime
-npm run backend:simple:server
+pip install -e ".[dev]"
+python -m playwright install chromium
 ```
 
-- Health: `http://127.0.0.1:4888/health`
-- UI 샘플: `http://127.0.0.1:4888/backend/ui`
+### SDK 빠른 시작
 
-### 모드 B: Chat Automation Example Backend
+```python
+from src.web_agent import WebAgent
+
+async with WebAgent(headless=True, stealth_level="standard") as agent:
+    await agent.goto("https://example.com")
+    result = await agent.run("More information 링크 클릭")
+    print(f"성공: {result.success}, 비용: ${result.total_cost_usd:.4f}")
+```
+
+---
+
+## 세션 API
+
+세션 API는 영구 브라우저 상태, 비용 추적, Human Handoff를 지원하는 멀티턴 자동화 세션을 제공합니다.
+
+| 메서드 | 엔드포인트 | 설명 |
+|--------|----------|------|
+| `POST` | `/api/sessions/` | 새 세션 생성 |
+| `POST` | `/api/sessions/{id}/turn` | 의도 실행 (멀티턴) |
+| `GET` | `/api/sessions/{id}/screenshot` | 현재 페이지 스크린샷 조회 |
+| `GET` | `/api/sessions/{id}/handoffs` | 대기 중인 Human Handoff 목록 |
+| `POST` | `/api/sessions/{id}/handoffs/{rid}/resolve` | Handoff 해결 |
+| `DELETE` | `/api/sessions/{id}` | 세션 종료 |
+| `POST` | `/api/run` | 원샷 실행 (세션 없이) |
+
+전체 요청/응답 상세는 [API 레퍼런스](./docs/API-REFERENCE.ko.md)를 참조하세요.
+
+---
+
+## 자동화 UI
+
+진화 UI(`evolution-ui/`)에 2개 페이지가 추가되었습니다:
+
+- **Automation** — 원샷 태스크 실행, 실시간 스텝 진행 및 비용 표시
+- **Sessions** — 멀티턴 세션 관리, 실시간 스크린샷 및 Handoff 처리
+
+---
+
+## 진화 파이프라인
+
+자가 진화 엔진은 실패를 자동 감지하고, 수정을 생성하며, 사람의 승인을 요청하는 상태 머신으로 동작합니다.
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING
+    PENDING --> ANALYZING
+    ANALYZING --> GENERATING
+    GENERATING --> TESTING
+
+    TESTING --> AWAITING_APPROVAL : 테스트 통과
+    TESTING --> ANALYZING : 테스트 실패, 재시도 < 1
+    TESTING --> FAILED : 테스트 실패, 재시도 소진
+
+    AWAITING_APPROVAL --> MERGED : 승인
+    AWAITING_APPROVAL --> REJECTED : 거절
+
+    MERGED --> [*]
+    REJECTED --> [*]
+    FAILED --> [*]
+```
+
+테스트 실패 시 분석과 코드 생성을 거쳐 1회 자동 재시도합니다. 재시도가 소진되면 FAILED 상태로 전환되어 수동 조사가 필요합니다.
+
+---
+
+## 프로젝트 구조
+
+```
+web-agentic/
+├── src/
+│   ├── core/           # 자동화 엔진
+│   │   ├── orchestrator.py       # 메인 루프 — LLM-First 에스컬레이션
+│   │   ├── llm_orchestrator.py   # LLM-First 오케스트레이터 + 재시도/재계획
+│   │   ├── executor.py           # Playwright 래퍼 (스텔스/행동 시뮬레이션)
+│   │   ├── executor_pool.py      # 세션 풀 (브라우저 재사용)
+│   │   ├── extractor.py          # DOM → 구조화 JSON
+│   │   ├── rule_engine.py        # 셀렉터 캐시 (기존 규칙 엔진)
+│   │   ├── verifier.py           # 액션 후 검증
+│   │   ├── fallback_router.py    # 실패 분류 + 에스컬레이션 체인
+│   │   ├── stealth.py            # 브라우저 봇 탐지 방어 패치
+│   │   ├── human_behavior.py     # 자연스러운 마우스/타이핑/스크롤
+│   │   ├── navigation.py         # 레이트리밋, robots.txt, 워밍
+│   │   └── config.py             # YAML → dataclass 설정 로더
+│   ├── ai/             # LLM 모듈
+│   │   ├── llm_planner.py        # Gemini Flash/Pro 플래너
+│   │   ├── prompt_manager.py     # 프롬프트 템플릿 버전 관리
+│   │   └── patch_system.py       # 구조화된 패치 생성
+│   ├── vision/         # 비전 모듈
+│   │   ├── yolo_detector.py      # YOLO 로컬 추론
+│   │   ├── vlm_client.py         # VLM API 클라이언트 (Gemini 멀티모달)
+│   │   ├── image_batcher.py      # 스크린샷 배칭/리사이즈
+│   │   └── coord_mapper.py       # 스크린샷 ↔ 페이지 좌표 매핑
+│   ├── learning/       # 학습 모듈
+│   │   ├── pattern_db.py         # 셀렉터 캐시 (SQLite, TTL 기반)
+│   │   ├── rule_promoter.py      # 캐시 저장 로직
+│   │   ├── dspy_optimizer.py     # DSPy 프롬프트 최적화
+│   │   └── memory_manager.py     # 4계층 메모리 시스템
+│   ├── workflow/       # 워크플로우 DSL
+│   │   ├── dsl_parser.py         # YAML 워크플로우 파서
+│   │   └── step_queue.py         # FIFO 스텝 큐
+│   ├── evolution/      # 자가 진화 엔진
+│   │   ├── pipeline.py           # 진화 사이클 상태 머신
+│   │   ├── analyzer.py           # 실패 패턴 감지
+│   │   ├── code_generator.py     # Gemini Pro 코드 수정 생성
+│   │   ├── sandbox.py            # Git 브랜치 격리 + 테스트
+│   │   ├── version_manager.py    # 버전 태깅, 머지, 롤백
+│   │   ├── db.py                 # 진화 DB (aiosqlite)
+│   │   └── notifier.py           # SSE 이벤트 브로드캐스터
+│   ├── web_agent.py              # SDK Facade (WebAgent)
+│   └── api/            # FastAPI 서버
+│       ├── session_db.py         # 세션 데이터베이스 (aiosqlite)
+│       ├── session_manager.py    # 세션 매니저 (라이브 세션 관리)
+│       ├── routes/
+│       │   ├── sessions.py       # 세션 API 라우트
+│       │   └── run.py            # 원샷 실행 API 라우트
+│       └── ...                   # REST 라우트 + 모델
+├── evolution-ui/       # React 19 + Vite + Tailwind CSS 대시보드
+│   ├── src/
+│   │   ├── pages/                # Dashboard, Evolutions, Scenarios, Versions, Automation, Sessions
+│   │   └── components/           # 공유 UI 컴포넌트
+│   └── package.json
+├── config/             # YAML 규칙, 동의어, 설정
+│   ├── rules/                    # 사전 정의 규칙 (캐시 시드)
+│   ├── synonyms.yaml             # 한국어/영어 동의어 사전
+│   └── settings.yaml             # 엔진 설정
+├── tests/              # 968개 테스트 (단위, 통합, E2E)
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+├── docs/               # 문서
+├── scripts/            # 유틸리티 스크립트
+├── data/               # 런타임 데이터 (gitignored)
+└── pyproject.toml
+```
+
+---
+
+## 테스트
+
+| 카테고리 | 테스트 수 | 명령어 |
+|---------|----------:|--------|
+| 단위 테스트 | 816 | `pytest tests/unit/` |
+| 통합 테스트 | 95 | `pytest tests/integration/` |
+| E2E 테스트 | 57 | `pytest tests/e2e/` |
+| **합계** | **968** | `pytest tests/` |
+
+### 빠른 품질 체크
 
 ```bash
-cd runtime
-npm run example:chat-backend
+ruff check --fix          # 린트
+mypy --strict             # 타입 체크
+pytest tests/ -q          # 전체 테스트
 ```
 
-- Health: `http://127.0.0.1:4999/example/chat/health`
-- Chat UI: `http://127.0.0.1:4999/example/chat/ui`
+---
 
-### 모드 C: SDK 임베딩
+## API 엔드포인트
 
-```bash
-cd runtime
-npm run example:sdk:basic
-npm run example:sdk:multiturn
-npm run example:sdk:auto-improve
-npm run example:sdk:human-handoff
-npm run example:repeated-item
-```
+FastAPI 서버(포트 8000)에서 제공하는 엔드포인트:
 
-## 환경 변수 핵심
+| 메서드 | 엔드포인트 | 설명 |
+|--------|----------|------|
+| `POST` | `/api/evolution/trigger` | 진화 사이클 시작 |
+| `GET` | `/api/evolution/` | 진화 목록 조회 |
+| `POST` | `/api/evolution/{id}/approve` | 진화 승인 → 머지 |
+| `POST` | `/api/evolution/{id}/reject` | 진화 거절 → 폐기 |
+| `POST` | `/api/scenarios/run` | 시나리오 실행 |
+| `GET` | `/api/scenarios/results` | 시나리오 결과 이력 |
+| `GET` | `/api/scenarios/trends` | 시나리오 트렌드 |
+| `GET` | `/api/versions/` | 버전 목록 |
+| `GET` | `/api/progress/stream` | SSE 실시간 이벤트 |
 
-- 지원 LLM provider: `gemini`, `openai`만 지원
-- 기본 Gemini 모델: `gemini-3.1-pro-preview,gemini-3.0-flash`
-- 기본 OpenAI 모델: `gpt-5.2-codex,gpt-5-mini`
-- YOLO26 기본 모델: `yolo26l`
+---
 
-주요 변수:
-- `BACKEND_AUTOMATION_MODEL`
-- `BACKEND_CASCADE_ESCALATION_MODEL`
-- `BACKEND_CASCADE_THRESHOLD`
-- `PLAN_CACHE_ENABLED`
-- `PLAN_CACHE_SIMILARITY_THRESHOLD`
-- `SIMILO_ENABLED`
+## 문서
 
-상세 설정:
-- [Environment Setup (EN)](./doc/CODEX-ENV-SETUP.en.md)
-- [환경설정 (KO)](./doc/CODEX-ENV-SETUP.md)
+| 문서 | 설명 |
+|------|------|
+| [자가 진화 엔진](./docs/EVOLUTION-ENGINE.ko.md) | 자가 진화 시스템 상세 문서 |
+| [API 레퍼런스](./docs/API-REFERENCE.ko.md) | REST API 엔드포인트, 모델, curl 예제 |
+| [테스트 가이드](./docs/TESTING-GUIDE.ko.md) | 테스트 카테고리, 명령어, 테스트 작성법 |
+| [진화 UI](./evolution-ui/README.ko.md) | React 대시보드 설정 및 페이지 |
+| [아키텍처](./docs/ARCHITECTURE.md) | 모듈별 아키텍처 상세 |
+| [PRD](./docs/PRD.md) | 제품 요구사항 정의서 |
+| [기술 기획서](./docs/web-automation-technical-spec-v2.md) | 전체 기술 기획서 (2,268줄) |
 
-## E2E 테스트 시작점
+---
 
-대표 명령:
+## 환경 변수
 
-```bash
-cd runtime
-npm run typecheck
-npm test
-npm run test:e2e:chat-ui:headful
-npm run test:e2e:kr:headful
-npm run test:e2e:assistantless:live
-npm run test:e2e:provider:live
-npm run test:e2e:autonomous:live
-```
+| 변수 | 필수 | 기본값 | 설명 |
+|------|------|--------|------|
+| `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY` | 예 | — | Google Gemini API 키 |
+| `GEMINI_FLASH_MODEL` | 아니오 | `gemini-3-flash-preview` | Tier-1 모델 (자동화, 빠르고 저렴) |
+| `GEMINI_PRO_MODEL` | 아니오 | `gemini-3.1-pro-preview` | Tier-2 모델 (코딩, 에스컬레이션) |
+| `YOLO_MODEL` | 아니오 | `yolo26l.pt` | YOLO 모델 가중치 파일 |
+| `VITE_API_PORT` | 아니오 | `8000` | UI 프록시용 API 포트 |
 
-live 플래그 의미:
-1. `RUN_KR_E2E=1`: 한국 사이트 live smoke 실행
-2. `RUN_ASSISTANTLESS_KR_E2E=1`: assistantless live 루프 실행
-3. `RUN_PROVIDER_LIVE_E2E=1`: 실제 provider matrix 실행(대상 모델이 env에 있어야 동작)
-4. `RUN_AUTONOMOUS_BATCH_E2E=1`: autonomous batch 실행 + `testing/autonomous-batch/`에 증적 저장
+---
 
-## 문서 안내
+## 라이선스
 
-문서 시작점:
-1. [Documentation Index (EN)](./doc/README.md)
-2. [문서 인덱스 (KO)](./doc/README.ko.md)
-
-자주 보는 문서:
-1. [Runbook (EN)](./doc/CODEX-RUNBOOK.en.md) | [런북 (KO)](./doc/CODEX-RUNBOOK.md)
-2. [Automation Test Plan (EN)](./doc/CODEX-AUTOMATION-TEST-PLAN.en.md) | [자동화 테스트 계획 (KO)](./doc/CODEX-AUTOMATION-TEST-PLAN.md)
-3. [E2E Testing Guide (EN)](./doc/CODEX-E2E-TESTING.en.md) | [E2E 테스트 가이드 (KO)](./doc/CODEX-E2E-TESTING.md)
-4. [SDK + Backend Usage (EN)](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [SDK + 백엔드 사용법 (KO)](./doc/CODEX-SDK-BACKEND-USAGE.md)
+MIT

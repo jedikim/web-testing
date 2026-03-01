@@ -1,152 +1,292 @@
-> Language: [English](./README.md) | [한국어](./README.ko.md)
+# Web-Agentic — Self-Evolving Adaptive Web Automation Engine
 
-# Adaptive Web Automation Core
+> **[한국어 버전 (Korean)](./README.ko.md)**
 
-Last Updated: 2026-02-25 (KST)
+An adaptive web automation engine where **the LLM is the decision-maker**. The LLM analyzes user intent, plans execution steps, and selects DOM elements. Successful selectors are cached for zero-cost repeated execution. When automation fails, the **self-evolution engine** automatically analyzes failure patterns, generates code fixes, and awaits human approval before merging.
 
-This repository provides the web-automation core for an external AI assistant project.
-It is designed for:
-1. deterministic-first web execution
-2. bounded LLM fallback
-3. screenshot-based human handoff for sensitive steps
-4. bug/exception-driven self-improvement (not per every new request)
+### Key Differentiators
 
-Legal-safe default:
-- no automatic captcha/2FA/security bypass
-- immediate handoff to human input on security challenges
+- **LLM-First**: The LLM analyzes intent, plans execution, and selects elements. Rules serve as a cache, not the primary decision path.
+- **Self-Evolving**: When automation fails, the system automatically analyzes failure patterns, generates code fixes via Gemini Pro, tests in a git sandbox, and awaits human approval before merging.
+- **Smart Caching**: First execution uses LLM (~$0.02/task), repeated executions hit cache (~$0.005/task).
+- **Vision Fallback**: When LLM confidence drops below 0.7, YOLO/VLM visual grounding kicks in.
+- **Stealth & Human Simulation**: Anti-detection JS patches (3 levels), Bézier-curve mouse movement, natural typing delays, and smart navigation to bypass bot detection.
+- **Adaptive Retry**: FallbackRouter-driven exponential backoff with escalation chains (retry → LLM → Vision → Human Handoff) and automatic replanning on consecutive failures.
+- **Human-in-the-Loop**: CAPTCHA, authentication, and evolution approvals always require human intervention.
 
-## Scope Boundary
+---
 
-In scope:
-- web automation runtime, session contracts, fallback/recovery, E2E simulation
-- chat-style backend sample and SDK for embedding
-
-Out of scope:
-- production Slack/Telegram bot routing and webhook orchestration
-- credential vault/policy management for production assistants
-
-## Core Capabilities
-
-1. Deterministic workflow engine (`rules first`)
-2. Selector recovery with Similo-style fingerprints before LLM patch fallback
-3. Cascaded LLM routing (`flash-first -> uncertainty/sensitive gate -> pro -> rule fallback`)
-4. Semantic replay + plan cache reuse/adaptation for repeated tasks
-5. Self-healing taxonomy for failure classification and suggested action
-6. Repeated-item visual chain (`composite image -> YOLO26 -> VLM fallback -> reverse mapping`)
-7. Chat automation backend sample with:
-   - headful/headless switch
-   - live logs/progress stream (SSE)
-   - pause/resume/cancel
-   - captcha handoff input
-   - image attachments
-8. Evolution backend for isolated candidate versions (`git worktree`) and approval-based promotion
-
-## Architecture
+## System Overview
 
 ```mermaid
-flowchart LR
-    U[Operator / External Assistant] --> C[Chat or Backend API]
-    C --> S[Session Store]
-    C --> T[Turn Engine]
-    T --> D[Deterministic Runtime]
-    D --> F[Fallback and Recovery]
-    F --> H[Human Handoff]
-    D --> E[Evolution Trigger on Bug/Exception]
-    E --> W[Worktree Candidate + Test/Fix Loop]
+graph TB
+    A["User Intent"] --> B["LLM Planner"]
+    B --> C{"Selector Cache"}
+    C -->|hit| F["Execute (Playwright)"]
+    C -->|miss| D["DOM Extract"]
+    D --> E["LLM Select Element"]
+    E --> F
+    F --> G{"Verify"}
+    G -->|success| H["Cache Save"]
+    G -->|failure| I["Vision Fallback (YOLO/VLM)"]
+    I --> F
+    H --> J["Scenario Results"]
+    J --> K["Evolution Engine"]
+
+    subgraph Evolution ["Self-Evolution Pipeline"]
+        K --> L["Analyze Failure"]
+        L --> M["Generate Fix (Gemini Pro)"]
+        M --> N["Test in Sandbox"]
+        N --> O{"Human Review"}
+        O -->|approve| P["Merge + Tag"]
+        O -->|reject| Q["Discard Branch"]
+    end
+
+    style Evolution fill:#f0f4ff,stroke:#4a6fa5
 ```
+
+---
 
 ## Quick Start
 
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+ (for Evolution UI)
+- Google Gemini API key
+
+### Install & Run
+
 ```bash
-cd runtime
+# Clone
+git clone https://github.com/jedikim/web-agentic.git
+cd web-agentic
+
+# Install backend (with all optional deps)
+pip install -e ".[dev,server,vision,learning]"
+python -m playwright install chromium
+
+# Set API key
+export GEMINI_API_KEY="your-key"
+
+# Start API server
+python scripts/start_server.py  # localhost:8000
+
+# Start Evolution UI (separate terminal)
+cd evolution-ui
 npm install
-npx playwright install chromium
-cp .env.example .env
-npm run typecheck
-npm test
+npm run dev  # localhost:5173
 ```
 
-## How to Run
-
-### Mode A: Backend Simple
+### Minimal Install (automation only, no evolution)
 
 ```bash
-cd runtime
-npm run backend:simple:server
+pip install -e ".[dev]"
+python -m playwright install chromium
 ```
 
-- Health: `http://127.0.0.1:4888/health`
-- UI sample: `http://127.0.0.1:4888/backend/ui`
+### SDK Quick Start
 
-### Mode B: Chat Automation Example Backend
+```python
+from src.web_agent import WebAgent
+
+# Standard usage (stealth enabled by default)
+async with WebAgent(headless=True, stealth_level="standard") as agent:
+    await agent.goto("https://example.com")
+    result = await agent.run("click the More information link")
+    print(f"Success: {result.success}, Cost: ${result.total_cost_usd:.4f}")
+```
+
+---
+
+## Session API
+
+The Session API provides multi-turn automation sessions with persistent browser state, cost tracking, and human handoff support.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/sessions/` | Create a new session |
+| `POST` | `/api/sessions/{id}/turn` | Execute an intent (multi-turn) |
+| `GET` | `/api/sessions/{id}/screenshot` | Get current page screenshot |
+| `GET` | `/api/sessions/{id}/handoffs` | List pending human handoffs |
+| `POST` | `/api/sessions/{id}/handoffs/{rid}/resolve` | Resolve a handoff |
+| `DELETE` | `/api/sessions/{id}` | Close session |
+| `POST` | `/api/run` | One-shot execution (no session) |
+
+See [API Reference](./docs/API-REFERENCE.md) for full request/response details.
+
+---
+
+## Automation UI
+
+The Evolution UI (`evolution-ui/`) now includes two additional pages:
+
+- **Automation** — One-shot task execution with real-time step progress and cost display
+- **Sessions** — Multi-turn session management with live screenshots and handoff handling
+
+---
+
+## Evolution Pipeline
+
+The self-evolution engine follows a state machine that automatically detects failures, generates fixes, and requests human approval.
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING
+    PENDING --> ANALYZING
+    ANALYZING --> GENERATING
+    GENERATING --> TESTING
+
+    TESTING --> AWAITING_APPROVAL : tests pass
+    TESTING --> ANALYZING : tests fail, retry < 1
+    TESTING --> FAILED : tests fail, retry exhausted
+
+    AWAITING_APPROVAL --> MERGED : approve
+    AWAITING_APPROVAL --> REJECTED : reject
+
+    MERGED --> [*]
+    REJECTED --> [*]
+    FAILED --> [*]
+```
+
+When tests fail, the engine retries once by looping back through analysis and code generation. After exhausting retries, it moves to the FAILED state for manual investigation.
+
+---
+
+## Project Structure
+
+```
+web-agentic/
+├── src/
+│   ├── core/           # Automation engine
+│   │   ├── llm_orchestrator.py   # LLM-First orchestrator + retry/replan
+│   │   ├── executor.py           # Playwright wrapper (stealth/behavior)
+│   │   ├── executor_pool.py      # Session pool (browser reuse)
+│   │   ├── extractor.py          # DOM → structured JSON
+│   │   ├── rule_engine.py        # Selector cache (was rule engine)
+│   │   ├── verifier.py           # Post-action verification
+│   │   ├── fallback_router.py    # Failure classification + escalation
+│   │   ├── stealth.py            # Browser anti-detection patches
+│   │   ├── human_behavior.py     # Natural mouse/typing/scroll
+│   │   ├── navigation.py         # Rate limit, robots.txt, warming
+│   │   └── config.py             # YAML → dataclass config loader
+│   ├── ai/             # LLM modules
+│   │   ├── llm_planner.py        # Gemini Flash/Pro planner
+│   │   ├── prompt_manager.py     # Prompt template versioning
+│   │   └── patch_system.py       # Structured patch generation
+│   ├── vision/         # Vision modules
+│   │   ├── yolo_detector.py      # YOLO local inference
+│   │   ├── vlm_client.py         # VLM API client (Gemini multimodal)
+│   │   ├── image_batcher.py      # Screenshot batching/resizing
+│   │   └── coord_mapper.py       # Screenshot ↔ page coordinate mapping
+│   ├── learning/       # Learning modules
+│   │   ├── pattern_db.py         # Selector cache (SQLite, TTL-based)
+│   │   ├── rule_promoter.py      # Cache save logic
+│   │   ├── dspy_optimizer.py     # DSPy prompt optimization
+│   │   └── memory_manager.py     # 4-tier memory system
+│   ├── workflow/       # Workflow DSL
+│   │   ├── dsl_parser.py         # YAML workflow parser
+│   │   └── step_queue.py         # FIFO step queue
+│   ├── evolution/      # Self-evolution engine
+│   │   ├── pipeline.py           # Evolution cycle state machine
+│   │   ├── analyzer.py           # Failure pattern detection
+│   │   ├── code_generator.py     # Gemini Pro code fix generation
+│   │   ├── sandbox.py            # Git branch isolation + testing
+│   │   ├── version_manager.py    # Version tagging, merge, rollback
+│   │   ├── db.py                 # Evolution DB (aiosqlite)
+│   │   └── notifier.py           # SSE event broadcaster
+│   ├── web_agent.py              # SDK Facade (WebAgent)
+│   └── api/            # FastAPI server
+│       ├── session_db.py         # Session database (aiosqlite)
+│       ├── session_manager.py    # Session manager (live sessions)
+│       ├── routes/
+│       │   ├── sessions.py       # Session API routes
+│       │   └── run.py            # One-shot execution API route
+│       └── ...                   # REST routes + models
+├── evolution-ui/       # React 19 + Vite + Tailwind CSS dashboard
+│   ├── src/
+│   │   ├── pages/                # Dashboard, Evolutions, Scenarios, Versions, Automation, Sessions
+│   │   └── components/           # Shared UI components
+│   └── package.json
+├── config/             # YAML rules, synonyms, settings
+│   ├── rules/                    # Pre-defined rules (cache seeds)
+│   ├── synonyms.yaml             # Korean/English synonym dictionary
+│   └── settings.yaml             # Engine configuration
+├── tests/              # 968 tests (unit, integration, e2e)
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+├── docs/               # Documentation
+├── scripts/            # Utility scripts
+├── data/               # Runtime data (gitignored)
+└── pyproject.toml
+```
+
+---
+
+## Testing
+
+| Category | Tests | Command |
+|----------|------:|---------|
+| Unit | 816 | `pytest tests/unit/` |
+| Integration | 95 | `pytest tests/integration/` |
+| E2E | 57 | `pytest tests/e2e/` |
+| **Total** | **968** | `pytest tests/` |
+
+### Quick Quality Check
 
 ```bash
-cd runtime
-npm run example:chat-backend
+ruff check --fix          # Lint
+mypy --strict             # Type check
+pytest tests/ -q          # All tests
 ```
 
-- Health: `http://127.0.0.1:4999/example/chat/health`
-- Chat UI: `http://127.0.0.1:4999/example/chat/ui`
+---
 
-### Mode C: SDK Embedded Usage
+## API Endpoints
 
-```bash
-cd runtime
-npm run example:sdk:basic
-npm run example:sdk:multiturn
-npm run example:sdk:auto-improve
-npm run example:sdk:human-handoff
-npm run example:repeated-item
-```
+The FastAPI server (port 8000) exposes the following endpoints:
 
-## Environment Essentials
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/evolution/trigger` | Start an evolution cycle |
+| `GET` | `/api/evolution/` | List all evolutions |
+| `POST` | `/api/evolution/{id}/approve` | Approve evolution → merge |
+| `POST` | `/api/evolution/{id}/reject` | Reject evolution → discard |
+| `POST` | `/api/scenarios/run` | Run a scenario |
+| `GET` | `/api/scenarios/results` | Scenario result history |
+| `GET` | `/api/scenarios/trends` | Scenario trends |
+| `GET` | `/api/versions/` | Version list |
+| `GET` | `/api/progress/stream` | SSE real-time events |
 
-- LLM providers supported: `gemini`, `openai` only
-- Default Gemini models: `gemini-3.1-pro-preview,gemini-3.0-flash`
-- Default OpenAI models: `gpt-5.2-codex,gpt-5-mini`
-- YOLO26 default model: `yolo26l`
+---
 
-Key variables:
-- `BACKEND_AUTOMATION_MODEL`
-- `BACKEND_CASCADE_ESCALATION_MODEL`
-- `BACKEND_CASCADE_THRESHOLD`
-- `PLAN_CACHE_ENABLED`
-- `PLAN_CACHE_SIMILARITY_THRESHOLD`
-- `SIMILO_ENABLED`
+## Documentation
 
-Full setup:
-- [Environment Setup (EN)](./doc/CODEX-ENV-SETUP.en.md)
-- [환경설정 (KO)](./doc/CODEX-ENV-SETUP.md)
+| Document | Description |
+|----------|-------------|
+| [Evolution Engine](./docs/EVOLUTION-ENGINE.md) | Deep-dive into the self-evolution system |
+| [API Reference](./docs/API-REFERENCE.md) | REST API endpoints, models, and curl examples |
+| [Testing Guide](./docs/TESTING-GUIDE.md) | Test categories, commands, and writing tests |
+| [Evolution UI](./evolution-ui/README.md) | React dashboard setup and pages |
+| [Architecture](./docs/ARCHITECTURE.md) | Module-level architecture details |
+| [PRD](./docs/PRD.md) | Product requirements document |
+| [Technical Spec](./docs/web-automation-technical-spec-v2.md) | Full technical specification (2,268 lines) |
 
-## E2E Test Entry
+---
 
-Main command groups:
+## Environment Variables
 
-```bash
-cd runtime
-npm run typecheck
-npm test
-npm run test:e2e:chat-ui:headful
-npm run test:e2e:kr:headful
-npm run test:e2e:assistantless:live
-npm run test:e2e:provider:live
-npm run test:e2e:autonomous:live
-```
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Yes | — | Google Gemini API key |
+| `GEMINI_FLASH_MODEL` | No | `gemini-3-flash-preview` | Tier-1 model (automation, fast/cheap) |
+| `GEMINI_PRO_MODEL` | No | `gemini-3.1-pro-preview` | Tier-2 model (coding, escalation) |
+| `YOLO_MODEL` | No | `yolo26l.pt` | YOLO model weights file |
+| `VITE_API_PORT` | No | `8000` | API port for UI proxy |
 
-Meaning of live flags:
-1. `RUN_KR_E2E=1`: run Korea live smoke scenarios
-2. `RUN_ASSISTANTLESS_KR_E2E=1`: run assistantless live loop scenarios
-3. `RUN_PROVIDER_LIVE_E2E=1`: run real provider matrix (if model targets are configured)
-4. `RUN_AUTONOMOUS_BATCH_E2E=1`: run autonomous batch scenarios and save evidence under `testing/autonomous-batch/`
+---
 
-## Documentation Map
+## License
 
-Start here:
-1. [Documentation Index (EN)](./doc/README.md)
-2. [문서 인덱스 (KO)](./doc/README.ko.md)
-
-Most-used docs:
-1. [Runbook (EN)](./doc/CODEX-RUNBOOK.en.md) | [런북 (KO)](./doc/CODEX-RUNBOOK.md)
-2. [Automation Test Plan (EN)](./doc/CODEX-AUTOMATION-TEST-PLAN.en.md) | [자동화 테스트 계획 (KO)](./doc/CODEX-AUTOMATION-TEST-PLAN.md)
-3. [E2E Testing Guide (EN)](./doc/CODEX-E2E-TESTING.en.md) | [E2E 테스트 가이드 (KO)](./doc/CODEX-E2E-TESTING.md)
-4. [SDK + Backend Usage (EN)](./doc/CODEX-SDK-BACKEND-USAGE.en.md) | [SDK + 백엔드 사용법 (KO)](./doc/CODEX-SDK-BACKEND-USAGE.md)
+MIT

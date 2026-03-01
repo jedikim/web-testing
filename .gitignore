@@ -1,13 +1,48 @@
-.worktrees/
-runtime/node_modules/
-runs/samples/artifacts/e2e/
-runs/samples/artifacts/e2e-assistantless/
-runs/samples/artifacts/provider-matrix/
-/testing/
-/temp/
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.vitest/
+*.tsbuildinfo
 .env
 .env.*
-!.env.example
-runtime/.env
-runtime/.env.*
-!runtime/.env.example
+
+# E2E run artifacts (screenshots, logs, metrics)
+node-runtime/e2e/runs/
+
+# Python test data artifacts
+python-authoring-service/data/
+
+# Git worktrees
+.worktrees/
+.claude/worktrees/
+
+# Authoring UI
+authoring-ui/node_modules/
+
+# Playwright MCP logs
+.playwright-mcp/
+
+# Temporary screenshots
+*.png
+
+# Scenario testing artifacts
+testing/
+
+# Evolution UI
+evolution-ui/node_modules/
+evolution-ui/dist/
+
+# Runtime data
+data/*.db
+
+# Egg-info
+*.egg-info/
+
+# JPEG screenshots
+*.jpeg
+
+# Temp comparison repos
+temp/
