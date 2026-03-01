@@ -16,7 +16,7 @@ Both modes must support multi-turn LLM sessions and preserve reproducible sessio
 1. external assistant integrations (Slack/Telegram routing) stay out of scope
 2. this repository provides reusable backend + SDK contracts only
 3. coding model policy remains `gemini-3.1-pro-preview` for evolution/coding loops
-4. automation interaction model remains `gemini-3.0-flash` default for chat automation turns
+4. automation interaction model remains `gemini-3-flash-preview` default for chat automation turns
 5. all artifacts and logs must be storable under gitignored testing/runtime paths
 
 ## 2. Target Architecture

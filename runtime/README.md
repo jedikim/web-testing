@@ -36,7 +36,7 @@ TypeScript runtime 영역이다. `Rule-first`, `Patch-only`, `Verify-always` 원
 - Vision/Screenshot 준비 단계로 ROI 배칭, 체크포인트 정책, view mode 선택기를 추가했다.
 - Chat 경로로 Telegram/Slack 입력 정규화와 screenshot question 루프를 추가했다.
 - Chat과 분리된 integration 경로로 `runHumanLoop`를 추가해 외부 프로젝트가 채널 연동을 담당할 수 있게 했다.
-- Gemini/OpenAI + YOLO26 모델 매트릭스 테스트 경로를 추가했다.
+- Gemini/OpenAI + RFDETR 모델 매트릭스 테스트 경로를 추가했다.
 - AI 비서 없이도 `스크린샷 공유 → go/revise/not_go → LLM 최소화(rule-first)` 반복을 검증하는 assistantless e2e 경로를 추가했다.
 - Self-improvement 준비 단계로 replay store와 rule promotion 게이트를 추가했다.
 - Production hardening 준비 단계로 session manager, metrics dashboard, rollback log를 추가했다.

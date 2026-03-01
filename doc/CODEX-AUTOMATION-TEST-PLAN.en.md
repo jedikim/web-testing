@@ -2,7 +2,7 @@
 
 # CODEX AUTOMATION TEST PLAN
 
-Last Updated: 2026-02-25 (KST)
+Last Updated: 2026-02-26 (KST)
 
 ## 0. Goal
 
@@ -54,12 +54,16 @@ npm run test:sdk
 
 These areas must be covered in normal regression:
 1. Similo selector fingerprint recovery
-2. Cascaded LLM routing behavior
-3. Plan cache reuse and degradation logic
-4. Self-healing failure classification and retry behavior
+2. Structure-first candidate reduction with partial vectorization
+3. In-memory vector index behavior (hnsw/bruteforce fallback)
+4. Cascaded LLM routing behavior
+5. Plan cache reuse and degradation logic
+6. Self-healing failure classification and retry behavior
 
 Representative tests:
 - `tests/auto-recovery.test.ts`
+- `tests/context-reducer.test.ts`
+- `tests/in-memory-vector-index.test.ts`
 - `tests/session-engine-cascaded.test.ts`
 - `tests/plan-cache.test.ts`
 - `tests/replay-store.test.ts`
@@ -87,3 +91,15 @@ Representative tests:
 1. keep `PW_HEADLESS=0` for practical validation
 2. do not include captcha bypass scenarios
 3. quarantine flaky live scenarios with documentation instead of removing them
+
+## 6. Danawa Scenario Hardening (2026-02-26)
+
+The following hardening was applied and verified with live runs.
+1. Hierarchy probing: prepend deterministic root/mid/detail category hints (`deterministic_hierarchy_probe`)
+2. Constraint probing: inject deterministic price/color/women/hiking filter actions (`deterministic_constraint_probe`)
+3. Click safety: reject over-generic LLM selectors (`span`, `div`, etc.)
+4. Navigation safety: rollback on root-domain drift/promo pages/skip-link-like targets
+5. Tracing safety: force model and GENERATION metadata on Langfuse `llm_call`
+
+Latest live evidence:
+- `testing/chat-ui-manual/2026-02-26T00-02-02-081Z_danawa-live/result.md`

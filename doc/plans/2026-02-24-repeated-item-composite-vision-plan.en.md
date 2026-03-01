@@ -8,7 +8,7 @@ Implement a robust chain for repeated listing images:
 
 1. detect/trigger repeated-item analysis (LLM or code callback)
 2. merge item images into one composite sheet
-3. run YOLO26 on the composite image first
+3. run RFDETR on the composite image first
 4. if YOLO judgement is weak/uncertain, call VLM with the same composite image
 5. map detections/judgements back to original item IDs (reverse trace)
 

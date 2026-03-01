@@ -8,7 +8,7 @@ export interface LlmExecutionTarget {
 }
 
 export interface VisionExecutionTarget {
-  provider: 'yolo26';
+  provider: 'rfdetr';
   apiKey?: string;
   baseUrl: string;
   model: string;
@@ -80,7 +80,7 @@ export async function runProviderModelMatrix(
     for (const model of target.models) {
       try {
         const result = await input.executeVision({
-          provider: 'yolo26',
+          provider: 'rfdetr',
           apiKey: target.apiKey,
           baseUrl: target.baseUrl,
           model

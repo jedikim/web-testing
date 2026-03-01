@@ -50,11 +50,12 @@ For each step, record:
 
 1. deterministic/rule-first before LLM
 2. LLM usage is bounded and auditable
-3. full DOM/full screenshot should not be sent to LLM by default
-4. no captcha/2FA/payment bypass automation
-5. bug/exception triggers evolution, not every new feature request
-6. isolated candidate versions must run in `git worktree`
-7. promotion to active version requires explicit approval
+3. do not send full DOM/full screenshot/full raw HTML to LLM (send sanitized extraction only with length caps)
+4. run structure-first candidate reduction before semantic rerank, and only vectorize reduced candidates
+5. no captcha/2FA/payment bypass automation
+6. bug/exception triggers evolution, not every new feature request
+7. isolated candidate versions must run in `git worktree`
+8. promotion to active version requires explicit approval
 
 ## 4. Mode-Specific Run Commands
 
@@ -86,6 +87,9 @@ npm run example:chat-backend
 npm run test:sdk
 npm run test:evolution
 ```
+
+`example:chat-backend` defaults to real `playwright` execution mode. To force simulation:
+`CHAT_AUTOMATION_EXECUTION_MODE=simulate npm run example:chat-backend`.
 
 ## 5. Failure Handling Rules
 

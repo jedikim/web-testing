@@ -77,7 +77,7 @@ flowchart LR
 | 이미지 배칭 + 좌표 역매핑 | 수용 | Vision 호출 시 기본 전략으로 채택 |
 | 실패 패턴의 룰 승격(Rule Promotion) | 수용 | 성공 임계치 기반 자동 승격 |
 | DSPy + GEPA 자기개선 | 수용(제한) | 오프라인 리플레이/카나리 통과 시만 반영 |
-| 특정 모델명 고정(Gemini/YOLO26 하드코딩) | 보류 | 인터페이스는 모델 중립, 초기 권장만 제시 |
+| 특정 모델명 고정(Gemini/RFDETR 하드코딩) | 보류 | 인터페이스는 모델 중립, 초기 권장만 제시 |
 | Stagehand 전면 의존 | 보류 | 코어는 Playwright, Stagehand는 어댑터 옵션 |
 | Anti-bot 우회(stealth 패치 중심) | 비수용 | 캡차/2FA/보안 챌린지는 human handoff 원칙 |
 | 전체 DOM/스크린샷 상시 LLM 전송 | 비수용 | 후보 축약 JSON + ROI 이미지만 전송 |

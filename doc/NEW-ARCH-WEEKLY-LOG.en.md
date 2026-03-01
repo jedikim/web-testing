@@ -182,3 +182,29 @@
 - Tests
   - Extended `runtime/tests/v3-planner.test.ts`
   - Added `runtime/tests/v3-tree-traversal.test.ts`
+
+## Post Week 9 Enhancement: Hover/Menu Traversal Reliability (Applied from `new_arch_2.md`)
+
+- Focus
+  - Reduce wrong body clicks when submenu interaction depends on hover timing
+  - Prioritize navigation-scope candidates on non-final hierarchy hops
+  - Restrict follow-up candidate detection to actually interactable menu regions (not full-page noise)
+  - Clean domain residue from listing hints (e.g., `com ...`) before hierarchy grouping
+- Code
+  - `runtime/src/backend/chat-playwright-driver.ts`
+    - Added menu-scope + interactability(top-hit) checks in `hasFollowupNavigationCandidates`
+    - Added `prioritizeNavigationScopeCandidates` / `isNavigationScopeCandidate`
+    - Added reopen-and-retry path for recoverable submenu click failures
+    - Added product/ad-like candidate guard for non-final hierarchy hops
+  - `runtime/src/backend/chat-automation-service.ts`
+    - Strengthened `extractListingPathHints` cleaning (domain/verb noise removal)
+  - `runtime/tests/chat-playwright-driver-navigation.test.ts`
+    - Added hover-layer trap regression coverage
+  - `runtime/tests/chat-automation-service.test.ts`
+    - Added assertion to reject `com ...` noise inside hierarchy hint logs
+- Verification
+  - `npm run test -- tests/chat-playwright-driver-navigation.test.ts` passed (8 tests)
+  - `npm run test -- tests/chat-automation-service.test.ts` passed (11 tests)
+  - `npm run typecheck` passed
+  - Re-ran headful live UI E2E:
+    - `/home/jedi/code/web-agentic-codex/testing/chat-ui-manual/2026-02-28T17-54-05-872Z_danawa-navfix4-20260301-025404/result.md`

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { executeWithSelectorRecovery } from '../src/fallback/auto-recovery';
+import type { CandidateItem } from '../src/fallback/context-reducer';
 import type { SelectorRecipe } from '../src/fallback/recipe-version';
 
 describe('executeWithSelectorRecovery', () => {
@@ -104,5 +105,87 @@ describe('executeWithSelectorRecovery', () => {
     expect(result.llmCalls).toBe(0);
     expect(result.similoRecoveries).toBe(1);
     expect(attempts).toBe(2);
+  });
+
+  it('builds structure-first candidate context with optional semantic rerank before llm patch', async () => {
+    const initial: SelectorRecipe = {
+      workflowId: 'shopping_login_v01',
+      version: 'v001',
+      selectors: {
+        login_button: { css: '#old-login', updatedAt: '2026-02-24T00:00:00Z' }
+      }
+    };
+
+    const candidates: CandidateItem[] = Array.from({ length: 120 }).map((_, index) => ({
+      id: `generic-${index}`,
+      role: 'button',
+      text: `일반 버튼 ${index}`,
+      score: 0.9 - index * 0.001,
+      bbox: [0, 100 + index, 100, 20] as [number, number, number, number]
+    }));
+    candidates.push({
+      id: 'login-new',
+      role: 'button',
+      text: '로그인',
+      score: 0.1,
+      bbox: [0, 20, 100, 20],
+      attributes: {
+        class: 'btn login',
+        tag: 'button'
+      }
+    });
+
+    let embedCallInputs = 0;
+    let builtContextSize = 0;
+
+    const result = await executeWithSelectorRecovery({
+      recipe: initial,
+      candidateContext: {
+        intent: 'login',
+        query: '로그인 버튼',
+        maxCandidates: 6,
+        structureFirstLimit: 30,
+        semanticRerank: {
+          enabled: true,
+          query: '로그인 버튼',
+          vectorBackend: 'bruteforce',
+          embed: async (texts) => {
+            embedCallInputs += texts.length;
+            return texts.map((text) => (/로그인/i.test(text) ? [1, 0] : [0, 1]));
+          }
+        },
+        onBuilt: async (context) => {
+          builtContextSize = context.candidates.length;
+        }
+      },
+      run: async (recipe) => {
+        if (recipe.selectors.login_button?.css === '#old-login') {
+          return {
+            status: 'fail',
+            failureCode: 'SelectorNotFound',
+            candidates,
+            proposedPatch: {
+              target: 'selectors',
+              reason: 'selector changed',
+              operations: [
+                {
+                  op: 'replace',
+                  path: '/selectors/login_button',
+                  value: { css: '#new-login' }
+                }
+              ]
+            }
+          };
+        }
+        return { status: 'pass' };
+      }
+    });
+
+    expect(result.status).toBe('pass');
+    expect(result.semanticRerankCalls).toBe(1);
+    expect(result.reducedCandidateCount).toBeLessThanOrEqual(6);
+    expect(result.embeddedCandidateCount).toBeLessThanOrEqual(30);
+    expect(embedCallInputs).toBeLessThanOrEqual(31);
+    expect(builtContextSize).toBeGreaterThan(0);
   });
 });

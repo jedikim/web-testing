@@ -7,7 +7,7 @@ export interface ResolveEvolutionModelPolicyInput {
 }
 
 const DEFAULT_CODING_MODEL = 'gemini-3.1-pro-preview';
-const DEFAULT_AUTOMATION_MODEL = 'gemini-3.0-flash';
+const DEFAULT_AUTOMATION_MODEL = 'gemini-3-flash-preview';
 
 function optionalTrim(raw: string | undefined): string | undefined {
   if (!raw) {

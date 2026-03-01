@@ -9,6 +9,7 @@ import { SessionStore } from '../session/store';
 import {
   ChatAutomationService,
   type BrowserMode,
+  type ChatAutomationExecutionMode,
   type ChatMessageAttachmentInput,
   type CreateChatSessionInput
 } from './chat-automation-service';
@@ -44,6 +45,15 @@ function contentType(path: string): string {
       return 'text/css; charset=utf-8';
     case '.json':
       return 'application/json; charset=utf-8';
+    case '.png':
+      return 'image/png';
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.webp':
+      return 'image/webp';
+    case '.gif':
+      return 'image/gif';
     default:
       return 'text/plain; charset=utf-8';
   }
@@ -378,6 +388,43 @@ export function createChatAutomationHttpServer(options: ChatAutomationHttpServer
         return;
       }
 
+      const sessionScreenshots = path.match(/^\/example\/chat\/sessions\/([^/]+)\/screenshots$/);
+      if (method === 'GET' && sessionScreenshots) {
+        const screenshots = await options.service.listScreenshotHistory(sessionScreenshots[1]!);
+        sendJson(res, 200, {
+          ok: true,
+          data: screenshots
+        });
+        return;
+      }
+
+      const sessionScreenshotContent = path.match(
+        /^\/example\/chat\/sessions\/([^/]+)\/screenshot\/content$/
+      );
+      if (method === 'GET' && sessionScreenshotContent) {
+        const sessionId = sessionScreenshotContent[1]!;
+        const indexRaw = url.searchParams.get('index');
+        const screenshot =
+          indexRaw == null
+            ? await options.service.getLatestScreenshot(sessionId)
+            : await options.service.getScreenshotByIndex(sessionId, Number(indexRaw));
+        if (!screenshot?.path) {
+          sendJson(res, 404, {
+            ok: false,
+            error: `screenshot not found: ${sessionId}`
+          });
+          return;
+        }
+        const filePath = resolve(screenshot.path);
+        const content = await readFile(filePath);
+        res.writeHead(200, {
+          'content-type': contentType(filePath),
+          'cache-control': 'no-cache, no-store, must-revalidate'
+        });
+        res.end(content);
+        return;
+      }
+
       const messageRoute = path.match(/^\/example\/chat\/sessions\/([^/]+)\/message$/);
       if (method === 'POST' && messageRoute) {
         const body = asRecord(await parseBody(req));
@@ -557,6 +604,8 @@ export interface StartChatAutomationServerOptions {
   uiDir?: string;
   uploadDir?: string;
   stepDelayMs?: number;
+  executionMode?: ChatAutomationExecutionMode;
+  runtimeScreenshotRoot?: string;
 }
 
 export async function startChatAutomationServer(options: StartChatAutomationServerOptions = {}) {
@@ -579,7 +628,9 @@ export async function startChatAutomationServer(options: StartChatAutomationServ
 
   const service = new ChatAutomationService({
     store,
-    stepDelayMs: options.stepDelayMs
+    stepDelayMs: options.stepDelayMs,
+    executionMode: options.executionMode,
+    runtimeScreenshotRoot: options.runtimeScreenshotRoot
   });
   await service.init();
 

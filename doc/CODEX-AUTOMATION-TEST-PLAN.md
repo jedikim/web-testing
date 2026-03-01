@@ -2,7 +2,7 @@
 
 # CODEX AUTOMATION TEST PLAN
 
-최종 업데이트: 2026-02-25 (KST)
+최종 업데이트: 2026-02-26 (KST)
 
 ## 0. 목표
 
@@ -54,12 +54,16 @@ npm run test:sdk
 
 정기 회귀에 아래 항목이 반드시 포함되어야 합니다:
 1. Similo selector fingerprint 복구
-2. Cascaded LLM 라우팅 동작
-3. Plan cache 재사용/품질 저하 로직
-4. Self-healing 분류 및 retry 정책
+2. 구조 기반 후보 축소 + 부분 벡터화 파이프라인
+3. 인메모리 벡터 인덱스(hnsw/브루트포스 폴백) 동작
+4. Cascaded LLM 라우팅 동작
+5. Plan cache 재사용/품질 저하 로직
+6. Self-healing 분류 및 retry 정책
 
 대표 테스트:
 - `tests/auto-recovery.test.ts`
+- `tests/context-reducer.test.ts`
+- `tests/in-memory-vector-index.test.ts`
 - `tests/session-engine-cascaded.test.ts`
 - `tests/plan-cache.test.ts`
 - `tests/replay-store.test.ts`
@@ -87,3 +91,15 @@ npm run test:sdk
 1. 실전 검증은 `PW_HEADLESS=0` 사용
 2. 캡차 우회 시나리오 포함 금지
 3. flaky live 시나리오는 삭제하지 않고 quarantine + 문서화
+
+## 6. Danawa 시나리오 보강 (2026-02-26)
+
+아래 보강을 반영하고 live 재검증을 완료했습니다.
+1. 계층 탐색 보강: `deterministic_hierarchy_probe`로 루트/중간/세부 카테고리 힌트를 강제 삽입
+2. 제약 필터 보강: `deterministic_constraint_probe`로 가격/색상/여성/등산 제약 액션 삽입
+3. 클릭 안정성 보강: 과도하게 일반적인 LLM selector(`span`, `div` 등) 차단
+4. 네비게이션 안정성 보강: 루트 도메인 이탈/프로모션/skip-link 후보 롤백 및 감점
+5. 추적 보강: Langfuse `llm_call` 관측에 모델/GENERATION 메타를 강제 기록
+
+최신 live 증적:
+- `testing/chat-ui-manual/2026-02-26T00-02-02-081Z_danawa-live/result.md`

@@ -1,12 +1,12 @@
 export type LlmProvider = 'gemini' | 'openai';
 
 const SUPPORTED_MODELS: Record<LlmProvider, string[]> = {
-  gemini: ['gemini-3.1-pro-preview', 'gemini-3.0-flash'],
-  openai: ['gpt-5.2-codex', 'gpt-5-mini']
+  gemini: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview'],
+  openai: ['gpt-5-codex', 'gpt-5-mini']
 };
 
 const DEFAULT_MODEL: Record<LlmProvider, string> = {
-  gemini: 'gemini-3.0-flash',
+  gemini: 'gemini-3-flash-preview',
   openai: 'gpt-5-mini'
 };
 

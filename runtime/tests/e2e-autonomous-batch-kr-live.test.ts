@@ -291,7 +291,7 @@ function buildFinalOptimizedResultMarkdown(rows: BatchRow[]): string {
   lines.push('## Optimized Policy');
   lines.push('1. LLM warmup only for initial understanding, then rule-first execution.');
   lines.push('2. On first selector drift/failure, perform one revise cycle with vision hint.');
-  lines.push('3. For captcha, keep chain fixed: YOLO26 detect -> VLM confirm -> LLM solve retry.');
+  lines.push('3. For captcha, keep chain fixed: RFDETR detect -> VLM confirm -> LLM solve retry.');
   lines.push('4. Block sensitive steps (login/payment/delete) with not_go policy.');
   lines.push('5. Keep evidence mandatory for every step (before/after screenshots + process log).');
   return lines.join('\n');
@@ -554,7 +554,7 @@ function buildScenarios(timeout: number): BatchScenario[] {
           return { kind: 'goto', target: 'https://search.daum.net/search?w=tot&q=%EB%89%B4%EC%8A%A4' };
         },
         detectWithVision: async () => ({
-          model: 'yolo26l',
+          model: 'rf-detr-medium',
           target: 'input[name="q"]',
           confidence: 0.86
         }),
@@ -967,7 +967,7 @@ function buildScenarios(timeout: number): BatchScenario[] {
         },
         decideWithRules: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         detectWithVision: async () => ({
-          model: 'yolo26l',
+          model: 'rf-detr-medium',
           target: 'map.naver.com',
           confidence: 0.82
         }),
@@ -1127,7 +1127,7 @@ function buildScenarios(timeout: number): BatchScenario[] {
         analyzeWithLlm: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         decideWithRules: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         detectWithVision: async () => ({
-          model: 'yolo26l',
+          model: 'rf-detr-medium',
           target: progress >= 9 ? 'map.kakao.com' : 'map.naver.com',
           confidence: 0.84
         }),
@@ -1210,7 +1210,7 @@ function buildScenarios(timeout: number): BatchScenario[] {
         'Naver에서 판교역 날씨 검색 후 기상청으로 이동한다.',
         'KORAIL/Daum/지도로 교통 관련 단서를 수집한다.',
         '아이사랑/VisitKorea 공공 사이트로 정보 출처를 확장한다.',
-        '중간 단계에서 두 번의 캡차 이벤트를 YOLO26->VLM->LLM 체인으로 처리한다.',
+        '중간 단계에서 두 번의 캡차 이벤트를 RFDETR->VLM->LLM 체인으로 처리한다.',
         '지도 후보군을 반복 탐색하고 최종 추천 후보를 남긴다.'
       ],
       references: [
@@ -1470,7 +1470,7 @@ function buildScenarios(timeout: number): BatchScenario[] {
         analyzeWithLlm: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         decideWithRules: async () => scriptedActions[Math.min(progress, scriptedActions.length - 1)],
         detectWithVision: async () => ({
-          model: 'yolo26l',
+          model: 'rf-detr-medium',
           target: progress >= 8 ? 'map.kakao.com' : 'map.naver.com',
           confidence: 0.83
         }),

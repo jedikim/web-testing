@@ -118,7 +118,7 @@ describe('phase acceptance', () => {
       shareWithUser: async () => undefined,
       analyzeWithLlm: async () => ({ kind: 'type', target: 'input[name=q]', value: '뉴스' }),
       decideWithRules: async () => ({ kind: 'click', target: 'button.search' }),
-      detectWithVision: async () => ({ model: 'yolo26l', target: '#search', confidence: 0.91 }),
+      detectWithVision: async () => ({ model: 'rf-detr-medium', target: '#search', confidence: 0.91 }),
       executeAction: async () => {
         executionCount += 1;
         if (executionCount === 1) {

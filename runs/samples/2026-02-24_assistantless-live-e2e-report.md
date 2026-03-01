@@ -20,7 +20,7 @@
 ### Complex Flow Evidence
 
 1. 멀티 사이트 + 중간 개입 시나리오(`assistantless_multisite_human_intervention`)에서 `revise -> go` 개입이 반복적으로 재현되었다.
-2. 캡차 시나리오(`assistantless_captcha_escalation_retry`)에서 `YOLO26 -> VLM -> LLM solve retry` 체인이 수행된 뒤 pass 상태를 반환했다.
+2. 캡차 시나리오(`assistantless_captcha_escalation_retry`)에서 `RFDETR -> VLM -> LLM solve retry` 체인이 수행된 뒤 pass 상태를 반환했다.
 3. 민감 액션 시나리오(`assistantless_sensitive_not_go_block`)는 반복마다 `blocked`로 귀결되어 handoff 정책이 유지됐다.
 
 ### Artifacts

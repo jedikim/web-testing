@@ -23,7 +23,7 @@ function makeSnapshot(
       updatedAt: '2026-02-24T00:00:00.000Z',
       modelPolicy: {
         codingModel: 'gemini-3.1-pro-preview',
-        automationModel: 'gemini-3.0-flash'
+        automationModel: 'gemini-3-flash-preview'
       },
       baseBranch: 'main',
       testCommand: 'npm test',

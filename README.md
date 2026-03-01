@@ -28,18 +28,23 @@ Out of scope:
 ## Core Capabilities
 
 1. Deterministic workflow engine (`rules first`)
-2. Selector recovery with Similo-style fingerprints before LLM patch fallback
-3. Cascaded LLM routing (`flash-first -> uncertainty/sensitive gate -> pro -> rule fallback`)
-4. Semantic replay + plan cache reuse/adaptation for repeated tasks
-5. Self-healing taxonomy for failure classification and suggested action
-6. Repeated-item visual chain (`composite image -> YOLO26 -> VLM fallback -> reverse mapping`)
-7. Chat automation backend sample with:
+2. Structure-first candidate reduction (`DOM -> 20~50 candidates`) before any semantic/LLM step
+3. On-demand partial vectorization with page-scoped in-memory index (`hnswlib-node` if available, brute-force cosine fallback)
+4. Selector recovery with Similo-style fingerprints before LLM patch fallback
+5. Cascaded LLM routing (`flash-first -> uncertainty/sensitive gate -> pro -> rule fallback`)
+6. Semantic replay + plan cache reuse/adaptation for repeated tasks
+7. Self-healing taxonomy for failure classification and suggested action
+8. Repeated-item visual chain (`composite image -> RFDETR -> VLM fallback -> reverse mapping`)
+9. Chat automation backend sample with:
+   - two-stage LLM flow: `task analyzer` (decomposition + strategy options) -> `action planner`
+   - LLM-first action planning (default `flash -> rule fallback`, optional `flash -> pro -> rule fallback`) with JSON Action DSL validation
+   - result validation loop (`LLM validator -> retry with alternate strategy`)
    - headful/headless switch
    - live logs/progress stream (SSE)
    - pause/resume/cancel
    - captcha handoff input
    - image attachments
-8. Evolution backend for isolated candidate versions (`git worktree`) and approval-based promotion
+10. Evolution backend for isolated candidate versions (`git worktree`) and approval-based promotion
 
 ## Architecture
 
@@ -85,6 +90,18 @@ cd runtime
 npm run example:chat-backend
 ```
 
+- Default execution mode for this command is `playwright` (real browser actions).
+- Default planner mode is `llm_first`.
+- Default automation tier policy is `flash_only` (Gemini Flash for runtime analyzer/planner/validator/formatter).
+- To allow runtime pro escalation, set `CHAT_AUTOMATION_ALLOW_PRO_ESCALATION=1`.
+- LLM provider order follows `LLM_VENDOR_ORDER` exactly; set `LLM_VENDOR_ORDER=gemini` for gemini-only runtime.
+- To force simulation mode:
+```bash
+CHAT_AUTOMATION_EXECUTION_MODE=simulate npm run example:chat-backend
+```
+- If you request `browserMode=headful` and GUI launch fails, logs include:
+  `Headful launch failed in current environment. Fallback to headless was applied.`
+
 - Health: `http://127.0.0.1:4999/example/chat/health`
 - Chat UI: `http://127.0.0.1:4999/example/chat/ui`
 
@@ -102,17 +119,32 @@ npm run example:repeated-item
 ## Environment Essentials
 
 - LLM providers supported: `gemini`, `openai` only
-- Default Gemini models: `gemini-3.1-pro-preview,gemini-3.0-flash`
-- Default OpenAI models: `gpt-5.2-codex,gpt-5-mini`
-- YOLO26 default model: `yolo26l`
+- Default Gemini models: `gemini-3.1-pro-preview,gemini-3-flash-preview`
+- Default OpenAI models: `gpt-5-codex,gpt-5-mini`
+- Runtime automation model policy: use low-cost first (`BACKEND_AUTOMATION_GEMINI_MODEL=gemini-3-flash-preview`, `BACKEND_AUTOMATION_OPENAI_MODEL=gpt-5-mini`)
+- Coding/autofix model policy: use high-capability model (`EVOLUTION_CODING_MODEL=gemini-3.1-pro-preview`)
+- RFDETR default model: `rf-detr-medium`
+- Langfuse tracing: disabled by default (`LANGFUSE_ENABLED=0`), enable with env only when needed
+- Prompt management: all LLM prompts are split into `runtime/src/prompts/*` with explicit `id@version`
 
 Key variables:
 - `BACKEND_AUTOMATION_MODEL`
+- `BACKEND_AUTOMATION_GEMINI_MODEL`
+- `BACKEND_AUTOMATION_OPENAI_MODEL`
 - `BACKEND_CASCADE_ESCALATION_MODEL`
+- `CHAT_AUTOMATION_PLANNER_MODE`
+- `CHAT_AUTOMATION_ALLOW_PRO_ESCALATION`
+- `CHAT_AUTOMATION_MAX_PLANNER_ATTEMPTS`
+- `BACKEND_CASCADE_ESCALATION_GEMINI_MODEL`
+- `BACKEND_CASCADE_ESCALATION_OPENAI_MODEL`
 - `BACKEND_CASCADE_THRESHOLD`
 - `PLAN_CACHE_ENABLED`
 - `PLAN_CACHE_SIMILARITY_THRESHOLD`
 - `SIMILO_ENABLED`
+- `LANGFUSE_ENABLED`
+- `LANGFUSE_PUBLIC_KEY`
+- `LANGFUSE_SECRET_KEY`
+- `LANGFUSE_BASE_URL`
 
 Full setup:
 - [Environment Setup (EN)](./doc/CODEX-ENV-SETUP.en.md)

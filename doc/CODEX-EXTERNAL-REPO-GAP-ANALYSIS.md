@@ -29,7 +29,7 @@
 | 진화 엔진 | bug/exception trigger + worktree 격리 + 승인 전환 | 실패 분석 + branch sandbox + 승인/merge | 현재(worktree) 우선 유지 |
 | 채팅 세션 | 멀티턴/상태/SSE/pause-resume/captcha 입력 | 세션/턴/스크린샷/handoff API | 계약은 유사, 내부 실행 방식 차이 |
 | UI 샘플 | backend UI + chat UI 예제 | evolution-ui + automation/sessions 화면 | 상호 보완 가능 |
-| 모델 정책 | Gemini/OpenAI 제한 + yolo26l 단일 | Gemini 중심 설정 | 현재 정책 유지 |
+| 모델 정책 | Gemini/OpenAI 제한 + rf-detr-medium 단일 | Gemini 중심 설정 | 현재 정책 유지 |
 | 봇 회피 정책 | 우회 금지(문서 명시) | stealth/human-simulation 강조 | 외부 방식은 비수용 |
 
 ## 3. 충돌/리스크 확인

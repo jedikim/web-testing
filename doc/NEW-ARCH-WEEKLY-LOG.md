@@ -182,3 +182,29 @@
 - Tests
   - `runtime/tests/v3-planner.test.ts` 확장
   - `runtime/tests/v3-tree-traversal.test.ts` 신규
+
+## Post Week 9 Enhancement: Hover/Menu Traversal Reliability (`new_arch_2.md` 반영)
+
+- Focus
+  - hover 메뉴에서 하위 메뉴 클릭 시 잘못된 본문 요소 클릭되는 문제 완화
+  - non-final hierarchy hop에서 메뉴 스코프 우선 후보 선택
+  - followup 후보 탐지를 전체 페이지가 아닌 실제 인터랙터블 메뉴 범위로 제한
+  - listing hint 추출 시 `com 에 가서 ...` 형태의 도메인 찌꺼기 제거
+- Code
+  - `runtime/src/backend/chat-playwright-driver.ts`
+    - `hasFollowupNavigationCandidates`에 메뉴 스코프 + interactable(top hit) 검증 추가
+    - `prioritizeNavigationScopeCandidates` / `isNavigationScopeCandidate` 추가
+    - recoverable click 실패 시 동일 후보 재오픈 재시도 경로 추가
+    - non-final hop에서 product/ad 유사 후보 가드 추가
+  - `runtime/src/backend/chat-automation-service.ts`
+    - `extractListingPathHints` 정제 강화 (domain/verb 노이즈 제거)
+  - `runtime/tests/chat-playwright-driver-navigation.test.ts`
+    - hover layer trap 회귀 테스트 추가
+  - `runtime/tests/chat-automation-service.test.ts`
+    - hierarchy hint에 `com 에 가서` 같은 노이즈가 포함되지 않는 검증 추가
+- Verification
+  - `npm run test -- tests/chat-playwright-driver-navigation.test.ts` 통과 (8 tests)
+  - `npm run test -- tests/chat-automation-service.test.ts` 통과 (11 tests)
+  - `npm run typecheck` 통과
+  - 실사이트 UI E2E (headful) 재실행 완료:
+    - `/home/jedi/code/web-agentic-codex/testing/chat-ui-manual/2026-02-28T17-54-05-872Z_danawa-navfix4-20260301-025404/result.md`

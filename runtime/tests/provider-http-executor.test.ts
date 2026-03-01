@@ -7,7 +7,7 @@ describe('createHttpProviderExecutors', () => {
     vi.restoreAllMocks();
   });
 
-  it('calls provider specific endpoints for openai/gemini/yolo26', async () => {
+  it('calls provider specific endpoints for openai/gemini/rfdetr', async () => {
     const calls: Array<{ url: string; method: string; body: unknown; headers: Record<string, string> }> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -56,13 +56,13 @@ describe('createHttpProviderExecutors', () => {
       provider: 'gemini',
       apiKey: 'gm-key',
       baseUrl: 'https://gemini.local/v1beta',
-      model: 'gemini-3.0-flash'
+      model: 'gemini-3-flash-preview'
     });
     const yolo = await executors.executeVision({
-      provider: 'yolo26',
+      provider: 'rfdetr',
       apiKey: 'yo-key',
       baseUrl: 'https://vision.local',
-      model: 'yolo26l'
+      model: 'rf-detr-medium'
     });
 
     expect(openai.ok).toBe(true);
@@ -75,7 +75,7 @@ describe('createHttpProviderExecutors', () => {
     expect(calls.some((call) => call.url.includes('/detect'))).toBe(true);
   });
 
-  it('supports yolo26 endpoint without authorization header', async () => {
+  it('supports rfdetr endpoint without authorization header', async () => {
     const calls: Array<{ url: string; headers: Record<string, string> }> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const headers: Record<string, string> = {};
@@ -95,9 +95,9 @@ describe('createHttpProviderExecutors', () => {
     });
 
     const result = await executors.executeVision({
-      provider: 'yolo26',
+      provider: 'rfdetr',
       baseUrl: 'http://127.0.0.1:8080',
-      model: 'yolo26l'
+      model: 'rf-detr-medium'
     });
 
     expect(result.ok).toBe(true);
@@ -127,9 +127,9 @@ describe('createHttpProviderExecutors', () => {
     });
 
     const result = await executors.executeVision({
-      provider: 'yolo26',
+      provider: 'rfdetr',
       baseUrl: 'http://127.0.0.1:8080',
-      model: 'yolo26l'
+      model: 'rf-detr-medium'
     });
 
     expect(result.ok).toBe(true);

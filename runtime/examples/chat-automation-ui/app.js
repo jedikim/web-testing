@@ -4,7 +4,8 @@ const state = {
   snapshot: null,
   stream: null,
   refreshTimer: null,
-  pendingFiles: []
+  pendingFiles: [],
+  selectedScreenshotIndex: null
 };
 
 const sessionListEl = document.getElementById('sessionList');
@@ -19,6 +20,18 @@ const queueTextEl = document.getElementById('queueText');
 
 const turnsEl = document.getElementById('turns');
 const logsEl = document.getElementById('logs');
+const screenshotMetaEl = document.getElementById('screenshotMeta');
+const screenshotPreviewEl = document.getElementById('screenshotPreview');
+const screenshotEmptyEl = document.getElementById('screenshotEmpty');
+const screenshotTimelineEl = document.getElementById('screenshotTimeline');
+
+if (screenshotPreviewEl) {
+  screenshotPreviewEl.addEventListener('error', () => {
+    screenshotPreviewEl.classList.add('hidden');
+    screenshotEmptyEl.classList.remove('hidden');
+    screenshotEmptyEl.textContent = 'Failed to load screenshot image.';
+  });
+}
 
 const pauseBtn = document.getElementById('pauseBtn');
 const resumeBtn = document.getElementById('resumeBtn');
@@ -147,6 +160,91 @@ function renderLogs(logs = []) {
   logsEl.scrollTop = logsEl.scrollHeight;
 }
 
+function formatTime(value) {
+  if (!value) {
+    return 'n/a';
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleTimeString();
+}
+
+function buildScreenshotContentUrl(sessionId, index, cacheKey) {
+  const qs = new URLSearchParams();
+  qs.set('index', String(index));
+  qs.set('t', String(cacheKey || Date.now()));
+  return `/example/chat/sessions/${encodeURIComponent(sessionId)}/screenshot/content?${qs.toString()}`;
+}
+
+function normalizeScreenshotHistory(snapshot) {
+  const history = Array.isArray(snapshot?.screenshotHistory) ? snapshot.screenshotHistory : [];
+  if (history.length > 0) {
+    return history;
+  }
+  if (snapshot?.latestScreenshot) {
+    return [snapshot.latestScreenshot];
+  }
+  return [];
+}
+
+function renderScreenshots(snapshot) {
+  const sessionId = snapshot?.session?.id;
+  const history = normalizeScreenshotHistory(snapshot);
+  if (!sessionId || history.length === 0) {
+    screenshotMetaEl.textContent = 'No screenshots yet.';
+    screenshotTimelineEl.innerHTML = '';
+    screenshotPreviewEl.classList.add('hidden');
+    screenshotPreviewEl.removeAttribute('src');
+    screenshotEmptyEl.classList.remove('hidden');
+    state.selectedScreenshotIndex = null;
+    return;
+  }
+
+  const maxIndex = history.length - 1;
+  if (
+    typeof state.selectedScreenshotIndex !== 'number' ||
+    state.selectedScreenshotIndex < 0 ||
+    state.selectedScreenshotIndex > maxIndex
+  ) {
+    state.selectedScreenshotIndex = maxIndex;
+  }
+
+  const selectedIndex = state.selectedScreenshotIndex;
+  const selected = history[selectedIndex] || history[maxIndex];
+  const previewUrl = buildScreenshotContentUrl(sessionId, selectedIndex, selected?.capturedAt);
+  screenshotPreviewEl.src = previewUrl;
+  screenshotPreviewEl.classList.remove('hidden');
+  screenshotEmptyEl.classList.add('hidden');
+  const selectedLabel = selected?.label ? ` • ${selected.label}` : '';
+  screenshotMetaEl.textContent = `${selectedIndex + 1}/${history.length} • ${selected?.source || 'runtime'}${selectedLabel} • ${formatTime(selected?.capturedAt)}`;
+
+  screenshotTimelineEl.innerHTML = history
+    .map((entry, index) => {
+      const thumbUrl = buildScreenshotContentUrl(sessionId, index, entry?.capturedAt);
+      const active = index === selectedIndex ? 'active' : '';
+      return `
+      <button class="screenshot-thumb ${active}" data-idx="${index}">
+        <img src="${thumbUrl}" alt="screenshot ${index + 1}" />
+        <span class="meta">${index + 1}. ${escapeHtml(formatTime(entry?.capturedAt))}${entry?.label ? ` • ${escapeHtml(entry.label)}` : ''}</span>
+      </button>
+    `;
+    })
+    .join('');
+
+  for (const button of screenshotTimelineEl.querySelectorAll('.screenshot-thumb')) {
+    button.addEventListener('click', () => {
+      const index = Number(button.getAttribute('data-idx'));
+      if (!Number.isFinite(index)) {
+        return;
+      }
+      state.selectedScreenshotIndex = index;
+      renderScreenshots(snapshot);
+    });
+  }
+}
+
 function renderSnapshot() {
   const snapshot = state.snapshot;
   if (!snapshot) {
@@ -157,6 +255,7 @@ function renderSnapshot() {
     queueTextEl.textContent = 'queue: 0';
     renderTurns([]);
     renderLogs([]);
+    renderScreenshots(null);
     captchaBoxEl.classList.add('hidden');
     return;
   }
@@ -172,6 +271,7 @@ function renderSnapshot() {
 
   renderTurns(session.turns || []);
   renderLogs(snapshot.logs || []);
+  renderScreenshots(snapshot);
 
   const waitingCaptcha = run.waitingCaptcha || run.status === 'waiting_captcha';
   if (waitingCaptcha) {
@@ -219,6 +319,7 @@ function closeStream() {
 
 async function selectSession(sessionId) {
   state.selectedSessionId = sessionId;
+  state.selectedScreenshotIndex = null;
   renderSessions();
 
   closeStream();

@@ -33,6 +33,19 @@ Loop:
 6. if blocked/security, request human handoff
 7. continue until done
 
+### 2.1 DOM handling strategy (performance + stability)
+
+Before any web-action tool call, enforce this sequence:
+1. never embed full DOM
+2. run structure-first reduction (`nav`, `role`, `header`, `aria-expanded`, link-dense containers, etc.)
+3. only when target is clear, run partial vectorization on reduced candidates (typically 20-100)
+4. use page-scoped in-memory index (`hnswlib-node` when available, brute-force cosine fallback otherwise)
+5. pass only top candidate context to LLM, never full DOM
+
+Key point:
+1. the bottleneck is embedding, not nearest-neighbor search
+2. reuse embedding cache on repeated turns within the same page/session
+
 ## 3. Chat Backend Practical Example
 
 ### 3.1 Start server
@@ -41,6 +54,11 @@ Loop:
 cd runtime
 npm run example:chat-backend
 ```
+
+Notes:
+1. default execution mode is `playwright` (real actions, not simulation)
+2. force simulation mode with `CHAT_AUTOMATION_EXECUTION_MODE=simulate`
+3. if `browserMode=headful` cannot launch GUI, runtime logs emit a headful fallback warning
 
 ### 3.2 Create session
 

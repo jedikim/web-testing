@@ -10,7 +10,7 @@ Core policy:
 1. trigger only on `bug` or `exception`
 2. isolate candidate in `git worktree`
 3. coding model: `gemini-3.1-pro-preview`
-4. automation model: flash tier (`gemini-3.0-flash`)
+4. automation model: flash tier (`gemini-3-flash-preview`)
 5. promote only after explicit user approval
 6. persist every stage (events, attempts, version pointer)
 

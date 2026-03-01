@@ -29,7 +29,7 @@ Constraint: re-clone and compare first, then implement and verify prioritized ad
 | Evolution engine | bug/exception trigger + worktree isolation + approval gating | failure analysis + branch sandbox + approve/merge | keep current worktree model |
 | Chat/session | multi-turn/session state/SSE/pause-resume/captcha input | session/turn/screenshot/handoff APIs | API shape is comparable; runtime implementation differs |
 | Sample UIs | backend UI + chat UI example | evolution-ui + automation/sessions pages | complementary patterns |
-| Model policy | gemini/openai only + single `yolo26l` | gemini-focused | keep current policy |
+| Model policy | gemini/openai only + single `rf-detr-medium` | gemini-focused | keep current policy |
 | Bot-evasion stance | bypass not provided by policy | stealth/human-simulation highlighted | do not adopt stealth bypass direction |
 
 ## 3. Conflict and Risk Findings

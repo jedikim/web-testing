@@ -10,7 +10,7 @@
 
 1. 트리거 한정: 신규 요구가 아니라 `bug/exception` 트리거에서만 진화 시작
 2. 격리 실행: `git worktree`로 별도 후보 버전에서 테스트/수정
-3. 모델 분리: 코딩 수정은 `gemini-3.1-pro-preview`, 자동화 실행 판단은 `gemini-3.0-flash`
+3. 모델 분리: 코딩 수정은 `gemini-3.1-pro-preview`, 자동화 실행 판단은 `gemini-3-flash-preview`
 4. 승인 전환: 테스트 통과 후 `awaiting_approval`에서 사용자 승인 시에만 `promoted`
 5. 기록 보존: 시나리오/테스트 로그/자동수정 로그/버전 히스토리를 파일로 저장
 
@@ -110,7 +110,7 @@ npm run evolution:server
 3. `EVOLUTION_BASE_BRANCH`, `EVOLUTION_TEST_COMMAND`
 4. `EVOLUTION_MAX_AUTOFIX_ATTEMPTS`, `EVOLUTION_TEST_TIMEOUT_MS`
 5. `EVOLUTION_CODING_MODEL` (기본 `gemini-3.1-pro-preview`)
-6. `EVOLUTION_AUTOMATION_MODEL` (기본 `gemini-3.0-flash`)
+6. `EVOLUTION_AUTOMATION_MODEL` (기본 `gemini-3-flash-preview`)
 7. `EVOLUTION_AUTOFIX_ENABLED` (`1`이면 Gemini 패치 자동 적용 시도)
 8. `EVOLUTION_PROMOTE_MODE` (`pointer` or `git-merge`)
 

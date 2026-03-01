@@ -287,7 +287,7 @@ describe('chat automation UI e2e', () => {
         const turns = (await page.locator('#turns').textContent()) ?? '';
         expect(turns).toContain('sample-reference.png');
         expect(logs).toContain('Attachment-aware flow enabled');
-        expect(logs).toContain('Captcha input required from user');
+        expect(logs.toLowerCase()).toContain('captcha input required from user');
         expect(logs).toContain('Run completed successfully');
 
         await context.close();

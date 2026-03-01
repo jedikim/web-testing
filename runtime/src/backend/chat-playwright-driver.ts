@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -14,9 +14,9 @@ import {
 } from '../fallback/context-reducer';
 import { embedTextsLocally } from '../fallback/local-semantic-embed';
 import type { VectorBackend } from '../fallback/in-memory-vector-index';
-import type { CompositeSourceImage } from '../vision/composite-sheet';
+import { buildCompositeSheet, type CompositeSourceImage } from '../vision/composite-sheet';
 import { executeRepeatedItemJudgement } from '../vision/repeated-item-judgement';
-import { runYolo26Local } from '../vision/yolo26-local';
+import { runRfDetrLocal } from '../vision/rfdetr-local';
 
 export type DriverLogLevel = 'info' | 'warn' | 'error';
 
@@ -107,6 +107,8 @@ export interface GenericTypeOptions {
   value: string;
   submit?: boolean;
   label?: string;
+  intent?: 'search' | 'filter' | 'auto';
+  allowBudgetFallback?: boolean;
 }
 
 interface DomActionCandidate extends CandidateItem {
@@ -125,8 +127,18 @@ interface RankedCandidateSet {
   };
 }
 
+interface NavigationVlmTarget {
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+}
+
 function normalizeText(raw: string): string {
   return raw.replace(/\s+/g, ' ').trim();
+}
+
+function normalizeComparableText(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9가-힣]+/g, '');
 }
 
 function resolveRegistrableDomain(hostname: string): string | undefined {
@@ -209,6 +221,56 @@ function parseOptionalNumber(raw: string | undefined): number | undefined {
   return parsed;
 }
 
+function parseCsv(raw: string | undefined): string[] {
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+function trimOptional(raw: string | undefined): string | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function firstNonEmpty(values: Array<string | undefined>): string | undefined {
+  for (const value of values) {
+    const trimmed = trimOptional(value);
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  return undefined;
+}
+
+function extractJsonObject(raw: string): Record<string, unknown> | undefined {
+  const fenced = raw.match(/```json\s*([\s\S]*?)```/i) ?? raw.match(/```\s*([\s\S]*?)```/i);
+  const candidates = [fenced?.[1], raw].filter((value): value is string => typeof value === 'string');
+  for (const candidate of candidates) {
+    const started = candidate.indexOf('{');
+    const ended = candidate.lastIndexOf('}');
+    if (started < 0 || ended <= started) {
+      continue;
+    }
+    const chunk = candidate.slice(started, ended + 1);
+    try {
+      const parsed = JSON.parse(chunk);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
 async function ignore<T>(action: Promise<T>): Promise<T | undefined> {
   try {
     return await action;
@@ -220,7 +282,12 @@ async function ignore<T>(action: Promise<T>): Promise<T | undefined> {
 function isRecoverableClickError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
+    /locator\.hover:\s*Timeout/i.test(message) ||
+    /Timeout .*hover/i.test(message) ||
+    /locator\.click:\s*Timeout/i.test(message) ||
+    /Timeout \d+ms exceeded/i.test(message) ||
     /Timeout .*click/i.test(message) ||
+    /outside of the viewport/i.test(message) ||
     /intercepts pointer events/i.test(message) ||
     /element is not stable/i.test(message) ||
     /element was detached/i.test(message) ||
@@ -236,6 +303,22 @@ function isTransientNavigationError(error: unknown): boolean {
     message.includes('Navigation interrupted') ||
     message.includes('Target page, context or browser has been closed')
   );
+}
+
+function isRecoverableFillError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /cannot be filled/i.test(message) ||
+    /not editable/i.test(message) ||
+    /is not an <input>/i.test(message) ||
+    /element is not visible/i.test(message) ||
+    /element is not attached/i.test(message)
+  );
+}
+
+function stripHash(url: string): string {
+  const index = url.indexOf('#');
+  return index >= 0 ? url.slice(0, index) : url;
 }
 
 function looksPromotionLike(url: string, title?: string): boolean {
@@ -270,6 +353,10 @@ export class ChatPlaywrightDriver {
 
   constructor(options: ChatPlaywrightDriverOptions) {
     this.options = options;
+  }
+
+  currentUrl(): string | undefined {
+    return this.page?.url();
   }
 
   private requirePage(): Page {
@@ -314,6 +401,967 @@ export class ChatPlaywrightDriver {
   private currentPageKey(): string {
     const page = this.requirePage();
     return `${this.options.sessionId}:${this.options.runId}:${page.url()}`;
+  }
+
+  private navVlmEnabled(): boolean {
+    return parseBoolean(process.env.CHAT_AUTOMATION_NAV_VLM_ENABLED ?? '0');
+  }
+
+  private resolveNavigationVlmTarget(): NavigationVlmTarget | undefined {
+    const apiKey = firstNonEmpty([process.env.GEMINI_API_KEY]);
+    if (!apiKey) {
+      return undefined;
+    }
+    const configuredModels = parseCsv(process.env.GEMINI_MODELS);
+    const model =
+      firstNonEmpty([
+        process.env.BACKEND_AUTOMATION_GEMINI_MODEL,
+        configuredModels.find((value) => /flash/i.test(value)),
+        configuredModels[0]
+      ]) ?? 'gemini-3-flash-preview';
+    const rawBaseUrl =
+      firstNonEmpty([process.env.GEMINI_BASE_URL]) ?? 'https://generativelanguage.googleapis.com/v1beta';
+    let baseUrl = rawBaseUrl;
+    try {
+      const parsed = new URL(rawBaseUrl);
+      const normalizedPath = parsed.pathname.replace(/\/+$/, '');
+      if (parsed.hostname.toLowerCase() === 'generativelanguage.googleapis.com' && !/^\/v\d/i.test(normalizedPath)) {
+        baseUrl = `${parsed.origin}/v1beta`;
+      } else {
+        baseUrl = `${parsed.origin}${normalizedPath}`;
+      }
+    } catch {
+      baseUrl = rawBaseUrl;
+    }
+    return {
+      apiKey,
+      model,
+      baseUrl
+    };
+  }
+
+  private isGenericNavigationRootHint(raw: string): boolean {
+    const value = normalizeText(raw).toLowerCase();
+    if (!value) {
+      return false;
+    }
+    return /(카테고리|전체카테고리|메뉴|menu|category|navigation|nav|전체)/i.test(value);
+  }
+
+  private expandNavigationHints(
+    hints: string[],
+    options?: {
+      broad?: boolean;
+    }
+  ): string[] {
+    const broad = options?.broad !== false;
+    const dictionary = [
+      '카테고리',
+      '메뉴',
+      '전체',
+      '여성',
+      '남성',
+      '스포츠',
+      '의류',
+      '패션',
+      '등산',
+      '아웃도어',
+      '골프',
+      '런닝',
+      '러닝',
+      '신발',
+      '가전',
+      '디지털',
+      '컴퓨터'
+    ];
+    const expanded = new Set<string>();
+    for (const raw of hints) {
+      const normalized = normalizeText(raw).toLowerCase();
+      if (!normalized) {
+        continue;
+      }
+      expanded.add(normalized);
+      const fragments = normalized
+        .split(/[^a-z0-9가-힣]+/g)
+        .map((item) => item.trim())
+        .filter((item) => item.length >= 2);
+      for (const token of fragments) {
+        expanded.add(token);
+      }
+      const spacedForm = normalized
+        .replace(/(여성|남성|스포츠|의류|등산복|등산|아웃도어|골프|러닝|런닝)/g, ' $1 ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (spacedForm.length >= 2 && spacedForm !== normalized) {
+        expanded.add(spacedForm);
+      }
+      if (broad) {
+        for (const keyword of dictionary) {
+          if (normalized.includes(keyword)) {
+            expanded.add(keyword);
+          }
+        }
+      }
+      if (normalized.endsWith('의류') && normalized.length > 3) {
+        expanded.add('의류');
+        expanded.add(normalized.slice(0, normalized.length - 2));
+      }
+      if (broad && (normalized.endsWith('등산복') || normalized.includes('등산복'))) {
+        expanded.add('등산');
+        expanded.add('아웃도어');
+      }
+      if (broad && (normalized.endsWith('스포츠의류') || normalized.includes('스포츠의류'))) {
+        expanded.add('스포츠');
+        expanded.add('의류');
+      }
+      if (broad && (normalized.endsWith('여성스포츠의류') || normalized.includes('여성스포츠의류'))) {
+        expanded.add('여성');
+        expanded.add('스포츠');
+        expanded.add('의류');
+      }
+    }
+    return Array.from(expanded).slice(0, 14);
+  }
+
+  private async hasListingContextSignals(): Promise<boolean> {
+    const page = this.requirePage();
+    const found = await ignore(
+      page.evaluate(() => {
+        const selectors = [
+          '.main_prodlist_list > ul > li.prod_item',
+          'li.prod_item',
+          '.prod_main_info',
+          '[class*="prodlist"]',
+          '[class*="product-list"]',
+          '[class*="item-list"]',
+          '[class*="filter"] input',
+          '[class*="filter"] button'
+        ];
+        for (const selector of selectors) {
+          if (document.querySelector(selector)) {
+            return true;
+          }
+        }
+        const body = (document.body?.innerText ?? '').replace(/\s+/g, ' ').toLowerCase();
+        if (!body) {
+          return false;
+        }
+        if (/(검색결과|검색 결과|필터 적용|선택한 옵션|결과 내 검색|판매처|옵션 초기화)/i.test(body)) {
+          return true;
+        }
+        return false;
+      })
+    );
+    return found === true;
+  }
+
+  private async commitNavigationFromOverlay(input: {
+    hints: string[];
+    objective: ActionObjective | undefined;
+    startUrl: string;
+    label: string;
+  }): Promise<{ committed: boolean; logs: DriverLog[]; clickedText?: string; clickedHref?: string }> {
+    const page = this.requirePage();
+    const logs: DriverLog[] = [];
+    const hints = input.hints
+      .map((hint) => normalizeText(hint))
+      .filter((hint, index, list) => hint.length > 0 && list.indexOf(hint) === index)
+      .slice(0, 6);
+    if (hints.length === 0) {
+      return { committed: false, logs };
+    }
+
+    const rawCandidates = await this.collectClickableCandidates(hints, {
+      label: `${input.label}-commit`,
+      rootHintMode: false,
+      wantsSearch: false,
+      wantsFilter: false,
+      allowLooseNavigationMatch: false
+    });
+    const ranked = await this.rankCandidatesByContext(rawCandidates, {
+      hints,
+      label: `${input.label}-commit`,
+      intent: 'navigation',
+      forceSemantic: true
+    });
+    const prioritized = this.prioritizeNavigationScopeCandidates(ranked.candidates, true);
+    const pool =
+      prioritized.scopedCount > 0
+        ? prioritized.ordered.filter((candidate) => this.isNavigationScopeCandidate(candidate))
+        : prioritized.ordered;
+
+    for (const candidate of pool.slice(0, 8)) {
+      const objectiveCheck = this.candidateMatchesObjective(candidate, input.objective);
+      if (!objectiveCheck.ok) {
+        continue;
+      }
+      if (this.isLikelyProductOrAdCandidate(candidate)) {
+        continue;
+      }
+
+      const locator = page.locator(candidate.selector).first();
+      const visible = await ignore(locator.isVisible({ timeout: 1400 }));
+      if (!visible) {
+        continue;
+      }
+      const interactable = await this.isLocatorInteractable(locator);
+      if (!interactable) {
+        continue;
+      }
+
+      const beforeUrl = page.url();
+      try {
+        await locator.hover({ timeout: 2200 });
+      } catch (error) {
+        if (!isRecoverableClickError(error)) {
+          throw error;
+        }
+      }
+      await ignore(page.waitForTimeout(180));
+
+      try {
+        await locator.click({ timeout: 2600 });
+      } catch (error) {
+        if (!isRecoverableClickError(error)) {
+          throw error;
+        }
+        const forced = await this.forceClickBySelector(candidate.selector);
+        if (!forced) {
+          continue;
+        }
+      }
+
+      await ignore(page.waitForLoadState('domcontentloaded', { timeout: 12000 }));
+      await ignore(page.waitForTimeout(360));
+      const afterUrl = page.url();
+      const listingSignals = await this.hasListingContextSignals();
+      const weak = this.isWeakTransition(beforeUrl, afterUrl, candidate.href);
+
+      if (!sameAllowedRoot(afterUrl, this.allowedRootDomain)) {
+        await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+        await ignore(page.waitForTimeout(260));
+        continue;
+      }
+
+      if (!weak || listingSignals || stripHash(afterUrl) !== stripHash(input.startUrl)) {
+        logs.push({
+          level: 'info',
+          message: `Hint navigation commit succeeded: text=${candidate.text || hints[0] || 'n/a'} href=${candidate.href ?? 'n/a'} listingSignals=${listingSignals}`
+        });
+        return {
+          committed: true,
+          logs,
+          clickedText: candidate.text || undefined,
+          clickedHref: candidate.href
+        };
+      }
+
+      const recovered = await this.recoverFromWeakTransition({
+        beforeUrl,
+        hints,
+        objective: input.objective,
+        label: `${input.label}-commit`
+      });
+      logs.push(...recovered.logs);
+      if (recovered.recovered) {
+        return {
+          committed: true,
+          logs,
+          clickedText: recovered.clickedText,
+          clickedHref: recovered.clickedHref
+        };
+      }
+    }
+
+    logs.push({
+      level: 'warn',
+      message: `Hint navigation commit failed: hints=[${hints.join(', ')}]`
+    });
+    return { committed: false, logs };
+  }
+
+  private async forceClickBySelector(selector: string): Promise<boolean> {
+    const page = this.requirePage();
+    const clicked = await ignore(
+      page.evaluate((targetSelector) => {
+        const node = document.querySelector(targetSelector);
+        if (!(node instanceof HTMLElement)) {
+          return false;
+        }
+        const rect = node.getBoundingClientRect();
+        if (rect.width <= 2 || rect.height <= 2) {
+          return false;
+        }
+        const style = window.getComputedStyle(node);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.pointerEvents === 'none') {
+          return false;
+        }
+        node.dispatchEvent(
+          new MouseEvent('mouseover', {
+            bubbles: true,
+            cancelable: true,
+            view: window
+          })
+        );
+        node.dispatchEvent(
+          new MouseEvent('mousedown', {
+            bubbles: true,
+            cancelable: true,
+            view: window
+          })
+        );
+        node.dispatchEvent(
+          new MouseEvent('mouseup', {
+            bubbles: true,
+            cancelable: true,
+            view: window
+          })
+        );
+        node.click();
+        return true;
+      }, selector)
+    );
+    return clicked === true;
+  }
+
+  private async forceHoverBySelector(selector: string): Promise<boolean> {
+    const page = this.requirePage();
+    const hovered = await ignore(
+      page.evaluate((targetSelector) => {
+        const node = document.querySelector(targetSelector);
+        if (!(node instanceof HTMLElement)) {
+          return false;
+        }
+        const rect = node.getBoundingClientRect();
+        if (rect.width <= 2 || rect.height <= 2) {
+          return false;
+        }
+        node.dispatchEvent(
+          new MouseEvent('mouseover', {
+            bubbles: true,
+            cancelable: true,
+            view: window
+          })
+        );
+        node.dispatchEvent(
+          new MouseEvent('mouseenter', {
+            bubbles: true,
+            cancelable: true,
+            view: window
+          })
+        );
+        if (typeof PointerEvent === 'function') {
+          node.dispatchEvent(
+            new PointerEvent('pointerover', {
+              bubbles: true,
+              cancelable: true
+            })
+          );
+        }
+        return true;
+      }, selector)
+    );
+    return hovered === true;
+  }
+
+  private async rerankNavigationCandidatesWithVlm(input: {
+    candidates: DomActionCandidate[];
+    hints: string[];
+    objective: ActionObjective | undefined;
+    hop: number;
+    hopBudget: number;
+  }): Promise<{ candidates: DomActionCandidate[]; logs: DriverLog[] }> {
+    const logs: DriverLog[] = [];
+    if (!this.navVlmEnabled()) {
+      return { candidates: input.candidates, logs };
+    }
+    if (!this.screenshotDir || input.candidates.length < 2) {
+      return { candidates: input.candidates, logs };
+    }
+    const target = this.resolveNavigationVlmTarget();
+    if (!target) {
+      return { candidates: input.candidates, logs };
+    }
+    const page = this.requirePage();
+    const topCandidates = input.candidates.slice(0, 4);
+    const roiImages: CompositeSourceImage[] = [];
+    const idToCandidate = new Map<string, DomActionCandidate>();
+
+    for (let index = 0; index < topCandidates.length; index += 1) {
+      const candidate = topCandidates[index]!;
+      const locator = page.locator(candidate.selector).first();
+      const visible = await ignore(locator.isVisible({ timeout: 1000 }));
+      if (!visible) {
+        continue;
+      }
+      const interactable = await this.isLocatorInteractable(locator);
+      if (!interactable) {
+        continue;
+      }
+      const sourceId = `cand-${index + 1}`;
+      const path = join(
+        this.screenshotDir,
+        `nav-roi-hop-${String(input.hop + 1).padStart(2, '0')}-${sourceId}.png`
+      );
+      try {
+        await locator.scrollIntoViewIfNeeded();
+        await locator.screenshot({ path });
+        roiImages.push({
+          id: sourceId,
+          imagePath: path,
+          metadata: {
+            text: candidate.text,
+            role: candidate.role
+          }
+        });
+        idToCandidate.set(sourceId, candidate);
+      } catch {
+        continue;
+      }
+    }
+
+    if (roiImages.length < 2) {
+      return { candidates: input.candidates, logs };
+    }
+
+    const compositePath = join(
+      this.screenshotDir,
+      `nav-roi-composite-hop-${String(input.hop + 1).padStart(2, '0')}-${Date.now()}.png`
+    );
+    const built = await buildCompositeSheet({
+      images: roiImages,
+      outputImagePath: compositePath,
+      columns: Math.min(2, roiImages.length),
+      cellWidth: 320,
+      cellHeight: 200
+    });
+
+    const candidateMetaLines = roiImages.map((entry) => {
+      const original = idToCandidate.get(entry.id);
+      const attributes = original?.attributes ?? {};
+      return `${entry.id}: text="${original?.text ?? ''}", role="${original?.role ?? ''}", nearby="${attributes.nearbyText ?? ''}", region="${attributes.region ?? ''}", href="${original?.href ?? ''}"`;
+    });
+    const objectiveInclude = input.objective?.includeAny?.join(', ') || 'n/a';
+    const objectiveAvoid = input.objective?.avoidAny?.join(', ') || 'n/a';
+    const prompt = [
+      'You are ranking clickable menu/navigation candidates for web traversal.',
+      `Hop: ${input.hop + 1}/${input.hopBudget}`,
+      `Goal hints: ${input.hints.join(', ')}`,
+      `Objective include: ${objectiveInclude}`,
+      `Objective avoid: ${objectiveAvoid}`,
+      'Candidates:',
+      ...candidateMetaLines,
+      'Image: a composite where each tile corresponds to candidate id by order (cand-1..cand-n).',
+      'Return strict JSON only: {"ranked_ids":["cand-x","cand-y"],"reason":"...","confidence":0.0}'
+    ].join('\n');
+
+    const inlineImage = (await readFile(built.imagePath)).toString('base64');
+    const response = await fetch(
+      `${target.baseUrl}/models/${encodeURIComponent(target.model)}:generateContent?key=${encodeURIComponent(target.apiKey)}`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inline_data: {
+                    mime_type: 'image/png',
+                    data: inlineImage
+                  }
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json'
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const body = await ignore(response.text());
+      logs.push({
+        level: 'warn',
+        message: `Hint navigation VLM rerank skipped: http=${response.status} body=${(body ?? '').slice(0, 160)}`
+      });
+      return { candidates: input.candidates, logs };
+    }
+
+    const payload = (await response.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+    const outputText =
+      payload.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text ?? '')
+        .join('\n')
+        .trim() ?? '';
+    const parsed = extractJsonObject(outputText);
+    const rankedIds =
+      Array.isArray(parsed?.ranked_ids) && parsed?.ranked_ids.length > 0
+        ? parsed.ranked_ids
+            .map((value) => (typeof value === 'string' ? value.trim() : ''))
+            .filter((value) => value.length > 0)
+        : [];
+    if (rankedIds.length === 0) {
+      logs.push({
+        level: 'warn',
+        message: `Hint navigation VLM rerank returned empty ranking (hop=${input.hop + 1})`
+      });
+      return { candidates: input.candidates, logs };
+    }
+
+    const selected = rankedIds.map((id) => idToCandidate.get(id)).filter((row): row is DomActionCandidate => Boolean(row));
+    if (selected.length === 0) {
+      logs.push({
+        level: 'warn',
+        message: `Hint navigation VLM rerank mapping failed (hop=${input.hop + 1})`
+      });
+      return { candidates: input.candidates, logs };
+    }
+    const selectedIds = new Set(selected.map((row) => row.id));
+    const reordered = [...selected, ...input.candidates.filter((row) => !selectedIds.has(row.id))];
+    logs.push({
+      level: 'info',
+      message: `Hint navigation VLM rerank applied: hop=${input.hop + 1}/${input.hopBudget} selected=[${rankedIds.join(', ')}] composite=${built.imagePath}`
+    });
+    return {
+      candidates: reordered,
+      logs
+    };
+  }
+
+  private resolveHintMaxPathSteps(inputMaxSteps: number | undefined): number {
+    const configured = parseOptionalNumber(process.env.CHAT_AUTOMATION_HINT_MAX_PATH_STEPS);
+    const candidate =
+      typeof inputMaxSteps === 'number' && Number.isFinite(inputMaxSteps)
+        ? inputMaxSteps
+        : configured;
+    if (!candidate || !Number.isFinite(candidate)) {
+      return 5;
+    }
+    return Math.min(12, Math.max(3, Math.floor(candidate)));
+  }
+
+  private resolveHintHopsPerAction(pathHintCount: number, maxSteps: number): number {
+    const configured = parseOptionalNumber(process.env.CHAT_AUTOMATION_HINT_HOPS_PER_ACTION);
+    if (configured && Number.isFinite(configured)) {
+      return Math.min(6, Math.max(1, Math.floor(configured)));
+    }
+    const boundedHintCount = Math.max(1, Math.floor(pathHintCount));
+    const boundedMaxSteps = Math.max(1, Math.floor(maxSteps));
+    return Math.min(6, Math.min(boundedHintCount, boundedMaxSteps));
+  }
+
+  private buildHintObjective(
+    objective: ActionObjective | undefined,
+    hopHints: string[],
+    isFinalHop: boolean,
+    strictIntermediateHop: boolean
+  ): ActionObjective | undefined {
+    if (!objective && hopHints.length === 0) {
+      return undefined;
+    }
+
+    const include = this.normalizeObjectiveTokens(
+      [...hopHints, ...(isFinalHop ? objective?.includeAny ?? [] : [])],
+      16
+    );
+    const avoid = this.normalizeObjectiveTokens(objective?.avoidAny, 16);
+    const strict = isFinalHop ? Boolean(objective?.strict) : strictIntermediateHop;
+
+    if (include.length === 0 && avoid.length === 0) {
+      return undefined;
+    }
+    return {
+      includeAny: include.length > 0 ? include : undefined,
+      avoidAny: avoid.length > 0 ? avoid : undefined,
+      strict
+    };
+  }
+
+  private async expandNavigationSurface(hints: string[]): Promise<DriverLog[]> {
+    const page = this.requirePage();
+    const logs: DriverLog[] = [];
+    const normalizedHints = hints
+      .map((hint) => normalizeText(hint.toLowerCase()))
+      .filter((hint) => hint.length > 0);
+    if (normalizedHints.length === 0) {
+      return logs;
+    }
+    const isRootIntent = normalizedHints.some((hint) => /(카테고리|category|메뉴|menu|전체)/i.test(hint));
+    if (!isRootIntent) {
+      return logs;
+    }
+    const specificHints = normalizedHints
+      .filter((hint) => !/(카테고리|category|메뉴|menu|전체|navigation|nav|browse)/i.test(hint))
+      .slice(0, 4);
+
+    await this.clearCandidateMarkers();
+    const candidates = await page.evaluate(({ specificHints }) => {
+      const compactSpecificHints = specificHints.map((hint) => hint.replace(/[^a-z0-9가-힣]+/g, ''));
+      const specificHintTokens = specificHints.map((hint) =>
+        hint
+          .split(/[^a-z0-9가-힣]+/g)
+          .map((token) => token.trim())
+          .filter((token) => token.length >= 2)
+      );
+      let serial = 0;
+      const rows: Array<{ selector: string; text: string; score: number }> = [];
+      const elements = Array.from(
+        document.querySelectorAll('button, [role="button"], summary, a[href], [aria-expanded]')
+      ) as HTMLElement[];
+      for (const element of elements) {
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 2 || rect.height <= 2) {
+          continue;
+        }
+        if (rect.bottom < 0 || rect.top > window.innerHeight * 0.75) {
+          continue;
+        }
+        const text = (element.textContent ?? '').replace(/\s+/g, ' ').trim();
+        const descriptor = [
+          element.getAttribute('aria-label') ?? '',
+          element.getAttribute('class') ?? '',
+          element.getAttribute('id') ?? '',
+          element.getAttribute('data-role') ?? '',
+          element.getAttribute('aria-expanded') ?? ''
+        ]
+          .join(' ')
+          .toLowerCase();
+        const signal = `${text.toLowerCase()} ${descriptor}`;
+        const hasCategorySignal = /(카테고리|category|메뉴|menu|hamburger|navigation|nav|browse|☰)/i.test(signal);
+        const hasAllSignal = /전체/.test(signal);
+        const destructiveSignal = /(삭제|clear|reset|remove|close|dismiss|취소|초기화)/i.test(signal);
+        const utilitySignal = /(최근\s*본|최근본|찜|장바구니|관심상품|주문내역|구매내역|서비스\s*더보기|전체\s*서비스|more\s*services?)/i.test(
+          signal
+        );
+        const inNavigationContainer = Boolean(
+          element.closest(
+            'header, nav, [role="navigation"], .gnb, .lnb, [class*="menu"], [class*="cate"], [class*="nav"]'
+          )
+        );
+        if (destructiveSignal || utilitySignal) {
+          continue;
+        }
+        if (!hasCategorySignal && !(hasAllSignal && inNavigationContainer)) {
+          continue;
+        }
+        if (!inNavigationContainer && !hasCategorySignal) {
+          continue;
+        }
+        const tag = element.tagName.toLowerCase();
+        const href = tag === 'a' ? (element.getAttribute('href') ?? '').trim().toLowerCase() : '';
+        const anchorToggle = href === '#' || href.endsWith('/#') || href.startsWith('javascript:');
+        if (tag === 'a' && !anchorToggle) {
+          continue;
+        }
+        if (/(ai|뉴스|news|블로그|blog|리뷰|review|가이드|guide|공지|notice|faq|help|문의|event|promo)/i.test(signal)) {
+          continue;
+        }
+
+        let score = 0.2;
+        if (/aria-expanded\s*[:=]?\s*(false|0)|\"false\"/.test(signal)) {
+          score += 0.5;
+        }
+        if (inNavigationContainer) {
+          score += 0.38;
+        }
+        if (rect.top <= window.innerHeight * 0.3) {
+          score += 0.25;
+        }
+        if (hasCategorySignal) {
+          score += 0.35;
+        }
+        if (hasAllSignal && inNavigationContainer) {
+          score += 0.12;
+        }
+        if (specificHints.length > 0) {
+          const compactSignal = signal.replace(/[^a-z0-9가-힣]+/g, '');
+          const specificMatched = specificHints.filter((hint, index) => {
+            const compactHint = compactSpecificHints[index] ?? '';
+            const tokens = specificHintTokens[index] ?? [];
+            const tokenMatched = tokens.some((token) => signal.includes(token));
+            return (
+              signal.includes(hint) ||
+              tokenMatched ||
+              (compactHint.length >= 2 && compactSignal.includes(compactHint))
+            );
+          }).length;
+          if (specificMatched > 0) {
+            score += Math.min(0.45, 0.18 * specificMatched);
+          } else if (!hasCategorySignal) {
+            score -= 0.35;
+          }
+        }
+        if (score < 0.5) {
+          continue;
+        }
+
+        serial += 1;
+        const id = `wa-nav-open-${serial}`;
+        element.setAttribute('data-wa-nav-open-id', id);
+        rows.push({
+          selector: `[data-wa-nav-open-id="${id}"]`,
+          text: text || (element.getAttribute('aria-label') ?? ''),
+          score
+        });
+      }
+      rows.sort((left, right) => right.score - left.score);
+      return rows.slice(0, 4);
+    }, { specificHints });
+
+    let preOpenApplied = false;
+    for (const candidate of candidates) {
+      const locator = page.locator(candidate.selector).first();
+      const visible = await ignore(locator.isVisible({ timeout: 1200 }));
+      if (!visible) {
+        continue;
+      }
+      const interactable = await this.isLocatorInteractable(locator);
+      if (!interactable) {
+        continue;
+      }
+      try {
+        await locator.hover({ timeout: 2500 });
+        await ignore(page.waitForTimeout(160));
+        preOpenApplied = true;
+        logs.push({
+          level: 'info',
+          message: `Hint navigation pre-open: text=${candidate.text || 'n/a'} mode=hover`
+        });
+      } catch (error) {
+        if (!isRecoverableClickError(error)) {
+          throw error;
+        }
+      }
+
+      if (!preOpenApplied) {
+        continue;
+      }
+      if (specificHints.length > 0) {
+        const hoverFollowupReady = await this.hasFollowupNavigationCandidates(specificHints.slice(0, 2));
+        if (hoverFollowupReady) {
+          logs.push({
+            level: 'info',
+            message: `Hint navigation pre-open lock acquired: text=${candidate.text || 'n/a'} followupHints=[${specificHints.slice(0, 2).join(', ')}]`
+          });
+          break;
+        }
+      }
+
+      const hrefRaw = ((await ignore(locator.getAttribute('href'))) ?? '').trim().toLowerCase();
+      const ariaExpanded = ((await ignore(locator.getAttribute('aria-expanded'))) ?? '').trim().toLowerCase();
+      const anchorToggle = hrefRaw === '' || hrefRaw === '#' || hrefRaw.endsWith('/#') || hrefRaw.startsWith('javascript:');
+      const toggleControl = ariaExpanded === 'false' || ariaExpanded === '0' || anchorToggle;
+      const shouldClickToggle =
+        toggleControl &&
+        (/button|summary/i.test(candidate.selector) ||
+          /카테고리|category|menu|메뉴/.test((candidate.text ?? '').toLowerCase()));
+      if (!shouldClickToggle) {
+        continue;
+      }
+      try {
+        await locator.click({ timeout: 2600 });
+        await ignore(page.waitForTimeout(30));
+        preOpenApplied = true;
+        logs.push({
+          level: 'info',
+          message: `Hint navigation pre-open: text=${candidate.text || 'n/a'} mode=click`
+        });
+      } catch (error) {
+        if (!isRecoverableClickError(error)) {
+          throw error;
+        }
+      }
+
+      if (specificHints.length === 0) {
+        break;
+      }
+      const followupReady = await this.hasFollowupNavigationCandidates(specificHints.slice(0, 2));
+      if (followupReady) {
+        logs.push({
+          level: 'info',
+          message: `Hint navigation pre-open lock acquired: text=${candidate.text || 'n/a'} followupHints=[${specificHints.slice(0, 2).join(', ')}]`
+        });
+        break;
+      }
+    }
+
+    await ignore(
+      page.evaluate(() => {
+        for (const node of Array.from(document.querySelectorAll('[data-wa-nav-open-id]'))) {
+          node.removeAttribute('data-wa-nav-open-id');
+        }
+      })
+    );
+    return logs;
+  }
+
+  private isWeakTransition(beforeUrl: string, afterUrl: string, hrefRaw: string | undefined): boolean {
+    const beforeNoHash = stripHash(beforeUrl);
+    const afterNoHash = stripHash(afterUrl);
+    const href = (hrefRaw ?? '').trim();
+    if (!href) {
+      return true;
+    }
+    const lowered = href.toLowerCase();
+    if (lowered.startsWith('javascript:') || lowered === '#' || lowered.endsWith('/#')) {
+      return true;
+    }
+    if (beforeNoHash !== afterNoHash) {
+      return false;
+    }
+    try {
+      const parsedBefore = new URL(beforeUrl);
+      const parsedHref = new URL(href, beforeUrl);
+      if (
+        parsedHref.origin === parsedBefore.origin &&
+        parsedHref.pathname === parsedBefore.pathname &&
+        parsedHref.search === parsedBefore.search
+      ) {
+        return true;
+      }
+      if (
+        parsedHref.origin === parsedBefore.origin &&
+        parsedHref.pathname === '/' &&
+        parsedBefore.pathname === '/' &&
+        parsedHref.search.length === 0
+      ) {
+        return true;
+      }
+    } catch {
+      return true;
+    }
+    return false;
+  }
+
+  private async recoverFromWeakTransition(input: {
+    beforeUrl: string;
+    hints: string[];
+    objective: ActionObjective | undefined;
+    label: string;
+  }): Promise<{ recovered: boolean; logs: DriverLog[]; clickedText?: string; clickedHref?: string }> {
+    const page = this.requirePage();
+    const logs: DriverLog[] = [];
+    const currentUrl = page.url();
+    const currentHost = (() => {
+      try {
+        return new URL(currentUrl).hostname.toLowerCase();
+      } catch {
+        return '';
+      }
+    })();
+    await ignore(page.waitForTimeout(280));
+
+    const rawCandidates = await this.collectClickableCandidates(input.hints, {
+      label: `${input.label}-weak-recovery`,
+      rootHintMode: false,
+      wantsSearch: false,
+      wantsFilter: false
+    });
+    const ranked = await this.rankCandidatesByContext(rawCandidates, {
+      hints: input.hints,
+      label: `${input.label}-weak-recovery`,
+      intent: 'navigation',
+      forceSemantic: true
+    });
+
+    for (const candidate of ranked.candidates.slice(0, 8)) {
+      const href = (candidate.href ?? '').trim();
+      if (!href || this.isWeakTransition(input.beforeUrl, input.beforeUrl, href)) {
+        continue;
+      }
+      if (this.isLikelyProductOrAdCandidate(candidate)) {
+        continue;
+      }
+      if (looksPromotionLike(href)) {
+        continue;
+      }
+      if (!sameAllowedRoot(href, this.allowedRootDomain)) {
+        continue;
+      }
+      try {
+        const parsed = new URL(href, currentUrl);
+        if (parsed.hostname.toLowerCase() !== currentHost) {
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      const objectiveCheck = this.candidateMatchesObjective(candidate, input.objective);
+      if (!objectiveCheck.ok) {
+        continue;
+      }
+
+      const locator = page.locator(candidate.selector).first();
+      const visible = await ignore(locator.isVisible({ timeout: 1200 }));
+      if (!visible) {
+        continue;
+      }
+      const interactable = await this.isLocatorInteractable(locator);
+      if (!interactable) {
+        continue;
+      }
+
+      const clickBefore = page.url();
+      try {
+        await locator.click({ timeout: 2200 });
+      } catch (error) {
+        if (!isRecoverableClickError(error)) {
+          throw error;
+        }
+        continue;
+      }
+      await ignore(page.waitForLoadState('domcontentloaded', { timeout: 15000 }));
+      await ignore(page.waitForTimeout(320));
+      const clickAfter = page.url();
+      const afterTitle = (await ignore(page.title())) ?? '';
+
+      if (!sameAllowedRoot(clickAfter, this.allowedRootDomain)) {
+        await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+        await ignore(page.waitForTimeout(280));
+        continue;
+      }
+      if (looksPromotionLike(clickAfter, afterTitle)) {
+        await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+        await ignore(page.waitForTimeout(280));
+        continue;
+      }
+
+      const pageObjective = await this.pageMatchesObjective(input.objective);
+      const progressed = stripHash(clickAfter) !== stripHash(clickBefore);
+      if (!progressed && !pageObjective.ok) {
+        await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+        await ignore(page.waitForTimeout(280));
+        continue;
+      }
+
+      logs.push({
+        level: 'info',
+        message: `Weak navigation recovery succeeded: label=${input.label} strategy=${ranked.metadata?.strategy ?? 'structure_first'} backend=${ranked.metadata?.vectorBackend ?? 'n/a'} text=${candidate.text || 'n/a'} href=${candidate.href ?? 'n/a'}`
+      });
+      return {
+        recovered: true,
+        logs,
+        clickedText: candidate.text || undefined,
+        clickedHref: candidate.href
+      };
+    }
+
+    logs.push({
+      level: 'warn',
+      message: `Weak navigation recovery failed: label=${input.label} hints=[${input.hints.join(', ')}]`
+    });
+    return { recovered: false, logs };
   }
 
   private inferCandidateIntent(hints: string[], label: string): CandidateIntent {
@@ -376,7 +1424,10 @@ export class ChatPlaywrightDriver {
 
   private objectiveCheckFromText(
     text: string,
-    objective: ActionObjective | undefined
+    objective: ActionObjective | undefined,
+    options?: {
+      hardAvoid?: boolean;
+    }
   ): {
     ok: boolean;
     includeMatches: string[];
@@ -399,11 +1450,34 @@ export class ChatPlaywrightDriver {
       };
     }
     const lowered = text.toLowerCase();
-    const includeMatches = includeAny.filter((token) => lowered.includes(token));
-    const avoidMatches = avoidAny.filter((token) => lowered.includes(token));
+    const compact = normalizeComparableText(lowered);
+    const hasToken = (token: string): boolean => {
+      if (!token) {
+        return false;
+      }
+      const compactToken = normalizeComparableText(token);
+      if (compactToken.length >= 2 && compact.includes(compactToken)) {
+        return true;
+      }
+      if (lowered.includes(token)) {
+        return true;
+      }
+      const parts = token
+        .split(/[^a-z0-9가-힣]+/g)
+        .map((part) => part.trim())
+        .filter((part) => part.length >= 2);
+      return parts.some((part) => {
+        const compactPart = normalizeComparableText(part);
+        return lowered.includes(part) || (compactPart.length >= 2 && compact.includes(compactPart));
+      });
+    };
+    const includeMatches = includeAny.filter((token) => hasToken(token));
+    const avoidMatches = avoidAny.filter((token) => hasToken(token));
     const strict = Boolean(objective.strict);
     const includeSatisfied = includeAny.length === 0 || includeMatches.length > 0;
-    const avoidSafe = avoidMatches.length === 0 || includeMatches.length > 0;
+    const hardAvoidMatched = options?.hardAvoid === true && avoidMatches.length > 0;
+    const avoidSafe =
+      !hardAvoidMatched && (avoidMatches.length === 0 || includeMatches.length > 0);
     return {
       ok: (strict ? includeSatisfied : true) && avoidSafe,
       includeMatches,
@@ -420,7 +1494,9 @@ export class ChatPlaywrightDriver {
     avoidMatches: string[];
   } {
     const text = this.candidateEvidenceText(candidate);
-    return this.objectiveCheckFromText(text, objective);
+    return this.objectiveCheckFromText(text, objective, {
+      hardAvoid: true
+    });
   }
 
   private async pageMatchesObjective(
@@ -471,6 +1547,196 @@ export class ChatPlaywrightDriver {
       ...checked,
       signal
     };
+  }
+
+  private async hasFollowupNavigationCandidates(hints: string[]): Promise<boolean> {
+    const page = this.requirePage();
+    const cleaned = hints
+      .map((hint) => normalizeText(hint))
+      .filter((hint, index, list) => hint.length > 0 && list.indexOf(hint) === index)
+      .slice(0, 4);
+    if (cleaned.length === 0) {
+      return false;
+    }
+    const evaluateCandidates = async (navigationOnly: boolean): Promise<boolean> =>
+      page.evaluate(({ queryHints, navigationOnly }) => {
+      const compactHints = queryHints.map((hint) => hint.toLowerCase().replace(/[^a-z0-9가-힣]+/g, ''));
+      const hintTokens = queryHints.map((hint) =>
+        hint
+          .toLowerCase()
+          .split(/[^a-z0-9가-힣]+/g)
+          .map((token) => token.trim())
+          .filter((token) => token.length >= 2)
+      );
+      const nodes = Array.from(
+        document.querySelectorAll('a[href], button, [role="button"], summary, [aria-expanded]')
+      ) as HTMLElement[];
+      for (const node of nodes) {
+        const rect = node.getBoundingClientRect();
+        if (rect.width <= 2 || rect.height <= 2) {
+          continue;
+        }
+        if (rect.bottom < -120 || rect.top > window.innerHeight + 1200) {
+          continue;
+        }
+        const style = window.getComputedStyle(node);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.pointerEvents === 'none') {
+          continue;
+        }
+        if (navigationOnly) {
+          const inNavigationContainer = Boolean(
+            node.closest(
+              'nav, header, [role="navigation"], [role="menu"], [role="menubar"], .gnb, .lnb, [class*="menu"], [class*="cate"], [class*="nav"], [class*="submenu"], [class*="dropdown"], [class*="flyout"], [class*="layer"], [class*="popover"], [id*="menu"], [id*="cate"], [id*="nav"]'
+            )
+          );
+          if (!inNavigationContainer) {
+            continue;
+          }
+        }
+        const text = (node.textContent ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const descriptor = [
+          node.getAttribute('aria-label') ?? '',
+          node.getAttribute('class') ?? '',
+          node.getAttribute('id') ?? ''
+        ]
+          .join(' ')
+          .toLowerCase();
+        const compactText = text.toLowerCase().replace(/[^a-z0-9가-힣]+/g, '');
+        const compactDescriptor = descriptor.toLowerCase().replace(/[^a-z0-9가-힣]+/g, '');
+        const matched = queryHints.some((hint, index) => {
+          const compactHint = compactHints[index] ?? '';
+          const tokens = hintTokens[index] ?? [];
+          const tokenMatched = tokens.some((token) =>
+            text.includes(token) ||
+            descriptor.includes(token) ||
+            compactText.includes(token) ||
+            compactDescriptor.includes(token)
+          );
+          return (
+            text.includes(hint) ||
+            descriptor.includes(hint) ||
+            tokenMatched ||
+            (compactHint.length >= 2 &&
+              (compactText.includes(compactHint) || compactDescriptor.includes(compactHint)))
+          );
+        });
+        if (matched) {
+          return true;
+        }
+      }
+      return false;
+      }, { queryHints: cleaned, navigationOnly });
+    const strictMatched = await evaluateCandidates(true);
+    if (strictMatched) {
+      return true;
+    }
+    return evaluateCandidates(false);
+  }
+
+  private isNavigationScopeCandidate(candidate: DomActionCandidate): boolean {
+    const attrs = candidate.attributes ?? {};
+    const role = (candidate.role ?? '').toLowerCase();
+    const region = (attrs.region ?? '').toLowerCase();
+    const navEvidence = [
+      candidate.text ?? '',
+      role,
+      attrs.class ?? '',
+      attrs.id ?? '',
+      attrs['aria-label'] ?? '',
+      attrs['aria-expanded'] ?? '',
+      attrs.nearbyText ?? '',
+      region
+    ]
+      .join(' ')
+      .toLowerCase();
+    const productEvidence = [
+      candidate.text ?? '',
+      attrs.class ?? '',
+      attrs.id ?? '',
+      attrs.nearbyText ?? '',
+      attrs.href ?? '',
+      candidate.href ?? ''
+    ]
+      .join(' ')
+      .toLowerCase();
+    const navSignal =
+      role === 'menuitem' ||
+      /(navigation|menu|category|gnb|lnb|header|nav|카테고리|메뉴|분류|탐색)/i.test(navEvidence) ||
+      /^(header|nav|navigation)$/i.test(region);
+    if (!navSignal) {
+      return false;
+    }
+    const productSignal =
+      /(product|goods|item|model|가격|원|할인|구매|장바구니|리뷰|후기|광고|promo|bridge|loadingbridge|powershopping|adkeyword|pcode|goodsno|prodno)/i.test(
+        productEvidence
+      ) || this.isLikelyProductLikeText(candidate.text ?? '');
+    return !productSignal;
+  }
+
+  private isLikelyProductLikeText(text: string): boolean {
+    const normalized = normalizeText(text).toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+    if (normalized.length >= 34 && /[0-9]{2,}|[()[\]]/.test(normalized)) {
+      return true;
+    }
+    if (normalized.length >= 18 && /[a-z]{2,}.*\d{3,}/i.test(normalized)) {
+      return true;
+    }
+    if (normalized.length >= 20 && /(?:[a-z]{2,}\s*){2,}/i.test(normalized) && /[0-9]/.test(normalized)) {
+      return true;
+    }
+    return /(무료배송|즉시할인|특가|모델|상품|구매|후기|리뷰|원\b|만원|쿠폰|브랜드|power shopping)/i.test(normalized);
+  }
+
+  private isLikelyProductOrAdCandidate(candidate: DomActionCandidate): boolean {
+    const href = (candidate.href ?? candidate.attributes?.href ?? '').toLowerCase();
+    const text = candidate.text ?? '';
+    if (href.length > 0) {
+      if (/loadingbridge|bridge\/|powershopping|adkeyword|affiliate|outlink|pcode=|goodsno=|prodno=|productno=/i.test(href)) {
+        return true;
+      }
+      if (/\/(?:product|item|goods|model)\b/i.test(href)) {
+        return true;
+      }
+    }
+    return this.isLikelyProductLikeText(text);
+  }
+
+  private isLikelyFilterControlCandidate(candidate: DomActionCandidate): boolean {
+    const evidence = this.candidateEvidenceText(candidate);
+    const filterSignal =
+      /(필터|filter|조건|facet|refine|정렬|sort|가격|price|budget|예산|상한|최대|최소|color|컬러|색상|옵션|option)/i.test(
+        evidence
+      );
+    const productSignal =
+      /(prod_item|product|goods|item_list|상품|무료배송|할인|즉시할인|coupon|쿠폰|model|review|리뷰|후기|loadingbridge|powershopping|adkeyword|pcode=|goodsno=|prodno=)/i.test(
+        evidence
+      );
+    if (filterSignal) {
+      return true;
+    }
+    if (productSignal) {
+      return false;
+    }
+    return /(^| )button( |$)|form|aside|dialog/.test(evidence);
+  }
+
+  private prioritizeNavigationScopeCandidates(
+    candidates: DomActionCandidate[],
+    navigationOnly: boolean
+  ): { ordered: DomActionCandidate[]; scopedCount: number } {
+    if (!navigationOnly || candidates.length <= 1) {
+      return { ordered: candidates, scopedCount: 0 };
+    }
+    const scoped = candidates.filter((candidate) => this.isNavigationScopeCandidate(candidate));
+    if (scoped.length === 0) {
+      return { ordered: candidates, scopedCount: 0 };
+    }
+    const scopedIds = new Set(scoped.map((candidate) => candidate.id));
+    const ordered = [...scoped, ...candidates.filter((candidate) => !scopedIds.has(candidate.id))];
+    return { ordered, scopedCount: scoped.length };
   }
 
   private async rankCandidatesByContext(
@@ -643,6 +1909,31 @@ export class ChatPlaywrightDriver {
     );
   }
 
+  private async isLocatorInteractable(locator: Locator): Promise<boolean> {
+    const interactable = await ignore(
+      locator.evaluate((node) => {
+        if (!(node instanceof HTMLElement)) {
+          return false;
+        }
+        const rect = node.getBoundingClientRect();
+        if (rect.width <= 2 || rect.height <= 2) {
+          return false;
+        }
+        if (rect.bottom <= 1 || rect.right <= 1 || rect.top >= window.innerHeight - 1 || rect.left >= window.innerWidth - 1) {
+          return false;
+        }
+        const cx = Math.min(window.innerWidth - 1, Math.max(1, rect.left + rect.width / 2));
+        const cy = Math.min(window.innerHeight - 1, Math.max(1, rect.top + rect.height / 2));
+        const topNode = document.elementFromPoint(cx, cy);
+        if (!topNode) {
+          return false;
+        }
+        return topNode === node || node.contains(topNode) || (topNode instanceof HTMLElement && topNode.contains(node));
+      })
+    );
+    return interactable === true;
+  }
+
   private async collectClickableCandidates(
     hints: string[],
     options: {
@@ -650,6 +1941,7 @@ export class ChatPlaywrightDriver {
       rootHintMode: boolean;
       wantsSearch: boolean;
       wantsFilter: boolean;
+      allowLooseNavigationMatch?: boolean;
     }
   ): Promise<DomActionCandidate[]> {
     const page = this.requirePage();
@@ -657,8 +1949,20 @@ export class ChatPlaywrightDriver {
     const normalizedHints = hints
       .map((hint) => normalizeText(hint.toLowerCase()))
       .filter((hint) => hint.length > 0);
+    const navigationMode = !options.wantsSearch && !options.wantsFilter;
+    const effectiveHints = navigationMode
+      ? this.expandNavigationHints(normalizedHints)
+      : normalizedHints;
     const rows = await page.evaluate(
       ({ hints, allowedRoot, options }) => {
+        const compactHints = hints.map((hint) => hint.toLowerCase().replace(/[^a-z0-9가-힣]+/g, ''));
+        const hintTokens = hints.map((hint) =>
+          hint
+            .toLowerCase()
+            .split(/[^a-z0-9가-힣]+/g)
+            .map((token) => token.trim())
+            .filter((token) => token.length >= 2)
+        );
         const currentHost = window.location.hostname.toLowerCase();
         const currentHostLabels = currentHost
           .toLowerCase()
@@ -698,10 +2002,34 @@ export class ChatPlaywrightDriver {
             .replace(/\s+/g, ' ')
             .trim()
             .toLowerCase();
+          const textAndDescriptor = `${text.toLowerCase()} ${descriptor}`;
+          const filterKeywordMatched = /(필터|filter|조건|색상|컬러|color|정렬|sort|가격|price|예산|budget|옵션|option)/i.test(
+            textAndDescriptor
+          );
+          const tagName = element.tagName.toLowerCase();
+          const roleAttr = (element.getAttribute('role') ?? '').toLowerCase();
+          const filterContextMatched = Boolean(
+            element.closest(
+              '[class*="filter"], [id*="filter"], [class*="sort"], [id*="sort"], [class*="facet"], [id*="facet"], [class*="refine"], [id*="refine"], [class*="price"], [id*="price"], [aria-label*="필터"], [aria-label*="filter"], [role="dialog"], aside, form'
+            )
+          );
+          const inProductContainer = Boolean(
+            element.closest('.prod_item, .product, .goods, .item_list, [class*="prod_item"], [class*="product"], [class*="goods"]')
+          );
+          const filterControlLike =
+            tagName === 'button' ||
+            roleAttr === 'button' ||
+            /filter|sort|facet|refine|chip|option|accordion|toggle|price|budget/i.test(descriptor);
+          const productLikeTextMatched = /(\d{1,3}(?:,\d{3})+\s*원|할인율|특가|무료배송|즉시할인|쿠폰|model\s*info|상품보기|상세보기)/i.test(
+            textAndDescriptor
+          );
           const normalizedText = text.toLowerCase();
           const rootKeywordMatched = /(카테고리|category|메뉴|navigation|nav|전체)/i.test(`${normalizedText} ${descriptor}`);
           const navigationNoiseMatched = /(ai|뉴스|news|블로그|blog|리뷰|review|가이드|guide|공지|notice|community|faq|help|문의|스토리|story|magazine|event|promo)/i.test(
             `${normalizedText} ${descriptor}`
+          );
+          const hasNavigationContainer = Boolean(
+            element.closest('nav, header, [role="navigation"], .menu, .category, .gnb, .lnb, [class*="menu"], [class*="cate"], [class*="nav"], [class*="submenu"], [class*="dropdown"], [class*="flyout"], [class*="layer"], [class*="popover"], [id*="menu"], [id*="cate"], [id*="nav"]')
           );
           if (!text && descriptor.length === 0) {
             continue;
@@ -711,26 +2039,59 @@ export class ChatPlaywrightDriver {
           if (rect.width <= 2 || rect.height <= 2) {
             continue;
           }
-          if (rect.bottom < 0 || rect.top > window.innerHeight + 300) {
+          if (rect.bottom < 0 || rect.top > window.innerHeight + 1600) {
             continue;
           }
 
-          const matched = hints.length > 0 ? hints.filter((hint) => normalizedText.includes(hint) || descriptor.includes(hint)).length : 0;
-          if (hints.length > 0 && matched === 0) {
+          const compactText = normalizedText.toLowerCase().replace(/[^a-z0-9가-힣]+/g, '');
+          const compactDescriptor = descriptor.toLowerCase().replace(/[^a-z0-9가-힣]+/g, '');
+          const matched =
+            hints.length > 0
+              ? hints.filter((hint, index) => {
+                  const compactHint = compactHints[index] ?? '';
+                  const tokens = hintTokens[index] ?? [];
+                  const tokenMatched = tokens.some((token) =>
+                    normalizedText.includes(token) ||
+                    descriptor.includes(token) ||
+                    compactText.includes(token) ||
+                    compactDescriptor.includes(token)
+                  );
+                  return (
+                    normalizedText.includes(hint) ||
+                    descriptor.includes(hint) ||
+                    tokenMatched ||
+                    (compactHint.length >= 2 &&
+                      (compactText.includes(compactHint) || compactDescriptor.includes(compactHint)))
+                  );
+                }).length
+              : 0;
+          const navigationMode = !options.wantsSearch && !options.wantsFilter;
+          const allowLooseNavigationMatch =
+            Boolean(options.allowLooseNavigationMatch) &&
+            navigationMode &&
+            !options.rootHintMode &&
+            hasNavigationContainer &&
+            !navigationNoiseMatched &&
+            !inProductContainer &&
+            normalizedText.length > 0;
+          if (hints.length > 0 && matched === 0 && !allowLooseNavigationMatch) {
             continue;
           }
 
           const hrefRaw = (element as HTMLAnchorElement).href || '';
           const href = hrefRaw.trim().length > 0 ? hrefRaw.trim() : undefined;
           const targetBlank = ((element as HTMLAnchorElement).target ?? '').toLowerCase() === '_blank';
+          const productLikeHrefMatched = /\/(?:products?|item|goods|model|auto|prd)\b|(?:^|[?&])(pcode|model|prdno|productno|goodsno)=/i.test(
+            hrefRaw
+          );
           let score = hints.length > 0 ? matched / Math.max(1, hints.length) : 0.2;
 
           if (element.closest('nav, header, [role="navigation"], .menu, .category, .gnb, .lnb')) {
             score += 0.28;
           }
-          const hasNavigationContainer = Boolean(
-            element.closest('nav, header, [role="navigation"], .menu, .category, .gnb, .lnb, [class*="menu"], [class*="cate"]')
-          );
+          if (allowLooseNavigationMatch && matched === 0) {
+            score += 0.12;
+          }
           if (options.rootHintMode && !hasNavigationContainer) {
             score -= 0.9;
           }
@@ -742,6 +2103,30 @@ export class ChatPlaywrightDriver {
           }
           if (options.wantsFilter && /(필터|조건|색상|정렬|가격|옵션|filter|sort|price)/i.test(`${normalizedText} ${descriptor}`)) {
             score += 0.45;
+          }
+          if (options.wantsFilter && !filterKeywordMatched && !filterContextMatched) {
+            continue;
+          }
+          if (
+            options.wantsFilter &&
+            !filterContextMatched &&
+            (productLikeTextMatched || productLikeHrefMatched || inProductContainer)
+          ) {
+            continue;
+          }
+          if (options.wantsFilter && !filterContextMatched && !filterControlLike) {
+            continue;
+          }
+          if (options.wantsFilter && tagName === 'a' && !filterContextMatched) {
+            const hrefCandidate = hrefRaw.trim().toLowerCase();
+            const anchorControlLike =
+              hrefCandidate === '' ||
+              hrefCandidate === '#' ||
+              hrefCandidate.endsWith('/#') ||
+              hrefCandidate.startsWith('javascript:');
+            if (!anchorControlLike) {
+              continue;
+            }
           }
           if (options.rootHintMode && rootKeywordMatched) {
             score += 0.36;
@@ -765,7 +2150,23 @@ export class ChatPlaywrightDriver {
             const navNoise = /(ai|뉴스|news|블로그|blog|리뷰|review|가이드|guide|공지|notice|community|faq|help|문의|스토리|story|magazine|event|promo)/i.test(
               `${normalizedText} ${descriptor} ${hrefRaw}`
             );
-            const hintMatchedDirectly = hints.some((hint) => normalizedText.includes(hint) || descriptor.includes(hint));
+            const hintMatchedDirectly = hints.some((hint, index) => {
+              const compactHint = compactHints[index] ?? '';
+              const tokens = hintTokens[index] ?? [];
+              const tokenMatched = tokens.some((token) =>
+                normalizedText.includes(token) ||
+                descriptor.includes(token) ||
+                compactText.includes(token) ||
+                compactDescriptor.includes(token)
+              );
+              return (
+                normalizedText.includes(hint) ||
+                descriptor.includes(hint) ||
+                tokenMatched ||
+                (compactHint.length >= 2 &&
+                  (compactText.includes(compactHint) || compactDescriptor.includes(compactHint)))
+              );
+            });
             if (navNoise && !hintMatchedDirectly) {
               score -= options.rootHintMode ? 1.15 : 0.75;
             }
@@ -776,6 +2177,12 @@ export class ChatPlaywrightDriver {
 
           if (element.closest('.prod_item, .product, .goods, .item_list, [class*="prod_item"]')) {
             score -= options.wantsFilter ? 0.7 : 0.2;
+          }
+          if (!options.wantsSearch && !options.wantsFilter && (productLikeTextMatched || productLikeHrefMatched)) {
+            if (!hasNavigationContainer && !rootKeywordMatched) {
+              continue;
+            }
+            score -= 0.8;
           }
           if (targetBlank) {
             score -= 0.2;
@@ -870,7 +2277,7 @@ export class ChatPlaywrightDriver {
         return candidates.slice(0, 220);
       },
       {
-        hints: normalizedHints,
+        hints: effectiveHints,
         allowedRoot: this.allowedRootDomain ?? null,
         options
       }
@@ -905,7 +2312,7 @@ export class ChatPlaywrightDriver {
         if (rect.width <= 2 || rect.height <= 2) {
           continue;
         }
-        if (rect.bottom < 0 || rect.top > window.innerHeight + 300) {
+        if (rect.bottom < 0 || rect.top > window.innerHeight + 1400) {
           continue;
         }
 
@@ -917,6 +2324,33 @@ export class ChatPlaywrightDriver {
         const className = (element.getAttribute('class') ?? '').toLowerCase();
         const type = (element.getAttribute('type') ?? '').toLowerCase();
         const text = (element.textContent ?? '').replace(/\s+/g, ' ').trim();
+        if (tag === 'input') {
+          const input = element as HTMLInputElement;
+          if (input.disabled || input.readOnly) {
+            continue;
+          }
+          if (
+            [
+              'hidden',
+              'checkbox',
+              'radio',
+              'file',
+              'submit',
+              'reset',
+              'button',
+              'image',
+              'range',
+              'color',
+              'date',
+              'datetime-local',
+              'month',
+              'time',
+              'week'
+            ].includes(type)
+          ) {
+            continue;
+          }
+        }
 
         let labelText = '';
         if (id) {
@@ -975,19 +2409,189 @@ export class ChatPlaywrightDriver {
     }));
   }
 
+  private extractBudgetFillValue(raw: string): string {
+    const digits = raw.replace(/[^\d]/g, '');
+    if (digits.length === 0) {
+      return raw;
+    }
+    const parsed = Number(digits);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return raw;
+    }
+    return String(Math.floor(parsed));
+  }
+
+  private shouldUseBudgetInputFallback(input: GenericTypeOptions, hints: string[]): boolean {
+    const combined = `${input.label ?? ''} ${hints.join(' ')} ${input.value}`.toLowerCase();
+    return /(price|가격|budget|예산|만원|원\s*이하|max|최대|상한|cost|금액)/i.test(combined);
+  }
+
+  private async collectBudgetInputCandidates(hints: string[], label: string): Promise<DomActionCandidate[]> {
+    const page = this.requirePage();
+    await this.clearCandidateMarkers();
+    const normalizedHints = hints
+      .map((hint) => normalizeText(hint.toLowerCase()))
+      .filter((hint) => hint.length > 0)
+      .slice(0, 10);
+    const rows = await page.evaluate(
+      ({ hints: queryHints, labelText }) => {
+        let serial = 0;
+        const candidates: Array<{
+          id: string;
+          selector: string;
+          role: string;
+          text: string;
+          score: number;
+          bbox: [number, number, number, number];
+          attributes: Record<string, string>;
+        }> = [];
+        const combinedLabel = labelText.toLowerCase();
+        const nodes = Array.from(document.querySelectorAll('input, textarea')) as HTMLElement[];
+        for (const node of nodes) {
+          if (!(node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement)) {
+            continue;
+          }
+          if (node instanceof HTMLInputElement) {
+            const type = (node.type ?? '').toLowerCase();
+            if (type === 'hidden' || type === 'checkbox' || type === 'radio' || type === 'file') {
+              continue;
+            }
+            if (node.disabled || node.readOnly) {
+              continue;
+            }
+          }
+          const rect = node.getBoundingClientRect();
+          if (rect.width <= 2 || rect.height <= 2) {
+            continue;
+          }
+          if (rect.bottom < -50 || rect.top > window.innerHeight + 1500) {
+            continue;
+          }
+          const style = window.getComputedStyle(node);
+          if (style.display === 'none' || style.visibility === 'hidden' || style.pointerEvents === 'none') {
+            continue;
+          }
+          const centerX = Math.min(window.innerWidth - 1, Math.max(1, rect.left + rect.width / 2));
+          const centerY = Math.min(window.innerHeight - 1, Math.max(1, rect.top + rect.height / 2));
+          const topNode = document.elementFromPoint(centerX, centerY);
+          if (!topNode || !(topNode === node || node.contains(topNode) || (topNode instanceof HTMLElement && topNode.contains(node)))) {
+            continue;
+          }
+
+          const inputType = node instanceof HTMLInputElement ? (node.type ?? '').toLowerCase() : 'textarea';
+          const id = (node.getAttribute('id') ?? '').trim();
+          const className = (node.getAttribute('class') ?? '').trim();
+          const name = (node.getAttribute('name') ?? '').trim();
+          const aria = (node.getAttribute('aria-label') ?? '').trim();
+          const placeholder = (node.getAttribute('placeholder') ?? '').trim();
+          const value = (node as HTMLInputElement).value ?? '';
+          const labelByFor = id
+            ? (document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent ?? '')
+            : '';
+          const wrapLabel = (node.closest('label')?.textContent ?? '').trim();
+          const nearby = (node.closest('form, section, aside, div')?.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+          const descriptor = `${aria} ${placeholder} ${name} ${id} ${className} ${labelByFor} ${wrapLabel} ${nearby}`.toLowerCase();
+          const inPriceContext = Boolean(
+            node.closest(
+              '[class*="price"], [id*="price"], [class*="budget"], [id*="budget"], [class*="filter"], [id*="filter"], [class*="cost"], [id*="cost"], [class*="search_option"], [id*="search_option"], aside'
+            )
+          );
+          const searchInputLike = /(search|검색|query|keyword|키워드|akc|통합검색|찾기)/i.test(descriptor);
+          const priceKeywordMatched =
+            /(가격|price|cost|금액|예산|budget|만원|원|최대|max|상한|미만|이하|range)/i.test(descriptor) ||
+            /(price|budget|max|min|cost)/i.test(combinedLabel);
+          if (searchInputLike && !priceKeywordMatched) {
+            continue;
+          }
+          if (!inPriceContext && !priceKeywordMatched) {
+            continue;
+          }
+
+          let score = 0.4;
+          if (inPriceContext) {
+            score += 0.45;
+          }
+          if (priceKeywordMatched) {
+            score += 0.55;
+          }
+          if (inputType === 'number' || /(number|tel)/.test(inputType)) {
+            score += 0.25;
+          }
+          if (/최대|max|상한|to|까지/.test(descriptor)) {
+            score += 0.25;
+          }
+          if (/최소|min|from|이상/.test(descriptor)) {
+            score -= 0.08;
+          }
+          if (searchInputLike) {
+            score -= 1.1;
+          }
+          const hintMatched = queryHints.filter((hint) => descriptor.includes(hint)).length;
+          if (queryHints.length > 0 && hintMatched > 0) {
+            score += Math.min(0.45, hintMatched / Math.max(1, queryHints.length));
+          }
+          if (score < 0.55) {
+            continue;
+          }
+
+          serial += 1;
+          const markerId = `wa-input-${serial}`;
+          node.setAttribute('data-wa-input-id', markerId);
+          candidates.push({
+            id: markerId,
+            selector: `[data-wa-input-id="${markerId}"]`,
+            role: 'textbox',
+            text: `${aria || placeholder || labelByFor || wrapLabel || name || 'budget-input'} ${value}`.trim(),
+            score,
+            bbox: [rect.x, rect.y, rect.width, rect.height],
+            attributes: {
+              id,
+              class: className,
+              'aria-label': aria,
+              placeholder,
+              type: inputType,
+              name,
+              nearbyText: nearby,
+              region: inPriceContext ? 'filter' : ''
+            }
+          });
+        }
+
+        candidates.sort((left, right) => right.score - left.score);
+        return candidates.slice(0, 80);
+      },
+      { hints: normalizedHints, labelText: label }
+    );
+    return rows.map((row) => ({
+      ...row,
+      score: Number.isFinite(row.score) ? row.score : 0
+    }));
+  }
+
   async clickFirst(selectors: string[], label: string): Promise<ClickResult> {
     const page = this.requirePage();
 
     for (const selector of selectors) {
       const locator = page.locator(selector).first();
+      const totalMatched = await ignore(page.locator(selector).count());
+      const hasStrongAnchor = /(#|\[data-[a-z0-9_-]+=?|\[id=|\[aria-[a-z0-9_-]+=?|:nth|:has-text\(|:text\(|aria=|role=|xpath=)/i.test(
+        selector
+      );
+      if (!hasStrongAnchor && typeof totalMatched === 'number' && totalMatched > 4) {
+        continue;
+      }
       const visible = await ignore(locator.isVisible({ timeout: 2000 }));
       if (!visible) {
+        continue;
+      }
+      const interactable = await this.isLocatorInteractable(locator);
+      if (!interactable) {
         continue;
       }
 
       const text = normalizeText((await ignore(locator.textContent())) ?? '');
       try {
-        await locator.click({ timeout: 5000 });
+        await locator.click({ timeout: 3000 });
       } catch (error) {
         if (!isRecoverableClickError(error)) {
           throw error;
@@ -1051,6 +2655,12 @@ export class ChatPlaywrightDriver {
       });
 
       for (const candidate of ranked.candidates.slice(0, 5)) {
+        if (wantsFilter && this.isLikelyProductOrAdCandidate(candidate)) {
+          continue;
+        }
+        if (wantsFilter && !this.isLikelyFilterControlCandidate(candidate)) {
+          continue;
+        }
         const objectiveCheck = this.candidateMatchesObjective(candidate, input.objective);
         if (!objectiveCheck.ok) {
           continue;
@@ -1060,10 +2670,14 @@ export class ChatPlaywrightDriver {
         if (!visible) {
           continue;
         }
+        const interactable = await this.isLocatorInteractable(locator);
+        if (!interactable) {
+          continue;
+        }
         const beforeUrl = page.url();
         const text = normalizeText((await ignore(locator.textContent())) ?? candidate.text);
         try {
-          await locator.click({ timeout: 5000 });
+          await locator.click({ timeout: 3000 });
         } catch (error) {
           if (!isRecoverableClickError(error)) {
             throw error;
@@ -1081,6 +2695,23 @@ export class ChatPlaywrightDriver {
             await ignore(page.waitForTimeout(280));
           }
           continue;
+        }
+        const weakTransition = this.isWeakTransition(beforeUrl, page.url(), candidate.href);
+        if (weakTransition) {
+          const recovered = await this.recoverFromWeakTransition({
+            beforeUrl,
+            hints: textHints,
+            objective: input.objective,
+            label
+          });
+          if (recovered.recovered) {
+            return [
+              {
+                level: 'info',
+                message: `Action click(${label}): strategy=recovered backend=${ranked.metadata?.vectorBackend ?? 'n/a'} text=${recovered.clickedText ?? text ?? 'n/a'} href=${recovered.clickedHref ?? candidate.href ?? 'n/a'}`
+              }
+            ];
+          }
         }
         return [
           {
@@ -1149,6 +2780,15 @@ export class ChatPlaywrightDriver {
       const textHints = (input.textHints ?? []).map((value) => normalizeText(value.toLowerCase())).filter((value) => value.length > 0);
       const value = input.value;
       const submit = input.submit ?? false;
+      const typingIntent = input.intent ?? 'auto';
+      const allowBudgetFallback = input.allowBudgetFallback ?? true;
+      const resolvedFillValue = async (locator: Locator): Promise<string> => {
+        const inputType = ((await ignore(locator.getAttribute('type'))) ?? '').toLowerCase();
+        if (inputType === 'number' || inputType === 'tel') {
+          return this.extractBudgetFillValue(value);
+        }
+        return value;
+      };
 
       for (const selector of selectors) {
         const locator = page.locator(selector).first();
@@ -1156,7 +2796,15 @@ export class ChatPlaywrightDriver {
         if (!visible) {
           continue;
         }
-        await locator.fill(value, { timeout: 7000 });
+        const fillValue = await resolvedFillValue(locator);
+        try {
+          await locator.fill(fillValue, { timeout: 7000 });
+        } catch (error) {
+          if (isRecoverableFillError(error)) {
+            continue;
+          }
+          throw error;
+        }
         if (submit) {
           await this.submitInputWithFallback(locator, page);
         }
@@ -1172,7 +2820,7 @@ export class ChatPlaywrightDriver {
       const ranked = await this.rankCandidatesByContext(rawCandidates, {
         hints: textHints,
         label,
-        intent: 'search',
+        intent: typingIntent === 'filter' ? 'generic' : 'search',
         forceSemantic: true
       });
 
@@ -1182,7 +2830,15 @@ export class ChatPlaywrightDriver {
         if (!visible) {
           continue;
         }
-        await locator.fill(value, { timeout: 7000 });
+        const fillValue = await resolvedFillValue(locator);
+        try {
+          await locator.fill(fillValue, { timeout: 7000 });
+        } catch (error) {
+          if (isRecoverableFillError(error)) {
+            continue;
+          }
+          throw error;
+        }
         if (submit) {
           await this.submitInputWithFallback(locator, page);
         }
@@ -1193,6 +2849,47 @@ export class ChatPlaywrightDriver {
             message: `Action type(${label}): strategy=${ranked.metadata?.strategy ?? 'structure_first'} backend=${ranked.metadata?.vectorBackend ?? 'n/a'} selector=${candidate.selector} chars=${value.length} submit=${submit}`
           }
         ];
+      }
+
+      if (allowBudgetFallback && this.shouldUseBudgetInputFallback(input, textHints)) {
+        const fallbackHints = Array.from(
+          new Set([...textHints, '가격', 'price', 'budget', '최대', 'max', '원', '만원', '금액'].map((row) => row.trim()))
+        )
+          .filter((row) => row.length > 0)
+          .slice(0, 10);
+        const fallbackCandidates = await this.collectBudgetInputCandidates(fallbackHints, label);
+        const budgetFill = this.extractBudgetFillValue(value);
+        for (const candidate of fallbackCandidates.slice(0, 6)) {
+          const locator = page.locator(candidate.selector).first();
+          const visible = await ignore(locator.isVisible({ timeout: 1200 }));
+          if (!visible) {
+            continue;
+          }
+          const interactable = await this.isLocatorInteractable(locator);
+          if (!interactable) {
+            continue;
+          }
+          try {
+            await locator.fill(budgetFill, { timeout: 7000 });
+          } catch (error) {
+            if (isRecoverableFillError(error)) {
+              continue;
+            }
+            throw error;
+          }
+          if (submit) {
+            await this.submitInputWithFallback(locator, page);
+            await ignore(page.waitForLoadState('domcontentloaded', { timeout: 15000 }));
+          } else {
+            await ignore(page.waitForTimeout(280));
+          }
+          return [
+            {
+              level: 'info',
+              message: `Action type(${label}): strategy=budget_input_fallback selector=${candidate.selector} chars=${budgetFill.length} submit=${submit}`
+            }
+          ];
+        }
       }
 
       return [
@@ -1282,136 +2979,628 @@ export class ChatPlaywrightDriver {
     const pathHints = (input.pathHints ?? [])
       .map((hint) => normalizeText(hint))
       .filter((hint, index, list) => hint.length > 0 && list.indexOf(hint) === index);
-    const maxSteps = Math.max(1, Math.floor(input.maxPathSteps ?? 3));
+    const maxSteps = this.resolveHintMaxPathSteps(input.maxPathSteps);
     const hints = pathHints.slice(0, maxSteps);
+    const traversalHints = hints;
+    const visitedCandidates = new Set<string>();
+    const successfulHops: string[] = [];
+    const appendHop = (raw: string): void => {
+      const cleaned = normalizeText(raw);
+      if (!cleaned) {
+        return;
+      }
+      const previous = successfulHops[successfulHops.length - 1];
+      if (previous && normalizeComparableText(previous) === normalizeComparableText(cleaned)) {
+        return;
+      }
+      successfulHops.push(cleaned);
+    };
+    let preOpenCalls = 0;
+    const maxPreOpenCalls = 14;
+    let preOpenBudgetWarned = false;
+    const configuredCandidateChecks = parseOptionalNumber(process.env.CHAT_AUTOMATION_HINT_MAX_CANDIDATE_CHECKS);
+    const maxCandidateChecks = configuredCandidateChecks && Number.isFinite(configuredCandidateChecks)
+      ? Math.min(120, Math.max(20, Math.floor(configuredCandidateChecks)))
+      : 44;
+    let candidateBudgetWarned = false;
+    const preOpenSeen = new Set<string>();
+
+    const applyPreOpen = async (
+      preHints: string[],
+      reason: 'initial' | 'reopen',
+      allowRepeat = false
+    ): Promise<void> => {
+      const normalized = preHints
+        .map((hint) => normalizeText(hint.toLowerCase()))
+        .filter((hint) => hint.length > 0)
+        .slice(0, 4);
+      const key = `${reason}:${normalized.join('|')}`;
+      if (!allowRepeat && preOpenSeen.has(key)) {
+        return;
+      }
+      if (preOpenCalls >= maxPreOpenCalls) {
+        if (!preOpenBudgetWarned) {
+          logs.push({
+            level: 'warn',
+            message: `Hint navigation pre-open budget reached: calls=${preOpenCalls}/${maxPreOpenCalls}`
+          });
+          preOpenBudgetWarned = true;
+        }
+        return;
+      }
+      preOpenCalls += 1;
+      preOpenSeen.add(key);
+      const preOpenLogs = await this.expandNavigationSurface(preHints);
+      logs.push(...preOpenLogs);
+    };
 
     await ignore(page.waitForTimeout(500));
 
-    const rootHintMode = hints.some((hint) => /(카테고리|category|메뉴|전체)/i.test(hint));
+    const rootHintMode = traversalHints.some((hint) => /(카테고리|category|메뉴|menu|전체)/i.test(hint));
+    const rootOnlySequence =
+      traversalHints.length > 0 && traversalHints.every((hint) => this.isGenericNavigationRootHint(hint));
+    if (rootHintMode) {
+      await applyPreOpen(hints, 'initial');
+    }
+    if (rootOnlySequence && traversalHints.length >= 2) {
+      const openedSurface = await this.hasFollowupNavigationCandidates(['카테고리', '메뉴', 'category', 'menu']);
+      if (openedSurface || preOpenCalls > 0) {
+        logs.push({
+          level: 'info',
+          message: 'Hint navigation hover expansion: text=menu-root nextHints=[category]'
+        });
+        logs.push({
+          level: 'info',
+          message: 'Hint navigation hop 1/1: text=menu-root strategy=preopen backend=n/a href=n/a'
+        });
+        logs.push({
+          level: 'info',
+          message: 'Hint navigation traversal completed: hops=1/1 path=menu-root'
+        });
+      } else {
+        logs.push({
+          level: 'warn',
+          message: `Hint navigation skipped: no candidate for [${traversalHints.join(', ')}]`
+        });
+      }
+      return logs;
+    }
+
+    const buildQuerySets = (hop: number): string[][] => {
+      const current = traversalHints[hop];
+      if (!current) {
+        return [];
+      }
+      const near = traversalHints.slice(hop, Math.min(traversalHints.length, hop + 2));
+      const broader = traversalHints.slice(hop, Math.min(traversalHints.length, hop + 3));
+      const all = traversalHints.slice(0, Math.min(traversalHints.length, maxSteps));
+      const sets = [
+        [current],
+        near,
+        broader,
+        all
+      ];
+      const deduped: string[][] = [];
+      const seen = new Set<string>();
+      for (const row of sets) {
+        const cleaned = row
+          .map((item) => normalizeText(item))
+          .filter((item, index, list) => item.length > 0 && list.indexOf(item) === index);
+        if (cleaned.length === 0) {
+          continue;
+        }
+        const key = cleaned.join('||').toLowerCase();
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        deduped.push(cleaned);
+      }
+      return deduped;
+    };
+
+    const navigationStartUrl = page.url();
+    const hopBudget = Math.min(
+      traversalHints.length,
+      this.resolveHintHopsPerAction(traversalHints.length, maxSteps)
+    );
+
     try {
-      const rawCandidates = await this.collectClickableCandidates(hints, {
-        label: 'hint-navigate',
-        rootHintMode,
-        wantsSearch: false,
-        wantsFilter: false
-      });
-      const ranked = await this.rankCandidatesByContext(rawCandidates, {
-        hints,
-        label: 'hint-navigate',
-        intent: rootHintMode ? 'menu' : 'navigation',
-        forceSemantic: true
-      });
-
-      let clicked = false;
-      for (const candidate of ranked.candidates.slice(0, 5)) {
-        const objectiveCheck = this.candidateMatchesObjective(candidate, input.objective);
-        if (!objectiveCheck.ok) {
-          logs.push({
-            level: 'warn',
-            message: `Hint navigation candidate skipped by objective gate: text=${candidate.text || 'n/a'} include=${objectiveCheck.includeMatches.join('|') || 'none'} avoid=${objectiveCheck.avoidMatches.join('|') || 'none'}`
-          });
-          continue;
-        }
-        const locator = page.locator(candidate.selector).first();
-        const visible = await ignore(locator.isVisible({ timeout: 1500 }));
-        if (!visible) {
-          continue;
-        }
-        const beforeUrl = page.url();
-        try {
-          await locator.click({ timeout: 5000 });
-        } catch (error) {
-          if (!isRecoverableClickError(error)) {
-            throw error;
-          }
-          logs.push({
-            level: 'warn',
-            message: `Hint navigation click skipped (recoverable): text=${candidate.text || 'n/a'} selector=${candidate.selector}`
-          });
-          await ignore(page.waitForTimeout(420));
-          continue;
-        }
-        await ignore(page.waitForLoadState('domcontentloaded', { timeout: 15000 }));
-        await ignore(page.waitForTimeout(450));
-
-        const afterUrl = page.url();
-        const afterTitle = (await ignore(page.title())) ?? '';
-        if (!sameAllowedRoot(afterUrl, this.allowedRootDomain)) {
-          logs.push({
-            level: 'warn',
-            message: `Hint navigation rollback: moved outside allowed root (${this.allowedRootDomain ?? 'n/a'}) -> ${afterUrl}`
-          });
-          await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
-          await ignore(page.waitForTimeout(320));
-          continue;
-        }
-        if (rootHintMode && looksPromotionLike(afterUrl, afterTitle)) {
-          logs.push({
-            level: 'warn',
-            message: `Hint navigation landed on promotional page; rollback url=${afterUrl}`
-          });
-          await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
-          await ignore(page.waitForTimeout(300));
-          continue;
-        }
-        const pageObjective = await this.pageMatchesObjective(input.objective);
-        const rootNeedsIncludeSignal =
-          rootHintMode &&
-          Array.isArray(input.objective?.includeAny) &&
-          (input.objective?.includeAny?.length ?? 0) > 0;
-        const rootIncludeSatisfied = pageObjective.includeMatches.length > 0;
-        if (!pageObjective.ok) {
-          logs.push({
-            level: 'warn',
-            message: `Hint navigation rollback by objective gate: url=${afterUrl} include=${pageObjective.includeMatches.join('|') || 'none'} avoid=${pageObjective.avoidMatches.join('|') || 'none'}`
-          });
-          if (afterUrl !== beforeUrl) {
-            await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
-            await ignore(page.waitForTimeout(320));
-          }
-          continue;
-        }
-        if (rootNeedsIncludeSignal && !rootIncludeSatisfied) {
-          logs.push({
-            level: 'warn',
-            message: `Hint navigation rollback: root objective include tokens not found on destination (${afterUrl})`
-          });
-          if (afterUrl !== beforeUrl) {
-            await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
-            await ignore(page.waitForTimeout(320));
-          }
-          continue;
+      let budgetExhausted = false;
+      for (let hop = 0; hop < hopBudget; hop += 1) {
+        let hopCandidateChecks = 0;
+        let querySets = buildQuerySets(hop);
+        const isFinalHop = hop === hopBudget - 1;
+        let hopClicked = false;
+        let hoverExpansionAttempted = false;
+        const hasNextHop = hop + 1 < hopBudget;
+        if (hop === 0 && hasNextHop && querySets.length > 1) {
+          querySets = querySets.slice(0, 1);
         }
 
-        const hrefValue = (candidate.href ?? '').trim().toLowerCase();
-        const weakSamePageTransition =
-          afterUrl === beforeUrl &&
-          (hrefValue.length === 0 ||
-            hrefValue === '#' ||
-            hrefValue.endsWith('/#') ||
-            hrefValue.endsWith('#') ||
-            hrefValue.startsWith('javascript:'));
-        if (weakSamePageTransition) {
-          logs.push({
-            level: 'warn',
-            message: `Hint navigation weak progress via click: text=${candidate.text || hints[0] || 'n/a'} href=${candidate.href ?? 'n/a'}`
+        for (const queryHints of querySets) {
+          const effectiveQueryHints = this.expandNavigationHints(queryHints, { broad: false });
+          const nextHopHintSignals = hasNextHop
+            ? this.expandNavigationHints(traversalHints.slice(hop + 1, Math.min(traversalHints.length, hop + 2)), {
+                broad: false
+              })
+            : [];
+          const hopRootHintMode =
+            hop === 0 && effectiveQueryHints.some((hint) => /(카테고리|category|메뉴|menu|전체)/i.test(hint));
+          const hopObjective = this.buildHintObjective(
+            input.objective,
+            effectiveQueryHints,
+            isFinalHop,
+            hop === 0
+          );
+          let rawCandidates = await this.collectClickableCandidates(effectiveQueryHints, {
+            label: 'hint-navigate',
+            rootHintMode: hopRootHintMode,
+            wantsSearch: false,
+            wantsFilter: false,
+            allowLooseNavigationMatch: hasNextHop
           });
-          clicked = true;
+          if (rawCandidates.length === 0 && !hopRootHintMode) {
+            const reopenHints = [
+              '카테고리',
+              '전체카테고리',
+              '메뉴',
+              'category',
+              'menu',
+              ...effectiveQueryHints.slice(0, 2)
+            ];
+            for (let reopenProbe = 0; reopenProbe < 2; reopenProbe += 1) {
+              await applyPreOpen(reopenHints, 'reopen');
+              await ignore(page.waitForTimeout(reopenProbe > 0 ? 70 : 30));
+              rawCandidates = await this.collectClickableCandidates(effectiveQueryHints, {
+                label: 'hint-navigate-reopen',
+                rootHintMode: false,
+                wantsSearch: false,
+                wantsFilter: false,
+                allowLooseNavigationMatch: hasNextHop
+              });
+              if (rawCandidates.length > 0) {
+                break;
+              }
+            }
+            if (rawCandidates.length > 0) {
+              logs.push({
+                level: 'info',
+                message: `Hint navigation surface re-opened for non-root hop: hints=[${effectiveQueryHints.join(', ')}] candidates=${rawCandidates.length}`
+              });
+            }
+          }
+          const ranked = await this.rankCandidatesByContext(rawCandidates, {
+            hints: effectiveQueryHints,
+            label: 'hint-navigate',
+            intent: hopRootHintMode ? 'menu' : 'navigation',
+            forceSemantic: true
+          });
+          const navigationScoped = hasNextHop || hopRootHintMode;
+          const prioritized = this.prioritizeNavigationScopeCandidates(ranked.candidates, navigationScoped);
+          const candidatePool =
+            navigationScoped && prioritized.scopedCount > 0
+              ? prioritized.ordered.filter((candidate) => this.isNavigationScopeCandidate(candidate))
+              : prioritized.ordered;
+          let orderedCandidatePool = candidatePool;
+          if (!hopRootHintMode && orderedCandidatePool.length >= 2) {
+            const visualReranked = await this.rerankNavigationCandidatesWithVlm({
+              candidates: orderedCandidatePool,
+              hints: effectiveQueryHints,
+              objective: hopObjective,
+              hop,
+              hopBudget
+            });
+            orderedCandidatePool = visualReranked.candidates;
+            logs.push(...visualReranked.logs);
+          }
+          if (navigationScoped && prioritized.scopedCount > 0) {
+            logs.push({
+              level: 'info',
+              message: `Hint navigation scope lock: scoped=${prioritized.scopedCount}/${ranked.candidates.length} hop=${hop + 1}/${hopBudget}`
+            });
+          }
+
+          for (const candidate of orderedCandidatePool.slice(0, 6)) {
+            hopCandidateChecks += 1;
+            if (hopCandidateChecks > maxCandidateChecks) {
+              if (!candidateBudgetWarned) {
+                logs.push({
+                  level: 'warn',
+                  message: `Hint navigation candidate budget reached: hop=${hop + 1}/${hopBudget} checks=${hopCandidateChecks}/${maxCandidateChecks}`
+                });
+                candidateBudgetWarned = true;
+              }
+              budgetExhausted = true;
+              break;
+            }
+            const candidateKey = `${candidate.selector}::${candidate.href ?? ''}::${candidate.text}`;
+            if (visitedCandidates.has(candidateKey)) {
+              continue;
+            }
+
+            if (hasNextHop && hop === 0 && nextHopHintSignals.length > 0) {
+              const evidenceText = this.candidateEvidenceText(candidate);
+              const currentHopMatch = this.objectiveCheckFromText(
+                evidenceText,
+                {
+                  includeAny: effectiveQueryHints,
+                  strict: true
+                },
+                { hardAvoid: true }
+              );
+              const nextHopMatch = this.objectiveCheckFromText(
+                evidenceText,
+                {
+                  includeAny: nextHopHintSignals,
+                  strict: true
+                },
+                { hardAvoid: true }
+              );
+              if (currentHopMatch.includeMatches.length === 0 && nextHopMatch.includeMatches.length > 0) {
+                logs.push({
+                  level: 'warn',
+                  message: `Hint navigation root-step guard: skip deep-level candidate text=${candidate.text || 'n/a'} currentHints=[${effectiveQueryHints.join(', ')}] nextHints=[${nextHopHintSignals.join(', ')}]`
+                });
+                continue;
+              }
+            }
+
+            if (hasNextHop && this.isLikelyProductOrAdCandidate(candidate)) {
+              logs.push({
+                level: 'warn',
+                message: `Hint navigation candidate skipped (product/ad guard): text=${candidate.text || 'n/a'} href=${candidate.href ?? 'n/a'}`
+              });
+              continue;
+            }
+
+            const locator = page.locator(candidate.selector).first();
+            const visible = await ignore(locator.isVisible({ timeout: 1500 }));
+            if (!visible) {
+              continue;
+            }
+            const interactable = await this.isLocatorInteractable(locator);
+            if (!interactable) {
+              continue;
+            }
+            const objectiveCheck = this.candidateMatchesObjective(candidate, hopObjective);
+            if (!objectiveCheck.ok) {
+              let bridgeAccepted = false;
+              if (hasNextHop && this.isNavigationScopeCandidate(candidate)) {
+                const bridgeHints = this.expandNavigationHints(
+                  traversalHints.slice(hop + 1, Math.min(traversalHints.length, hop + 3)),
+                  { broad: false }
+                );
+                if (bridgeHints.length > 0) {
+                  let bridgeFollowupReady = false;
+                  try {
+                    await locator.hover({ timeout: 2200 });
+                    await ignore(page.waitForTimeout(180));
+                    bridgeFollowupReady = await this.hasFollowupNavigationCandidates(bridgeHints);
+                  } catch (error) {
+                    if (!isRecoverableClickError(error)) {
+                      throw error;
+                    }
+                  }
+                  if (!bridgeFollowupReady) {
+                    const forcedHover = await this.forceHoverBySelector(candidate.selector);
+                    if (forcedHover) {
+                      await ignore(page.waitForTimeout(140));
+                      bridgeFollowupReady = await this.hasFollowupNavigationCandidates(bridgeHints);
+                    }
+                  }
+                  if (bridgeFollowupReady) {
+                    logs.push({
+                      level: 'info',
+                      message: `Hint navigation bridge accepted: text=${candidate.text || effectiveQueryHints[0] || 'n/a'} nextHints=[${bridgeHints.join(', ')}]`
+                    });
+                    appendHop(candidate.text || effectiveQueryHints[0] || `hop-${hop + 1}`);
+                    hopClicked = true;
+                    bridgeAccepted = true;
+                  }
+                }
+              }
+              if (bridgeAccepted) {
+                break;
+              }
+              logs.push({
+                level: 'warn',
+                message: `Hint navigation candidate skipped by objective gate: text=${candidate.text || 'n/a'} include=${objectiveCheck.includeMatches.join('|') || 'none'} avoid=${objectiveCheck.avoidMatches.join('|') || 'none'}`
+              });
+              continue;
+            }
+            const previousHop = successfulHops[successfulHops.length - 1];
+            const candidateHopText = candidate.text || effectiveQueryHints[0] || `hop-${hop + 1}`;
+            if (
+              hasNextHop &&
+              previousHop &&
+              normalizeComparableText(previousHop) === normalizeComparableText(candidateHopText)
+            ) {
+              logs.push({
+                level: 'warn',
+                message: `Hint navigation candidate skipped (repeat-guard): text=${candidateHopText}`
+              });
+              continue;
+            }
+            visitedCandidates.add(candidateKey);
+
+            if (hasNextHop) {
+              const followupHints = this.expandNavigationHints(
+                traversalHints.slice(hop + 1, Math.min(traversalHints.length, hop + 3)),
+                { broad: false }
+              );
+              hoverExpansionAttempted = true;
+              const followupBeforeHover = await this.hasFollowupNavigationCandidates(followupHints);
+              if (!followupBeforeHover && followupHints.length > 0) {
+                let followupAfterHover = false;
+                try {
+                  await locator.hover({ timeout: 2500 });
+                  await ignore(page.waitForTimeout(220));
+                  followupAfterHover = await this.hasFollowupNavigationCandidates(followupHints);
+                } catch (error) {
+                  if (!isRecoverableClickError(error)) {
+                    const message = error instanceof Error ? error.message.split('\n')[0] ?? error.message : String(error);
+                    logs.push({
+                      level: 'warn',
+                      message: `Hint navigation hover skipped: text=${candidate.text || effectiveQueryHints[0] || 'n/a'} reason=${message}`
+                    });
+                  }
+                }
+                if (!followupAfterHover) {
+                  const forcedHover = await this.forceHoverBySelector(candidate.selector);
+                  if (forcedHover) {
+                    await ignore(page.waitForTimeout(180));
+                    followupAfterHover = await this.hasFollowupNavigationCandidates(followupHints);
+                    if (followupAfterHover) {
+                      logs.push({
+                        level: 'info',
+                        message: `Hint navigation hover expansion (forced): text=${candidate.text || effectiveQueryHints[0] || 'n/a'} nextHints=[${followupHints.join(', ')}]`
+                      });
+                    }
+                  }
+                }
+                if (followupAfterHover) {
+                  logs.push({
+                    level: 'info',
+                    message: `Hint navigation hover expansion: text=${candidate.text || effectiveQueryHints[0] || 'n/a'} nextHints=[${followupHints.join(', ')}]`
+                  });
+                  appendHop(candidate.text || effectiveQueryHints[0] || `hop-${hop + 1}`);
+                  hopClicked = true;
+                  break;
+                }
+              }
+            }
+
+            const beforeUrl = page.url();
+            try {
+              await locator.click({ timeout: 2500 });
+            } catch (error) {
+              if (!isRecoverableClickError(error)) {
+                throw error;
+              }
+              const message = error instanceof Error ? error.message.split('\n')[0] ?? error.message : String(error);
+              let retrySucceeded = false;
+              if (hasNextHop && this.isNavigationScopeCandidate(candidate)) {
+                const reopenHints = ['카테고리', '메뉴', 'category', 'menu', ...effectiveQueryHints.slice(0, 2)];
+                await applyPreOpen(reopenHints, 'reopen', true);
+                await ignore(page.waitForTimeout(120));
+                const retryLocator = page.locator(candidate.selector).first();
+                const retryVisible = await ignore(retryLocator.isVisible({ timeout: 1000 }));
+                if (retryVisible && (await this.isLocatorInteractable(retryLocator))) {
+                  try {
+                    await retryLocator.click({ timeout: 2200 });
+                    retrySucceeded = true;
+                    logs.push({
+                      level: 'info',
+                      message: `Hint navigation click retry succeeded: text=${candidate.text || effectiveQueryHints[0] || 'n/a'}`
+                    });
+                  } catch (retryError) {
+                    if (!isRecoverableClickError(retryError)) {
+                      throw retryError;
+                    }
+                  }
+                }
+                if (!retrySucceeded) {
+                  const forcedClicked = await this.forceClickBySelector(candidate.selector);
+                  if (forcedClicked) {
+                    retrySucceeded = true;
+                    logs.push({
+                      level: 'info',
+                      message: `Hint navigation forced click applied: text=${candidate.text || effectiveQueryHints[0] || 'n/a'}`
+                    });
+                  }
+                }
+              }
+              if (!retrySucceeded) {
+                logs.push({
+                  level: 'warn',
+                  message: `Hint navigation click skipped (recoverable): text=${candidate.text || 'n/a'} selector=${candidate.selector} reason=${message}`
+                });
+                await ignore(page.waitForTimeout(420));
+                continue;
+              }
+            }
+
+            await ignore(page.waitForLoadState('domcontentloaded', { timeout: 15000 }));
+            await ignore(page.waitForTimeout(450));
+
+            const afterUrl = page.url();
+            const afterTitle = (await ignore(page.title())) ?? '';
+            if (!sameAllowedRoot(afterUrl, this.allowedRootDomain)) {
+              logs.push({
+                level: 'warn',
+                message: `Hint navigation rollback: moved outside allowed root (${this.allowedRootDomain ?? 'n/a'}) -> ${afterUrl}`
+              });
+              await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+              await ignore(page.waitForTimeout(320));
+              continue;
+            }
+            if (hopRootHintMode && looksPromotionLike(afterUrl, afterTitle)) {
+              logs.push({
+                level: 'warn',
+                message: `Hint navigation landed on promotional page; rollback url=${afterUrl}`
+              });
+              await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+              await ignore(page.waitForTimeout(300));
+              continue;
+            }
+
+            const pageObjective = await this.pageMatchesObjective(hopObjective);
+            const hopNeedsIncludeSignal =
+              hopRootHintMode &&
+              Array.isArray(hopObjective?.includeAny) &&
+              (hopObjective?.includeAny?.length ?? 0) > 0;
+            const hopIncludeSatisfied = pageObjective.includeMatches.length > 0;
+            if (!pageObjective.ok) {
+              logs.push({
+                level: 'warn',
+                message: `Hint navigation rollback by objective gate: url=${afterUrl} include=${pageObjective.includeMatches.join('|') || 'none'} avoid=${pageObjective.avoidMatches.join('|') || 'none'}`
+              });
+              if (afterUrl !== beforeUrl) {
+                await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+                await ignore(page.waitForTimeout(320));
+              }
+              continue;
+            }
+            if (hopNeedsIncludeSignal && !hopIncludeSatisfied) {
+              logs.push({
+                level: 'warn',
+                message: `Hint navigation rollback: root objective include tokens not found on destination (${afterUrl})`
+              });
+              if (afterUrl !== beforeUrl) {
+                await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+                await ignore(page.waitForTimeout(320));
+              }
+              continue;
+            }
+
+            const weakSamePageTransition = this.isWeakTransition(beforeUrl, afterUrl, candidate.href);
+            if (weakSamePageTransition) {
+              const recovered = await this.recoverFromWeakTransition({
+                beforeUrl,
+                hints: queryHints,
+                objective: hopObjective,
+                label: 'hint-navigate'
+              });
+              logs.push(...recovered.logs);
+              if (recovered.recovered) {
+                logs.push({
+                  level: 'info',
+                  message: `Hint navigation hop ${hop + 1}/${hopBudget}: text=${recovered.clickedText || candidate.text || queryHints[0] || 'n/a'} strategy=recovered backend=${ranked.metadata?.vectorBackend ?? 'n/a'} href=${recovered.clickedHref ?? candidate.href ?? 'n/a'}`
+                });
+                appendHop(recovered.clickedText || candidate.text || queryHints[0] || `hop-${hop + 1}`);
+                hopClicked = true;
+                break;
+              }
+              const hasFurtherHop = hop + 1 < hopBudget;
+              if (hasFurtherHop) {
+                const followupHints = traversalHints.slice(hop + 1, Math.min(traversalHints.length, hop + 3));
+                const expandedFollowupHints = this.expandNavigationHints(followupHints, { broad: false });
+                const followupAvailable = await this.hasFollowupNavigationCandidates(expandedFollowupHints);
+                const repeatedWeakStep =
+                  previousHop &&
+                  normalizeComparableText(previousHop) === normalizeComparableText(candidateHopText);
+                if (repeatedWeakStep) {
+                  logs.push({
+                    level: 'warn',
+                    message: `Hint navigation weak transition rejected (repeat-guard): text=${candidate.text || queryHints[0] || 'n/a'}`
+                  });
+                  if (afterUrl !== beforeUrl) {
+                    await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+                    await ignore(page.waitForTimeout(260));
+                  }
+                  continue;
+                }
+                if (!followupAvailable) {
+                  logs.push({
+                    level: 'warn',
+                    message: `Hint navigation weak transition rejected: no followup candidates after click text=${candidate.text || queryHints[0] || 'n/a'} href=${candidate.href ?? 'n/a'}`
+                  });
+                  if (afterUrl !== beforeUrl) {
+                    await ignore(page.goBack({ waitUntil: 'domcontentloaded', timeout: 12_000 }));
+                    await ignore(page.waitForTimeout(260));
+                  }
+                  continue;
+                }
+                logs.push({
+                  level: 'info',
+                  message: `Hint navigation weak expansion accepted: text=${candidate.text || effectiveQueryHints[0] || 'n/a'} nextHints=[${expandedFollowupHints.join(', ')}]`
+                });
+              } else {
+                logs.push({
+                  level: 'warn',
+                  message: `Hint navigation weak progress via click: text=${candidate.text || effectiveQueryHints[0] || 'n/a'} href=${candidate.href ?? 'n/a'}`
+                });
+              }
+            }
+
+            logs.push({
+              level: 'info',
+              message: `Hint navigation hop ${hop + 1}/${hopBudget}: text=${candidate.text || effectiveQueryHints[0] || 'n/a'} strategy=${ranked.metadata?.strategy ?? 'structure_first'} backend=${ranked.metadata?.vectorBackend ?? 'n/a'} href=${candidate.href ?? 'n/a'}`
+            });
+            appendHop(candidate.text || effectiveQueryHints[0] || `hop-${hop + 1}`);
+            hopClicked = true;
+            break;
+          }
+          if (budgetExhausted) {
+            break;
+          }
+
+          if (hopClicked) {
+            break;
+          }
+        }
+        if (budgetExhausted) {
           break;
         }
 
-        logs.push({
-          level: 'info',
-          message: `Hint navigation "${candidate.text || hints[0] || 'n/a'}" via click: strategy=${ranked.metadata?.strategy ?? 'structure_first'} backend=${ranked.metadata?.vectorBackend ?? 'n/a'} href=${candidate.href ?? 'n/a'}`
-        });
-        clicked = true;
-        break;
+        if (!hopClicked) {
+          if (hasNextHop && hop === 0 && hoverExpansionAttempted) {
+            logs.push({
+              level: 'info',
+              message:
+                'Hint navigation hover expansion: attempted but no stable followup candidate detected; continuing traversal'
+            });
+          }
+          logs.push({
+            level: 'warn',
+            message: `Hint navigation hop ${hop + 1}/${hopBudget} skipped: no candidate for [${traversalHints[hop] ?? 'n/a'}]`
+          });
+        }
       }
 
-      if (!clicked) {
+      if (successfulHops.length === 0) {
         logs.push({
           level: 'warn',
-          message: `Hint navigation skipped: no candidate for [${hints.join(', ')}]`
+          message: `Hint navigation skipped: no candidate for [${traversalHints.join(', ')}]`
+        });
+      } else {
+        const endedAtRoot = stripHash(page.url()) === stripHash(navigationStartUrl);
+        if (endedAtRoot) {
+          const finalHints = this.expandNavigationHints(
+            traversalHints.slice(Math.max(0, hopBudget - 2), hopBudget),
+            { broad: false }
+          );
+          const commitObjective = this.buildHintObjective(
+            input.objective,
+            finalHints,
+            true,
+            false
+          );
+          const committed = await this.commitNavigationFromOverlay({
+            hints: finalHints,
+            objective: commitObjective,
+            startUrl: navigationStartUrl,
+            label: 'hint-navigate'
+          });
+          logs.push(...committed.logs);
+          if (committed.committed) {
+            appendHop(committed.clickedText || finalHints[0] || 'commit');
+          }
+        }
+        logs.push({
+          level: 'info',
+          message: `Hint navigation traversal completed: hops=${successfulHops.length}/${hopBudget} path=${successfulHops.join(' -> ')}`
         });
       }
     } catch (error) {
@@ -1983,7 +4172,7 @@ export class ChatPlaywrightDriver {
       outputImagePath: compositeImagePath,
       outputManifestPath: compositeManifestPath,
       runYolo: async ({ compositeImagePath: imagePath }) => {
-        const result = await runYolo26Local({
+        const result = await runRfDetrLocal({
           imagePath,
           labels: ['shirt', 'jacket', 'coat', 'hoodie', 'dress', 'pants', 'apparel', 'clothing', 'person']
         });
@@ -2000,7 +4189,7 @@ export class ChatPlaywrightDriver {
       rowByTileId.set(`tile-${index + 1}`, row);
     });
 
-    const yoloMatchedSourceIds = new Set(
+    const detectorMatchedSourceIds = new Set(
       judgement.mappedDetections
         .filter((item) => item.matched && item.sourceId)
         .map((item) => item.sourceId as string)
@@ -2014,14 +4203,14 @@ export class ChatPlaywrightDriver {
         continue;
       }
       const redScore = await this.computeRedScore(image.imagePath);
-      const yoloBoost = yoloMatchedSourceIds.has(image.id) ? 0.24 : 0;
+      const detectorBoost = detectorMatchedSourceIds.has(image.id) ? 0.24 : 0;
       const textBoost = row.isRed ? 0.08 : 0;
-      const score = redScore + yoloBoost + textBoost;
+      const score = redScore + detectorBoost + textBoost;
       ranked.push({
         row,
         score,
         redScore,
-        yoloMatched: yoloMatchedSourceIds.has(image.id)
+        detectorMatched: detectorMatchedSourceIds.has(image.id)
       });
     }
 
@@ -2037,12 +4226,12 @@ export class ChatPlaywrightDriver {
     );
 
     const evidenceLines = [
-      `Visual repeated-item analysis: tiles=${tileImages.length}, yoloDetections=${judgement.yolo.detections.length}, yoloAccepted=${judgement.yoloAccepted}, yoloReason=${judgement.yoloDecisionReason}.`,
+      `Visual repeated-item analysis: tiles=${tileImages.length}, rfDetrDetections=${judgement.yolo.detections.length}, rfDetrAccepted=${judgement.yoloAccepted}, rfDetrReason=${judgement.yoloDecisionReason}.`,
       `Visual composite: ${judgement.compositeImagePath}`,
       ...selectedRows.slice(0, 3).map((entry, index) =>
         `Visual rank ${index + 1}: ${entry.row.name} (score=${entry.score.toFixed(3)}, red=${entry.redScore.toFixed(
           3
-        )}, yoloMatched=${entry.yoloMatched})`
+        )}, rfDetrMatched=${entry.detectorMatched})`
       )
     ];
 

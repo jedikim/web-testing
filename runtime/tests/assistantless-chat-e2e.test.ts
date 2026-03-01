@@ -77,7 +77,7 @@ describe('runAssistantlessChatE2E', () => {
       decideWithRules: async () => ({ kind: 'click', target: '#news-tab' }),
       detectWithVision: async () => {
         visionCalls += 1;
-        return { model: 'yolo26l', target: '#news-tab-v2', confidence: 0.84 };
+        return { model: 'rf-detr-medium', target: '#news-tab-v2', confidence: 0.84 };
       },
       executeAction: async () => {
         actionCount += 1;

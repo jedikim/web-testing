@@ -40,7 +40,7 @@ function triggerSpecificException(trigger: EvolutionJob['trigger']): ScenarioIte
           'Detect selector mismatch',
           'Capture screenshot and DOM snippet',
           'Try rule fallback',
-          'Run yolo26 detection if visual anchor exists',
+          'Run rfdetr detection if visual anchor exists',
           'Validate action result',
           'Record patch candidate'
         ]
@@ -84,10 +84,10 @@ function baseExceptions(): ScenarioItem[] {
     {
       id: 'captcha-escalation',
       title: 'Captcha escalation workflow',
-      objective: 'Enforce yolo26 -> VLM -> LLM sequence with handoff fallback.',
+      objective: 'Enforce rfdetr -> VLM -> LLM sequence with handoff fallback.',
       minSteps: 7,
       checkpoints: [
-        'Detect captcha candidate with yolo26',
+        'Detect captcha candidate with rfdetr',
         'Verify challenge type with VLM',
         'Attempt solve with LLM',
         'Re-validate captcha state',

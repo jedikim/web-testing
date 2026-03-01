@@ -82,16 +82,16 @@ it('phase3+: assistantless chat-loop e2e ...', async () => { ... });
 
 **Step 1: Gemini 기본 모델 우선순위 조정**
 
-- 기본 Gemini 모델을 `gemini-3.0-flash` 우선으로 변경
+- 기본 Gemini 모델을 `gemini-3-flash-preview` 우선으로 변경
 
-**Step 2: YOLO26 로컬 오픈소스 경로 허용**
+**Step 2: RFDETR 로컬 오픈소스 경로 허용**
 
-- `YOLO26_API_KEY`를 선택값으로 변경
+- `RFDETR_API_KEY`를 선택값으로 변경
 - API key 없는 경우도 `/detect` 호출 가능하게 수정
 
 **Step 3: 회귀 테스트 추가**
 
-- `provider-matrix-env`에서 key 없는 YOLO26 케이스 pass
+- `provider-matrix-env`에서 key 없는 RFDETR 케이스 pass
 - `provider-http-executor`에서 Authorization 없이 비전 호출 pass
 
 ### Task 4: 검증

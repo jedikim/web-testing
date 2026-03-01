@@ -33,6 +33,19 @@
 6. 보안/차단 구간이면 human handoff
 7. 완료까지 반복
 
+### 2.1 DOM 처리 전략 (성능/안정성)
+
+웹 조작 도구 호출 전에 아래 순서를 지킵니다:
+1. 전체 DOM 임베딩 금지
+2. 구조 기반 후보 축소(nav/role/header/aria-expanded/링크 밀집 영역 등)로 1차 후보군 생성
+3. 목표가 명확해진 순간에만 부분 벡터화 수행(후보 20~100개 범위)
+4. 페이지 단위 인메모리 인덱스 검색 사용(`hnswlib-node` 가능 시 사용, 없으면 brute-force cosine)
+5. LLM에는 전체 DOM이 아닌 상위 후보 context만 전달
+
+핵심:
+1. 병목은 검색이 아니라 임베딩
+2. 동일 페이지 반복에서는 embedding cache 재사용
+
 ## 3. Chat Backend 실전 예시
 
 ### 3.1 서버 실행
@@ -41,6 +54,11 @@
 cd runtime
 npm run example:chat-backend
 ```
+
+참고:
+1. 기본 실행 모드는 `playwright`(시뮬레이션 아님, 실제 액션)입니다.
+2. 시뮬레이션 강제는 `CHAT_AUTOMATION_EXECUTION_MODE=simulate`로 설정합니다.
+3. `browserMode=headful`에서 GUI 실행 실패 시 런타임 로그에 headful fallback 경고가 기록됩니다.
 
 ### 3.2 세션 생성
 

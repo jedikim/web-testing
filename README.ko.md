@@ -28,18 +28,23 @@
 ## 핵심 기능
 
 1. 결정론 워크플로우 엔진(`rule-first`)
-2. Similo fingerprint 기반 selector 선행 복구(LLM patch 이전)
-3. Cascaded LLM 라우팅(`flash 우선 -> 불확실/민감 게이트 -> pro -> rule fallback`)
-4. 반복 태스크용 semantic replay + plan cache 재사용/적응
-5. self-healing taxonomy 기반 실패 분류 + 제안 액션
-6. 반복 아이템 시각 체인(`합성 이미지 -> YOLO26 -> VLM fallback -> 역매핑`)
-7. 채팅 자동화 백엔드 샘플:
+2. 구조 기반 후보 축소(`DOM -> 20~50 후보`) 후에만 의미 기반/LLM 단계 진입
+3. 필요 시에만 부분 벡터화 + 페이지 단위 인메모리 인덱스(`hnswlib-node` 가능 시 사용, 미설치 시 brute-force cosine 폴백)
+4. Similo fingerprint 기반 selector 선행 복구(LLM patch 이전)
+5. Cascaded LLM 라우팅(`flash 우선 -> 불확실/민감 게이트 -> pro -> rule fallback`)
+6. 반복 태스크용 semantic replay + plan cache 재사용/적응
+7. self-healing taxonomy 기반 실패 분류 + 제안 액션
+8. 반복 아이템 시각 체인(`합성 이미지 -> RFDETR -> VLM fallback -> 역매핑`)
+9. 채팅 자동화 백엔드 샘플:
+   - 2단계 LLM 흐름: `task analyzer`(요구 분해 + 전략 후보) -> `action planner`
+   - LLM 우선 액션 플래너(기본 `flash -> rule fallback`, 옵션 `flash -> pro -> rule fallback`) + JSON Action DSL 검증
+   - 결과 검증 루프(`LLM validator -> 대안 전략 재시도`)
    - headful/headless 선택
    - SSE 실시간 진행 로그
    - pause/resume/cancel
    - captcha handoff 입력
    - 이미지 첨부
-8. 진화 백엔드(`git worktree` 격리 + 승인 기반 승격)
+10. 진화 백엔드(`git worktree` 격리 + 승인 기반 승격)
 
 ## 아키텍처
 
@@ -85,6 +90,18 @@ cd runtime
 npm run example:chat-backend
 ```
 
+- 이 명령의 기본 실행 모드는 `playwright`(실제 브라우저 액션)입니다.
+- 기본 플래너 모드는 `llm_first`입니다.
+- 기본 자동화 tier 정책은 `flash_only`이며(runtime analyzer/planner/validator/formatter는 Gemini Flash 사용) 필요 시에만 변경합니다.
+- 런타임에서 pro 에스컬레이션을 허용하려면 `CHAT_AUTOMATION_ALLOW_PRO_ESCALATION=1`을 설정하세요.
+- LLM provider 순서는 `LLM_VENDOR_ORDER`를 그대로 따릅니다. Gemini 전용으로 고정하려면 `LLM_VENDOR_ORDER=gemini`로 설정하세요.
+- 시뮬레이션 모드 강제:
+```bash
+CHAT_AUTOMATION_EXECUTION_MODE=simulate npm run example:chat-backend
+```
+- `browserMode=headful` 요청 시 GUI 실행이 실패하면 로그에 아래 경고가 기록됩니다:
+  `Headful launch failed in current environment. Fallback to headless was applied.`
+
 - Health: `http://127.0.0.1:4999/example/chat/health`
 - Chat UI: `http://127.0.0.1:4999/example/chat/ui`
 
@@ -102,17 +119,32 @@ npm run example:repeated-item
 ## 환경 변수 핵심
 
 - 지원 LLM provider: `gemini`, `openai`만 지원
-- 기본 Gemini 모델: `gemini-3.1-pro-preview,gemini-3.0-flash`
-- 기본 OpenAI 모델: `gpt-5.2-codex,gpt-5-mini`
-- YOLO26 기본 모델: `yolo26l`
+- 기본 Gemini 모델: `gemini-3.1-pro-preview,gemini-3-flash-preview`
+- 기본 OpenAI 모델: `gpt-5-codex,gpt-5-mini`
+- 런타임 자동화 모델 정책: 저비용 우선 (`BACKEND_AUTOMATION_GEMINI_MODEL=gemini-3-flash-preview`, `BACKEND_AUTOMATION_OPENAI_MODEL=gpt-5-mini`)
+- 코딩/autofix 모델 정책: 고성능 모델 사용 (`EVOLUTION_CODING_MODEL=gemini-3.1-pro-preview`)
+- RFDETR 기본 모델: `rf-detr-medium`
+- Langfuse 트레이싱: 기본 비활성화(`LANGFUSE_ENABLED=0`), 필요 시 env로만 활성화
+- 프롬프트 관리: 모든 LLM 프롬프트를 `runtime/src/prompts/*`로 분리하고 `id@version`으로 버전 추적
 
 주요 변수:
 - `BACKEND_AUTOMATION_MODEL`
+- `BACKEND_AUTOMATION_GEMINI_MODEL`
+- `BACKEND_AUTOMATION_OPENAI_MODEL`
 - `BACKEND_CASCADE_ESCALATION_MODEL`
+- `CHAT_AUTOMATION_PLANNER_MODE`
+- `CHAT_AUTOMATION_ALLOW_PRO_ESCALATION`
+- `CHAT_AUTOMATION_MAX_PLANNER_ATTEMPTS`
+- `BACKEND_CASCADE_ESCALATION_GEMINI_MODEL`
+- `BACKEND_CASCADE_ESCALATION_OPENAI_MODEL`
 - `BACKEND_CASCADE_THRESHOLD`
 - `PLAN_CACHE_ENABLED`
 - `PLAN_CACHE_SIMILARITY_THRESHOLD`
 - `SIMILO_ENABLED`
+- `LANGFUSE_ENABLED`
+- `LANGFUSE_PUBLIC_KEY`
+- `LANGFUSE_SECRET_KEY`
+- `LANGFUSE_BASE_URL`
 
 상세 설정:
 - [Environment Setup (EN)](./doc/CODEX-ENV-SETUP.en.md)

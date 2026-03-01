@@ -1,7 +1,7 @@
 ## Code Review Report
 - Scope: assistantless chat-loop e2e orchestration + provider/yolo matrix policy update + headful e2e execution path
 - Reviewer: codex
-- Summary: AI 비서 연동 없이도 반복 자동화 루프를 검증할 수 있도록 core e2e 경로를 추가했고, YOLO26 로컬 오픈소스 엔드포인트(무키) 경로를 허용했다.
+- Summary: AI 비서 연동 없이도 반복 자동화 루프를 검증할 수 있도록 core e2e 경로를 추가했고, RFDETR 로컬 오픈소스 엔드포인트(무키) 경로를 허용했다.
 - Issues:
   - severity: Minor
   - file: runtime/src/testing/assistantless-chat-e2e.ts

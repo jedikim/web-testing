@@ -10,7 +10,7 @@ export interface LlmProviderTarget {
 }
 
 export interface VisionProviderTarget {
-  provider: 'yolo26';
+  provider: 'rfdetr';
   apiKey?: string;
   baseUrl: string;
   models: string[];
@@ -99,18 +99,18 @@ export function loadProviderMatrixEnv(source: EnvMap = process.env): ProviderMat
   }
 
   const visionTargets: VisionProviderTarget[] = [];
-  if (parseBoolean(source.YOLO26_ENABLED)) {
-    const apiKey = trim(source.YOLO26_API_KEY);
-    const baseUrl = trim(source.YOLO26_BASE_URL);
+  if (parseBoolean(source.RFDETR_ENABLED)) {
+    const apiKey = trim(source.RFDETR_API_KEY);
+    const baseUrl = trim(source.RFDETR_BASE_URL);
     if (!baseUrl) {
-      throw new Error('YOLO26_BASE_URL is required when YOLO26_ENABLED=1');
+      throw new Error('RFDETR_BASE_URL is required when RFDETR_ENABLED=1');
     }
-    const models = parseCsv(source.YOLO26_MODELS);
+    const models = parseCsv(source.RFDETR_MODELS);
     if (models.length === 0) {
-      throw new Error('YOLO26_MODELS must include at least one model when YOLO26_ENABLED=1');
+      throw new Error('RFDETR_MODELS must include at least one model when RFDETR_ENABLED=1');
     }
     visionTargets.push({
-      provider: 'yolo26',
+      provider: 'rfdetr',
       apiKey,
       baseUrl,
       models

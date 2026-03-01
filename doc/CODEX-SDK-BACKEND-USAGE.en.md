@@ -124,7 +124,7 @@ console.log(result.assistantTurn.content);
 
 When many listing images repeat visually:
 1. merge item images into one composite image
-2. run YOLO26 first
+2. run RFDETR first
 3. if uncertainty remains, run VLM on the same composite image
 4. reverse-map detections to original item IDs
 
@@ -145,9 +145,9 @@ Evolution is triggered for bug/exception failures, not for every request.
 ## 6. Model Policy
 
 1. coding/self-improvement: `gemini-3.1-pro-preview`
-2. automation turns: `gemini-3.0-flash`
-3. OpenAI models: `gpt-5.2-codex`, `gpt-5-mini`
-4. YOLO26 default: `yolo26l`
+2. automation turns: `gemini-3-flash-preview`
+3. OpenAI models: `gpt-5-codex`, `gpt-5-mini`
+4. RFDETR default: `rf-detr-medium`
 
 ## 7. Safety Rules
 

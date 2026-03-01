@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { runProviderModelMatrix } from '../src/testing/provider-model-matrix';
 
 describe('runProviderModelMatrix', () => {
-  it('executes all llm and yolo26 models in matrix', async () => {
+  it('executes all llm and rfdetr models in matrix', async () => {
     const llmCalls: string[] = [];
     const visionCalls: string[] = [];
 
@@ -12,20 +12,20 @@ describe('runProviderModelMatrix', () => {
         {
           provider: 'gemini',
           apiKey: 'gm-key',
-          models: ['gemini-3.1-pro-preview', 'gemini-3.0-flash']
+          models: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview']
         },
         {
           provider: 'openai',
           apiKey: 'oa-key',
-          models: ['gpt-5.2-codex', 'gpt-5-mini']
+          models: ['gpt-5-codex', 'gpt-5-mini']
         }
       ],
       visionTargets: [
         {
-          provider: 'yolo26',
+          provider: 'rfdetr',
           apiKey: 'yo-key',
           baseUrl: 'https://vision.local',
-          models: ['yolo26l']
+          models: ['rf-detr-medium']
         }
       ],
       executeLlm: async (target) => {
@@ -43,11 +43,11 @@ describe('runProviderModelMatrix', () => {
     expect(report.summary.failed).toBe(0);
     expect(llmCalls).toEqual([
       'gemini:gemini-3.1-pro-preview',
-      'gemini:gemini-3.0-flash',
-      'openai:gpt-5.2-codex',
+      'gemini:gemini-3-flash-preview',
+      'openai:gpt-5-codex',
       'openai:gpt-5-mini'
     ]);
-    expect(visionCalls).toEqual(['yolo26:yolo26l']);
+    expect(visionCalls).toEqual(['rfdetr:rf-detr-medium']);
   });
 
   it('collects failure rows without aborting the full matrix', async () => {

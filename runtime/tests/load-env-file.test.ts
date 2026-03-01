@@ -23,7 +23,7 @@ describe('loadEnvFiles', () => {
     );
     writeFileSync(
       join(tempRoot, '.env'),
-      ['OPENAI_API_KEY=oa-from-root', "GEMINI_MODELS='gemini-3.1-pro-preview,gemini-3.0-flash'"].join('\n'),
+      ['OPENAI_API_KEY=oa-from-root', "GEMINI_MODELS='gemini-3.1-pro-preview,gemini-3-flash-preview'"].join('\n'),
       'utf-8'
     );
 
@@ -38,7 +38,7 @@ describe('loadEnvFiles', () => {
     expect(target.RUN_PROVIDER_LIVE_E2E).toBe('1');
     expect(target.GEMINI_API_KEY).toBe('gm-key');
     expect(target.OPENAI_API_KEY).toBe('preset-key');
-    expect(target.GEMINI_MODELS).toBe('gemini-3.1-pro-preview,gemini-3.0-flash');
+    expect(target.GEMINI_MODELS).toBe('gemini-3.1-pro-preview,gemini-3-flash-preview');
   });
 
   it('supports export prefix and override mode', () => {

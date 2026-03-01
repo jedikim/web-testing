@@ -11,11 +11,11 @@ describe('llm model registry', () => {
     const models = listSupportedModelIds('gemini');
     expect(models.length).toBe(2);
     expect(models).toContain('gemini-3.1-pro-preview');
-    expect(models).toContain('gemini-3.0-flash');
+    expect(models).toContain('gemini-3-flash-preview');
   });
 
   it('returns provider default model when request is empty', () => {
-    expect(defaultModelFor('gemini')).toBe('gemini-3.0-flash');
+    expect(defaultModelFor('gemini')).toBe('gemini-3-flash-preview');
     expect(defaultModelFor('openai')).toBe('gpt-5-mini');
   });
 
@@ -23,7 +23,7 @@ describe('llm model registry', () => {
     const model = resolveModelFromOptions({
       provider: 'gemini',
       requestedModel: 'gemini-3.1-pro-preview',
-      modelOptions: ['gemini-3.1-pro-preview', 'gemini-3.0-flash']
+      modelOptions: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview']
     });
 
     expect(model).toBe('gemini-3.1-pro-preview');
@@ -34,7 +34,7 @@ describe('llm model registry', () => {
       resolveModelFromOptions({
         provider: 'gemini',
         requestedModel: 'gemini-3.1-pro-preview',
-        modelOptions: ['gemini-3.0-flash']
+        modelOptions: ['gemini-3-flash-preview']
       })
     ).toThrow(/not in allowed model options/);
   });

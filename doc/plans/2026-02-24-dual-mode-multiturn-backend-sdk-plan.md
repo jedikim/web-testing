@@ -16,7 +16,7 @@
 1. Slack/Telegram 라우팅 등 외부 AI 비서 연동은 범위 밖
 2. 이 저장소는 재사용 가능한 backend + sdk 계약 제공에 집중
 3. 코딩/자가개선 루프 모델 정책은 `gemini-3.1-pro-preview` 유지
-4. 자동화 대화 턴 모델은 `gemini-3.0-flash` 기본값 유지
+4. 자동화 대화 턴 모델은 `gemini-3-flash-preview` 기본값 유지
 5. 아티팩트/로그는 gitignored 경로에 저장 가능해야 함
 
 ## 2. 목표 아키텍처

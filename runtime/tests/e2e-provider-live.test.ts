@@ -47,7 +47,7 @@ describe('provider live e2e', () => {
 
 describe.runIf(RUN_PROVIDER_LIVE_E2E && HAS_PROVIDER_LIVE_TARGETS)('provider live e2e - matrix', () => {
   it(
-    'runs llm multi-vendor and yolo26 multi-model matrix from env',
+    'runs llm multi-vendor and rfdetr multi-model matrix from env',
     async () => {
       const env = providerEnv;
       expect(env.llmTargets.length).toBeGreaterThan(0);

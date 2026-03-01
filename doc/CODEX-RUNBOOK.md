@@ -50,11 +50,12 @@ flowchart LR
 
 1. 결정론/룰 우선, LLM은 보조
 2. LLM 사용은 제한적이고 추적 가능해야 함
-3. 전체 DOM/전체 스크린샷을 기본으로 LLM에 보내지 않음
-4. 캡차/2FA/결제 우회 자동화 금지
-5. 진화 파이프라인은 bug/exception에서만 트리거
-6. 진화 후보는 `git worktree` 격리 실행 필수
-7. active version 승격은 명시적 승인 후에만 수행
+3. 전체 DOM/전체 스크린샷/전체 HTML 원문을 LLM에 보내지 않음(추출 요약 + 길이 제한 + sanitize 적용)
+4. 웹 요소 탐색은 구조 기반 후보 축소를 먼저 수행하고, 목표가 생긴 경우에만 부분 벡터화를 수행
+5. 캡차/2FA/결제 우회 자동화 금지
+6. 진화 파이프라인은 bug/exception에서만 트리거
+7. 진화 후보는 `git worktree` 격리 실행 필수
+8. active version 승격은 명시적 승인 후에만 수행
 
 ## 4. 모드별 실행 명령
 
@@ -86,6 +87,9 @@ npm run example:chat-backend
 npm run test:sdk
 npm run test:evolution
 ```
+
+`example:chat-backend` 기본은 `playwright` 실동작 모드이며, 시뮬레이션 강제는
+`CHAT_AUTOMATION_EXECUTION_MODE=simulate npm run example:chat-backend`를 사용한다.
 
 ## 5. 실패 대응 원칙
 

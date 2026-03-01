@@ -40,7 +40,7 @@ describe('provider matrix e2e (mock server)', () => {
     }
   });
 
-  it('runs gemini/openai + yolo26 multi-model matrix over http', async () => {
+  it('runs gemini/openai + rfdetr multi-model matrix over http', async () => {
     const calls: string[] = [];
     server = createServer(async (req, res) => {
       const url = req.url ?? '';
@@ -55,7 +55,7 @@ describe('provider matrix e2e (mock server)', () => {
         respondJson(res, { candidates: [{ content: { parts: [{ text: 'ok' }] } }] });
         return;
       }
-      if (url.includes('/yolo26/detect')) {
+      if (url.includes('/rfdetr/detect')) {
         respondJson(res, { detections: [] });
         return;
       }
@@ -74,14 +74,14 @@ describe('provider matrix e2e (mock server)', () => {
       LLM_VENDOR_ORDER: 'gemini,openai',
       GEMINI_API_KEY: 'gm-key',
       GEMINI_BASE_URL: `${root}/gemini`,
-      GEMINI_MODELS: 'gemini-3.1-pro-preview,gemini-3.0-flash',
+      GEMINI_MODELS: 'gemini-3.1-pro-preview,gemini-3-flash-preview',
       OPENAI_API_KEY: 'oa-key',
       OPENAI_BASE_URL: `${root}/openai`,
-      OPENAI_MODELS: 'gpt-5.2-codex,gpt-5-mini',
-      YOLO26_ENABLED: '1',
-      YOLO26_API_KEY: 'yo-key',
-      YOLO26_BASE_URL: `${root}/yolo26`,
-      YOLO26_MODELS: 'yolo26l'
+      OPENAI_MODELS: 'gpt-5-codex,gpt-5-mini',
+      RFDETR_ENABLED: '1',
+      RFDETR_API_KEY: 'yo-key',
+      RFDETR_BASE_URL: `${root}/rfdetr`,
+      RFDETR_MODELS: 'rf-detr-medium'
     });
 
     const executors = createHttpProviderExecutors({
@@ -101,6 +101,6 @@ describe('provider matrix e2e (mock server)', () => {
     expect(report.summary.failed).toBe(0);
     expect(calls.filter((url) => url.includes('/openai/chat/completions')).length).toBe(2);
     expect(calls.filter((url) => url.includes(':generateContent')).length).toBe(2);
-    expect(calls.filter((url) => url.includes('/yolo26/detect')).length).toBe(1);
+    expect(calls.filter((url) => url.includes('/rfdetr/detect')).length).toBe(1);
   });
 });

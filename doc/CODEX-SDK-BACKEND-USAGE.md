@@ -124,7 +124,7 @@ console.log(result.assistantTurn.content);
 
 리스트 이미지가 반복되는 경우:
 1. 아이템 이미지를 합성 이미지 1장으로 병합
-2. YOLO26 우선 실행
+2. RFDETR 우선 실행
 3. 불확실하면 같은 합성 이미지로 VLM 재판단
 4. 탐지 결과를 원본 아이템 ID로 역매핑
 
@@ -145,9 +145,9 @@ console.log(result.assistantTurn.content);
 ## 6. 모델 정책
 
 1. 코딩/자가개선: `gemini-3.1-pro-preview`
-2. 자동화 턴: `gemini-3.0-flash`
-3. OpenAI 모델: `gpt-5.2-codex`, `gpt-5-mini`
-4. YOLO26 기본: `yolo26l`
+2. 자동화 턴: `gemini-3-flash-preview`
+3. OpenAI 모델: `gpt-5-codex`, `gpt-5-mini`
+4. RFDETR 기본: `rf-detr-medium`
 
 ## 7. 안전 규칙
 

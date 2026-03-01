@@ -1,4 +1,6 @@
 import type { AutomationSession, SessionTurn } from './types';
+import { GEMINI_TURN_GUIDANCE_PROMPT_V1 } from '../prompts/gemini-turn-guidance';
+import { promptTag } from '../prompts/types';
 
 export interface GenerateTurnInput {
   session: AutomationSession;
@@ -111,7 +113,7 @@ export class GeminiTurnEngine implements MultiTurnEngine {
 
   constructor(options: GeminiTurnEngineOptions = {}) {
     this.apiKey = optionalTrim(options.apiKey) ?? optionalTrim(process.env.GEMINI_API_KEY);
-    this.model = options.model ?? process.env.BACKEND_AUTOMATION_MODEL ?? 'gemini-3.0-flash';
+    this.model = options.model ?? process.env.BACKEND_AUTOMATION_MODEL ?? 'gemini-3-flash-preview';
     this.baseUrl = options.baseUrl ?? process.env.GEMINI_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta';
     this.timeoutMs = options.timeoutMs ?? 60_000;
   }
@@ -126,15 +128,11 @@ export class GeminiTurnEngine implements MultiTurnEngine {
       .map((turn) => `${turn.role}: ${turn.content}`)
       .join('\n');
 
-    const prompt = [
-      'You are an automation co-pilot for web tasks.',
-      'Respond with concise next-step guidance.',
-      `Session mode: ${input.session.mode}`,
-      'Conversation so far:',
+    const prompt = GEMINI_TURN_GUIDANCE_PROMPT_V1.render({
+      sessionMode: input.session.mode,
       conversation,
-      '',
-      `Latest user message: ${input.userMessage}`
-    ].join('\n');
+      userMessage: input.userMessage
+    });
 
     const endpoint = `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
     const response = await fetch(endpoint, {
@@ -169,7 +167,8 @@ export class GeminiTurnEngine implements MultiTurnEngine {
       content: text,
       metadata: {
         provider: 'gemini',
-        model: this.model
+        model: this.model,
+        prompt: promptTag(GEMINI_TURN_GUIDANCE_PROMPT_V1)
       }
     };
   }
@@ -370,7 +369,7 @@ export function buildDefaultTurnEngine(
 
   return new CascadedTurnEngine({
     primary: new GeminiTurnEngine({
-      model: process.env.BACKEND_AUTOMATION_MODEL ?? 'gemini-3.0-flash'
+      model: process.env.BACKEND_AUTOMATION_MODEL ?? 'gemini-3-flash-preview'
     }),
     escalation: new GeminiTurnEngine({
       model: process.env.BACKEND_CASCADE_ESCALATION_MODEL ?? 'gemini-3.1-pro-preview'

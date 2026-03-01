@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 
 import type { CommandExecutor } from './git-sandbox';
 import { NodeCommandExecutor } from './git-sandbox';
+import { EVOLUTION_AUTOFIX_PROMPT_V1 } from '../prompts/evolution-autofix';
+import { promptTag } from '../prompts/types';
 
 export interface AutoFixApplyInput {
   attempt: number;
@@ -102,14 +104,9 @@ export class GeminiPatchAutoFixer implements EvolutionAutoFixer {
     const rawFailure = await readFile(input.failureLogPath, 'utf-8');
     const clippedFailure = rawFailure.slice(-16000);
 
-    const prompt = [
-      'You are a coding fixer for a TypeScript repository.',
-      'Return only a unified diff in a ```diff fenced block.',
-      'Do not include explanations.',
-      'Patch must be minimal and safe.',
-      'Failure log:',
-      clippedFailure
-    ].join('\n\n');
+    const prompt = EVOLUTION_AUTOFIX_PROMPT_V1.render({
+      failureLog: clippedFailure
+    });
 
     const endpoint = `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
     const response = await fetch(endpoint, {
@@ -174,7 +171,7 @@ export class GeminiPatchAutoFixer implements EvolutionAutoFixer {
 
     return {
       applied: true,
-      note: 'gemini patch applied successfully',
+      note: `gemini patch applied successfully (${promptTag(EVOLUTION_AUTOFIX_PROMPT_V1)})`,
       patchPath: resolve(input.outputPatchPath)
     };
   }

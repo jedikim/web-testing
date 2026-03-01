@@ -89,14 +89,15 @@ function defaultYoloAssessment(input: {
   if (typeof input.yolo.accepted === 'boolean') {
     return {
       accepted: input.yolo.accepted,
-      reason: input.yolo.reason ?? (input.yolo.accepted ? 'yolo accepted by provider' : 'yolo rejected by provider')
+      reason:
+        input.yolo.reason ?? (input.yolo.accepted ? 'rf-detr accepted by provider' : 'rf-detr rejected by provider')
     };
   }
 
   if (!input.yolo.detections.length) {
     return {
       accepted: false,
-      reason: 'yolo returned no detections'
+      reason: 'rf-detr returned no detections'
     };
   }
 
@@ -104,13 +105,13 @@ function defaultYoloAssessment(input: {
   if (maxConfidence < input.yoloMinConfidence) {
     return {
       accepted: false,
-      reason: `yolo max confidence ${maxConfidence.toFixed(2)} below threshold ${input.yoloMinConfidence.toFixed(2)}`
+      reason: `rf-detr max confidence ${maxConfidence.toFixed(2)} below threshold ${input.yoloMinConfidence.toFixed(2)}`
     };
   }
 
   return {
     accepted: true,
-    reason: `yolo confidence ${maxConfidence.toFixed(2)} meets threshold`
+    reason: `rf-detr confidence ${maxConfidence.toFixed(2)} meets threshold`
   };
 }
 
@@ -146,10 +147,10 @@ export async function executeRepeatedItemJudgement(
       yolo,
       mappedDetections,
       yoloAccepted: true,
-      yoloDecisionReason: assessment.reason ?? 'yolo accepted',
+      yoloDecisionReason: assessment.reason ?? 'rf-detr accepted',
       usedVlmFallback: false,
       finalStatus: 'accepted',
-      finalReason: assessment.reason ?? 'yolo accepted'
+      finalReason: assessment.reason ?? 'rf-detr accepted'
     };
   }
 
@@ -161,10 +162,10 @@ export async function executeRepeatedItemJudgement(
       yolo,
       mappedDetections,
       yoloAccepted: false,
-      yoloDecisionReason: assessment.reason ?? 'yolo rejected',
+      yoloDecisionReason: assessment.reason ?? 'rf-detr rejected',
       usedVlmFallback: false,
       finalStatus: 'rejected',
-      finalReason: assessment.reason ?? 'yolo rejected and no vlm fallback'
+      finalReason: assessment.reason ?? 'rf-detr rejected and no vlm fallback'
     };
   }
 
@@ -182,7 +183,7 @@ export async function executeRepeatedItemJudgement(
     yolo,
     mappedDetections,
     yoloAccepted: false,
-    yoloDecisionReason: assessment.reason ?? 'yolo rejected',
+    yoloDecisionReason: assessment.reason ?? 'rf-detr rejected',
     usedVlmFallback: true,
     vlm,
     finalStatus: vlm.accepted ? 'accepted' : 'rejected',

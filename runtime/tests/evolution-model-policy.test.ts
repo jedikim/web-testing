@@ -7,14 +7,14 @@ describe('resolveEvolutionModelPolicy', () => {
     const policy = resolveEvolutionModelPolicy({ source: {} });
 
     expect(policy.codingModel).toBe('gemini-3.1-pro-preview');
-    expect(policy.automationModel).toBe('gemini-3.0-flash');
+    expect(policy.automationModel).toBe('gemini-3-flash-preview');
   });
 
   it('rejects flash model for coding path', () => {
     expect(() =>
       resolveEvolutionModelPolicy({
         source: {
-          EVOLUTION_CODING_MODEL: 'gemini-3.0-flash'
+          EVOLUTION_CODING_MODEL: 'gemini-3-flash-preview'
         }
       })
     ).toThrow(/coding model/);

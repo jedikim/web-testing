@@ -349,7 +349,7 @@ export async function runAssistantlessChatE2E(
           const bestDetection = bestMappedDetection(judgement.mappedDetections);
           if (bestDetection?.sourceId) {
             pendingVisionHint = {
-              model: judgement.usedVlmFallback ? 'vlm-composite' : 'yolo26-composite',
+              model: judgement.usedVlmFallback ? 'vlm-composite' : 'rfdetr-composite',
               target: bestDetection.sourceId,
               confidence: bestDetection.confidence
             };

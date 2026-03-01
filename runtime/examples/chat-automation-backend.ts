@@ -16,9 +16,17 @@ async function main(): Promise<void> {
   });
 
   const uiDir = resolve(runtimeRoot, 'examples', 'chat-automation-ui');
+  const executionMode = process.env.CHAT_AUTOMATION_EXECUTION_MODE === 'simulate'
+    ? 'simulate'
+    : 'playwright';
+  const runtimeScreenshotRoot =
+    process.env.CHAT_AUTOMATION_RUNTIME_SCREENSHOT_ROOT ??
+    resolve(repoRoot, 'testing', 'chat-automation', 'runtime-shots');
 
   await startChatAutomationServer({
-    uiDir
+    uiDir,
+    executionMode,
+    runtimeScreenshotRoot
   });
 }
 
