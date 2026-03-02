@@ -15,6 +15,7 @@ from src.recon.models import SiteProfile
 from src.recon.promotion_gate import PromotionGate
 from src.recon.self_improver import SelfImprover
 from src.recon.validator import CodeValidator
+from src.recon.workflow_patcher import PatchDecision, WorkflowPatcher
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,17 @@ class IWorkflowStepRunner(Protocol):
 
 class IPromotionGate(Protocol):
     def evaluate_bundle(self, *, bundle: Any, profile: SiteProfile, intent: str) -> Any: ...
+
+
+class IWorkflowPatcher(Protocol):
+    def patch_bundle(
+        self,
+        *,
+        bundle: Any,
+        classification: Any,
+        plan: Any,
+        failed_step_id: str | None = None,
+    ) -> PatchDecision: ...
 
 
 class DeterministicStepRunner:
@@ -118,6 +130,7 @@ class ReconRuntime:
         self.kb = kb
         self.failure_analyzer = FailureAnalyzer()
         self.self_improver = SelfImprover()
+        self.workflow_patcher = WorkflowPatcher()
 
     def resolve(self, *, domain: str, url: str) -> RuntimeLookup:
         pattern = self.kb.resolve_pattern_for_url(domain, url)
@@ -690,3 +703,97 @@ class ReconRuntime:
                 runtime_stats=runtime_stats,
             )
         return generate(profile=profile, url=url, intent=intent)
+
+    def apply_failure_patch_stub(
+        self,
+        *,
+        domain: str,
+        url_pattern: str,
+        intent: str,
+        error: str,
+        verify_code: str | None,
+        failed_step_id: str | None = None,
+        patcher: IWorkflowPatcher | WorkflowPatcher | None = None,
+    ) -> dict[str, Any]:
+        """Apply deterministic patch for a failure and save as next bundle version."""
+        current = self.kb.load_current_bundle(domain, url_pattern)
+        versions = self.kb.get_current_versions(domain, url_pattern)
+        from_version = versions.get("workflow_version")
+        if current is None:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=url_pattern,
+                payload={
+                    "status": "patch_miss",
+                    "intent": intent,
+                    "error": error,
+                    "verify_code": verify_code,
+                    "failed_step": failed_step_id,
+                    "bundle_version": None,
+                    "prompt_version": None,
+                },
+            )
+            return {"status": "patch_miss", "from_version": None, "to_version": None}
+
+        cls = self.failure_analyzer.classify(error=error, verify_code=verify_code)
+        plan = self.self_improver.plan_remediation(classification=cls)
+        worker = patcher or self.workflow_patcher
+        decision = worker.patch_bundle(
+            bundle=current,
+            classification=cls,
+            plan=plan,
+            failed_step_id=failed_step_id,
+        )
+        if not decision.patched or decision.bundle is None:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=url_pattern,
+                payload={
+                    "status": "patch_skipped",
+                    "intent": intent,
+                    "error": error,
+                    "verify_code": verify_code,
+                    "failed_step": failed_step_id,
+                    "failure_category": cls.category,
+                    "recommended_action": cls.recommended_action,
+                    "patch_reason": decision.reason,
+                    "bundle_version": from_version,
+                    "prompt_version": versions.get("prompt_version"),
+                    "strategy": current.strategy,
+                },
+            )
+            return {
+                "status": "patch_skipped",
+                "from_version": from_version,
+                "to_version": from_version,
+                "patch_reason": decision.reason,
+                "failure_category": cls.category,
+            }
+
+        to_version = self.kb.save_bundle(domain, url_pattern, decision.bundle)
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=url_pattern,
+            payload={
+                "status": "patched",
+                "intent": intent,
+                "error": error,
+                "verify_code": verify_code,
+                "failed_step": failed_step_id,
+                "failure_category": cls.category,
+                "recommended_action": cls.recommended_action,
+                "patch_reason": decision.reason,
+                "from_version": from_version,
+                "to_version": to_version,
+                "bundle_version": to_version,
+                "prompt_version": to_version,
+                "strategy": decision.bundle.strategy,
+            },
+        )
+        return {
+            "status": "patched",
+            "from_version": from_version,
+            "to_version": to_version,
+            "patch_reason": decision.reason,
+            "failure_category": cls.category,
+        }

@@ -25,6 +25,7 @@ from src.recon.runtime import (
 from src.recon.scanners import DOMScanner, NavigationScanner, VisualScanner
 from src.recon.self_improver import RemediationPlan, SelfImprover
 from src.recon.validator import CodeValidator, ValidationResult
+from src.recon.workflow_patcher import PatchDecision, WorkflowPatcher
 
 __all__ = [
     "ReconAgent",
@@ -45,6 +46,8 @@ __all__ = [
     "SiteProfile",
     "PromotionDecision",
     "PromotionGate",
+    "PatchDecision",
+    "WorkflowPatcher",
     "DOMScanner",
     "VisualScanner",
     "NavigationScanner",

@@ -40,3 +40,4 @@ If conflicts exist: `DEV_GUIDE > RECON_CODEGEN_ARCHITECTURE > new_arch > ARCHITE
 - 2026-03-02: Added category-driven retry/handoff recovery loop for runtime execution.
 - 2026-03-02: Added deterministic replay/canary promotion gate and runtime promotion-block path.
 - 2026-03-02: Added runtime strategy-stat feedback loop from KB history into codegen decision.
+- 2026-03-02: Added failure-driven deterministic workflow patcher with versioned patch promotion.

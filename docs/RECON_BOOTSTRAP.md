@@ -148,6 +148,24 @@ This document tracks the first implementation slice aligned to:
   - backward-compatible fallback for legacy codegen agents without `runtime_stats` parameter
   - runtime logs now include `strategy` field across major statuses
 
+15. **Failure-Driven Workflow Patching**
+- `src/recon/workflow_patcher.py`
+  - Added deterministic `WorkflowPatcher` + `PatchDecision`
+  - Category-driven patch actions:
+    - `add_wait`: insert wait step before failing step
+    - `fix_selector`: attach selector recovery params on failing step
+    - `fix_obstacle`: inject hover pre-step
+    - `change_strategy`: add strategy escalation hint
+    - `human_handoff/security`: patch skipped
+- `src/recon/runtime.py`
+  - Added `ReconRuntime.apply_failure_patch_stub(...)`
+  - Flow:
+    - classify failure + remediation plan
+    - apply patch deterministically
+    - save as next bundle version
+    - append run log (`patched` / `patch_skipped` / `patch_miss`)
+- This keeps patch behavior structured and site-agnostic (no per-domain hardcoding).
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -175,6 +193,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_stats.py`
 - `tests/unit/test_recon_codegen_runtime_stats.py`
 - `tests/unit/test_recon_runtime_codegen_stats_integration.py`
+- `tests/unit/test_recon_workflow_patcher.py`
+- `tests/unit/test_recon_runtime_patch_integration.py`
 
 ## Verification commands
 
