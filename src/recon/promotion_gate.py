@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from src.recon.browser_sandbox_gate import BrowserCanaryEvaluator
 from src.recon.models import GeneratedBundle, SiteProfile
 from src.recon.replay_runner import ReplayCase, WorkflowReplayRunner
 
@@ -31,6 +32,8 @@ class PromotionGate:
         replay_runner: WorkflowReplayRunner | None = None,
         replay_cases: list[ReplayCase] | None = None,
         canary_cases: list[ReplayCase] | None = None,
+        browser_canary: BrowserCanaryEvaluator | None = None,
+        browser_canary_strict: bool = False,
     ) -> None:
         self._replay_runner = replay_runner or WorkflowReplayRunner()
         self._replay_cases = replay_cases or [
@@ -40,6 +43,8 @@ class PromotionGate:
         self._canary_cases = canary_cases or [
             ReplayCase(name="canary-baseline", context={"candidate_count": 2}),
         ]
+        self._browser_canary = browser_canary
+        self._browser_canary_strict = browser_canary_strict
 
     def evaluate_bundle(
         self,
@@ -89,6 +94,18 @@ class PromotionGate:
         else:
             canary_ok = False
             issues.extend([f"canary:{issue}" for issue in canary_report.issues])
+
+        if self._browser_canary is not None:
+            canary_checks_total += 1
+            browser_report = self._browser_canary.evaluate_bundle(bundle=bundle)
+            if browser_report.ok:
+                canary_checks_passed += 1
+            elif browser_report.skipped and not self._browser_canary_strict:
+                canary_checks_passed += 1
+                issues.extend([f"canary:{issue}" for issue in browser_report.issues])
+            else:
+                canary_ok = False
+                issues.extend([f"canary:{issue}" for issue in browser_report.issues])
 
         canary_pass_rate = canary_checks_passed / canary_checks_total
 

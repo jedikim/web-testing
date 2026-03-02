@@ -49,3 +49,4 @@ If conflicts exist: `DEV_GUIDE > RECON_CODEGEN_ARCHITECTURE > new_arch > ARCHITE
 - 2026-03-02: Added persistent health snapshot storage for domain operational summaries.
 - 2026-03-02: Added executable replay/canary gate and adaptive runtime loop for patch/regenerate retries.
 - 2026-03-02: Added Playwright-backed step runner and runtime runner-finalize lifecycle hook.
+- 2026-03-02: Added optional browser sandbox canary evaluator integrated with promotion gate.

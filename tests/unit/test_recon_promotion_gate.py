@@ -93,3 +93,31 @@ def test_promotion_gate_canary_fails_when_intent_empty() -> None:
     assert decision.replay_ok is True
     assert decision.canary_ok is False
     assert any("intent" in issue for issue in decision.issues)
+
+
+def test_promotion_gate_strict_browser_canary_can_block() -> None:
+    class _BrowserFail:
+        class _Report:
+            ok = False
+            skipped = False
+            issues = ["browser_canary: click failed"]
+
+        def evaluate_bundle(self, *, bundle):
+            _ = bundle
+            return self._Report()
+
+    gate = PromotionGate(
+        replay_cases=[ReplayCase(name="baseline", context={"candidate_count": 2})],
+        canary_cases=[ReplayCase(name="canary", context={"candidate_count": 2})],
+        browser_canary=_BrowserFail(),
+        browser_canary_strict=True,
+    )
+    decision = gate.evaluate_bundle(
+        bundle=_bundle(with_verify_step=True),
+        profile=_profile(),
+        intent="find cheapest tv",
+    )
+
+    assert decision.overall is False
+    assert decision.canary_ok is False
+    assert any("browser_canary" in issue for issue in decision.issues)

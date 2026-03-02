@@ -275,6 +275,17 @@ This document tracks the first implementation slice aligned to:
   - This allows browser-backed runners to release resources deterministically after each run.
 - This advances runtime from in-memory-only execution toward browser-context execution while preserving deterministic interfaces.
 
+25. **Browser Sandbox Canary Hook for Promotion**
+- `src/recon/browser_sandbox_gate.py`
+  - Added `BrowserCanaryEvaluator` + `BrowserCanaryReport`.
+  - Runs lightweight browser canary on local `data:` fixture page to validate action semantics (`click/type/hover/scroll/wait/extract/verify`) without external site dependency.
+  - Supports graceful `skipped` when browser runtime is unavailable.
+- `src/recon/promotion_gate.py`
+  - Added optional `browser_canary` integration and strict/non-strict mode.
+  - In strict mode, browser canary failure blocks promotion.
+  - In non-strict mode, unavailable browser canary is recorded but does not block.
+- This introduces a bridge toward browser-sandbox replay/canary validation while keeping CI deterministic.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -318,6 +329,7 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_adaptive_loop.py`
 - `tests/unit/test_recon_playwright_runner.py`
 - `tests/unit/test_recon_runtime_runner_finalize.py`
+- `tests/unit/test_recon_browser_sandbox_gate.py`
 
 ## Verification commands
 
@@ -332,5 +344,5 @@ python -m pytest tests/unit/test_recon_*.py tests/unit/test_web_agent.py tests/u
 2. Implement CodeGenAgent (DSL-first) that persists generated bundles directly into KB pattern folders.
 3. Connect runtime execution logs into `runs.jsonl` with bundle/prompt versions.
 4. Extend Playwright step semantics (selector/text fallback, iframe/shadow support, stronger error codes) and integrate with runtime selection policy.
-5. Expand replay/canary from in-memory deterministic execution to browser sandbox execution for higher-fidelity gates.
+5. Upgrade browser canary from synthetic fixture-only to target-domain sandbox replay scenarios.
 6. Expand adaptive regeneration to include strategy escalation policy + automatic rollback guard coupling.

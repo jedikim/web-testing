@@ -8,6 +8,7 @@ Phase-1 bootstrap for the v4.3 architecture:
 """
 
 from src.recon.agent import ReconAgent
+from src.recon.browser_sandbox_gate import BrowserCanaryEvaluator, BrowserCanaryReport
 from src.recon.change_detector import ChangeDetector, ChangeReport
 from src.recon.codegen import CodeGenAgent, StrategyDecision
 from src.recon.failure_analyzer import FailureAnalyzer, FailureClassification
@@ -31,6 +32,8 @@ from src.recon.workflow_patcher import PatchDecision, WorkflowPatcher
 
 __all__ = [
     "ReconAgent",
+    "BrowserCanaryEvaluator",
+    "BrowserCanaryReport",
     "ChangeDetector",
     "ChangeReport",
     "CodeGenAgent",

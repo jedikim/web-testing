@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
-from src.recon.runtime import StepExecutionResult
+
+@dataclass(frozen=True)
+class StepExecutionResult:
+    ok: bool
+    error: str | None = None
+    verify_code: str | None = None
+    evidence: dict[str, Any] | None = None
 
 
 class PlaywrightStepRunner:
