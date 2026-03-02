@@ -190,6 +190,21 @@ This document tracks the first implementation slice aligned to:
   - Returns structured maturity payload for orchestration/monitoring
 - This enables low-cost health checks for automatic mode transition decisions.
 
+18. **Auto-Rollback Guard on Consecutive Failures**
+- `src/recon/knowledge_base.py`
+  - Added failure-guard helpers:
+    - `list_bundle_versions(domain, url_pattern)` for ordered version discovery
+    - `get_consecutive_failures(domain, url_pattern, window)` for trailing failure count
+- `src/recon/runtime.py`
+  - Added `ReconRuntime.auto_rollback_guard_stub(...)`
+  - Behavior:
+    - if trailing failures < threshold → `auto_rollback_skipped` (`threshold_not_met`)
+    - if no previous version available → `auto_rollback_skipped` (`no_previous_version`)
+    - if rollback succeeds → `auto_rolled_back`
+    - if rollback operation fails → `auto_rollback_failed`
+  - All outcomes are logged with threshold/failure/version metadata.
+- This adds a deterministic safety net for unstable newly promoted bundles.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -223,6 +238,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_rollback_integration.py`
 - `tests/unit/test_recon_kb_maturity.py`
 - `tests/unit/test_recon_runtime_maturity_integration.py`
+- `tests/unit/test_recon_kb_failure_guard.py`
+- `tests/unit/test_recon_runtime_auto_rollback_guard.py`
 
 ## Verification commands
 

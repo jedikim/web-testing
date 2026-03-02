@@ -220,6 +220,56 @@ class KnowledgeBase:
         (prompts / "current").write_text(token, encoding="utf-8")
         return True
 
+    def list_bundle_versions(self, *, domain: str, url_pattern: str) -> list[int]:
+        """Return available workflow DSL versions for a URL pattern."""
+        workflows = self._pattern_dir(domain, url_pattern) / "workflows"
+        if not workflows.exists():
+            return []
+        versions: list[int] = []
+        for path in workflows.glob("v*.dsl.json"):
+            name = path.name.split(".", 1)[0]  # v1
+            if not name.startswith("v"):
+                continue
+            try:
+                versions.append(int(name[1:]))
+            except ValueError:
+                continue
+        return sorted(set(versions))
+
+    def get_consecutive_failures(
+        self,
+        *,
+        domain: str,
+        url_pattern: str,
+        window: int = 20,
+    ) -> int:
+        """Count trailing consecutive failures for a URL pattern."""
+        runs_path = self._domain_dir(domain) / "history" / "runs.jsonl"
+        if not runs_path.exists():
+            return 0
+
+        success_status = {"executed", "ok", "recovery_completed"}
+        failure_status = {"failed", "recovery_failed"}
+
+        lines = runs_path.read_text(encoding="utf-8").splitlines()
+        if window > 0:
+            lines = lines[-window:]
+
+        consecutive = 0
+        for raw in reversed(lines):
+            if not raw.strip():
+                continue
+            row = json.loads(raw)
+            if str(row.get("url_pattern") or "") != url_pattern:
+                continue
+            status = str(row.get("status") or "").strip()
+            if status in failure_status:
+                consecutive += 1
+                continue
+            if status in success_status:
+                break
+        return consecutive
+
     def resolve_pattern_for_url(self, domain: str, url: str) -> str | None:
         """Match URL against saved pattern rules for a domain."""
         patterns_root = self._domain_dir(domain) / "url_patterns"

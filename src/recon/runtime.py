@@ -852,6 +852,147 @@ class ReconRuntime:
             "to_version": new_versions.get("workflow_version"),
         }
 
+    def auto_rollback_guard_stub(
+        self,
+        *,
+        domain: str,
+        url_pattern: str,
+        failure_threshold: int = 3,
+        reason: str = "auto_guard",
+        consecutive_window: int = 20,
+    ) -> dict[str, Any]:
+        """Automatically rollback when trailing failures exceed threshold."""
+        threshold = max(1, failure_threshold)
+        versions = self.kb.get_current_versions(domain, url_pattern)
+        current_version = versions.get("workflow_version")
+        consecutive_failures = self.kb.get_consecutive_failures(
+            domain=domain,
+            url_pattern=url_pattern,
+            window=consecutive_window,
+        )
+        current_bundle = self.kb.load_current_bundle(domain, url_pattern)
+        strategy = current_bundle.strategy if current_bundle is not None else None
+
+        if current_version is None:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=url_pattern,
+                payload={
+                    "status": "auto_rollback_skipped",
+                    "skip_reason": "no_current_version",
+                    "reason": reason,
+                    "failure_threshold": threshold,
+                    "consecutive_failures": consecutive_failures,
+                },
+            )
+            return {
+                "status": "auto_rollback_skipped",
+                "skip_reason": "no_current_version",
+                "from_version": None,
+                "to_version": None,
+                "consecutive_failures": consecutive_failures,
+            }
+
+        if consecutive_failures < threshold:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=url_pattern,
+                payload={
+                    "status": "auto_rollback_skipped",
+                    "skip_reason": "threshold_not_met",
+                    "reason": reason,
+                    "failure_threshold": threshold,
+                    "consecutive_failures": consecutive_failures,
+                    "bundle_version": current_version,
+                    "prompt_version": versions.get("prompt_version"),
+                    "strategy": strategy,
+                },
+            )
+            return {
+                "status": "auto_rollback_skipped",
+                "skip_reason": "threshold_not_met",
+                "from_version": current_version,
+                "to_version": current_version,
+                "consecutive_failures": consecutive_failures,
+            }
+
+        available = self.kb.list_bundle_versions(domain=domain, url_pattern=url_pattern)
+        previous_versions = [v for v in available if v < current_version]
+        if not previous_versions:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=url_pattern,
+                payload={
+                    "status": "auto_rollback_skipped",
+                    "skip_reason": "no_previous_version",
+                    "reason": reason,
+                    "failure_threshold": threshold,
+                    "consecutive_failures": consecutive_failures,
+                    "bundle_version": current_version,
+                    "prompt_version": versions.get("prompt_version"),
+                    "strategy": strategy,
+                },
+            )
+            return {
+                "status": "auto_rollback_skipped",
+                "skip_reason": "no_previous_version",
+                "from_version": current_version,
+                "to_version": current_version,
+                "consecutive_failures": consecutive_failures,
+            }
+
+        target_version = previous_versions[-1]
+        ok = self.kb.rollback_bundle(
+            domain=domain,
+            url_pattern=url_pattern,
+            target_version=target_version,
+        )
+        if not ok:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=url_pattern,
+                payload={
+                    "status": "auto_rollback_failed",
+                    "reason": reason,
+                    "failure_threshold": threshold,
+                    "consecutive_failures": consecutive_failures,
+                    "from_version": current_version,
+                    "to_version": target_version,
+                    "bundle_version": current_version,
+                    "prompt_version": versions.get("prompt_version"),
+                    "strategy": strategy,
+                },
+            )
+            return {
+                "status": "auto_rollback_failed",
+                "from_version": current_version,
+                "to_version": target_version,
+                "consecutive_failures": consecutive_failures,
+            }
+
+        new_versions = self.kb.get_current_versions(domain, url_pattern)
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=url_pattern,
+            payload={
+                "status": "auto_rolled_back",
+                "reason": reason,
+                "failure_threshold": threshold,
+                "consecutive_failures": consecutive_failures,
+                "from_version": current_version,
+                "to_version": new_versions.get("workflow_version"),
+                "bundle_version": new_versions.get("workflow_version"),
+                "prompt_version": new_versions.get("prompt_version"),
+                "strategy": strategy,
+            },
+        )
+        return {
+            "status": "auto_rolled_back",
+            "from_version": current_version,
+            "to_version": new_versions.get("workflow_version"),
+            "consecutive_failures": consecutive_failures,
+        }
+
     def get_maturity_state_stub(self, *, domain: str) -> dict[str, Any]:
         """Return maturity state snapshot and append trace log."""
         state = self.kb.get_maturity_state(domain=domain)
