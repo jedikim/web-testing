@@ -99,6 +99,8 @@ class DeterministicStepRunner:
 class ReconRuntime:
     """Minimal runtime bridge: lookup bundle and append versioned run logs."""
 
+    _RETRYABLE_FAILURE_CATEGORIES = {"timing", "selector", "interaction", "rendering", "data"}
+
     def __init__(self, kb: KnowledgeBase) -> None:
         self.kb = kb
         self.failure_analyzer = FailureAnalyzer()
@@ -436,3 +438,139 @@ class ReconRuntime:
             "bundle_version": lookup.workflow_version,
             "prompt_version": lookup.prompt_version,
         }
+
+    def execute_with_recovery_stub(
+        self,
+        *,
+        domain: str,
+        url: str,
+        intent: str,
+        runner: IWorkflowStepRunner | None = None,
+        max_attempts: int = 3,
+        max_steps: int = 50,
+    ) -> dict[str, Any]:
+        """Execute workflow with deterministic retry/handoff policy."""
+        attempts = max(1, max_attempts)
+        final_result: dict[str, Any] | None = None
+        lookup = self.resolve(domain=domain, url=url)
+        parsed = urlparse(url)
+        fallback_pattern = parsed.path or "/"
+        run_pattern = lookup.url_pattern or fallback_pattern
+        bundle_version = lookup.workflow_version
+        prompt_version = lookup.prompt_version
+
+        for attempt in range(1, attempts + 1):
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=run_pattern,
+                payload={
+                    "status": "recovery_attempt",
+                    "intent": intent,
+                    "attempt": attempt,
+                    "max_attempts": attempts,
+                    "bundle_version": bundle_version,
+                    "prompt_version": prompt_version,
+                },
+            )
+            out = self.execute_workflow_stub(
+                domain=domain,
+                url=url,
+                intent=intent,
+                runner=runner,
+                max_steps=max_steps,
+            )
+            final_result = out
+
+            if out.get("status") == "executed":
+                recovered = attempt > 1
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=run_pattern,
+                    payload={
+                        "status": "recovery_completed",
+                        "intent": intent,
+                        "attempts": attempt,
+                        "recovered": recovered,
+                        "bundle_version": bundle_version,
+                        "prompt_version": prompt_version,
+                    },
+                )
+                result = dict(out)
+                result.update({"attempts": attempt, "recovered": recovered})
+                return result
+
+            if out.get("status") == "miss":
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=run_pattern,
+                    payload={
+                        "status": "recovery_failed",
+                        "intent": intent,
+                        "attempts": attempt,
+                        "reason": "bundle_not_found",
+                        "bundle_version": bundle_version,
+                        "prompt_version": prompt_version,
+                    },
+                )
+                result = dict(out)
+                result.update({"attempts": attempt, "recovered": False})
+                return result
+
+            category = str(out.get("failure_category") or "runtime")
+            if category == "security":
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=run_pattern,
+                    payload={
+                        "status": "recovery_handoff",
+                        "intent": intent,
+                        "attempts": attempt,
+                        "failure_category": category,
+                        "requires_human": True,
+                        "bundle_version": bundle_version,
+                        "prompt_version": prompt_version,
+                    },
+                )
+                result = dict(out)
+                result.update({"attempts": attempt, "recovered": False, "requires_human": True})
+                return result
+
+            is_retryable = category in self._RETRYABLE_FAILURE_CATEGORIES
+            if attempt >= attempts or not is_retryable:
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=run_pattern,
+                    payload={
+                        "status": "recovery_failed",
+                        "intent": intent,
+                        "attempts": attempt,
+                        "failure_category": category,
+                        "retryable": is_retryable,
+                        "bundle_version": bundle_version,
+                        "prompt_version": prompt_version,
+                    },
+                )
+                result = dict(out)
+                result.update({"attempts": attempt, "recovered": False, "requires_human": False})
+                return result
+
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=run_pattern,
+                payload={
+                    "status": "recovery_retry_scheduled",
+                    "intent": intent,
+                    "attempt": attempt,
+                    "next_attempt": attempt + 1,
+                    "failure_category": category,
+                    "recommended_action": out.get("recommended_action"),
+                    "bundle_version": bundle_version,
+                    "prompt_version": prompt_version,
+                },
+            )
+
+        if final_result is None:
+            final_result = {"status": "failed", "failure_category": "runtime"}
+        result = dict(final_result)
+        result.update({"attempts": attempts, "recovered": False})
+        return result

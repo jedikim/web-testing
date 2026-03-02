@@ -105,6 +105,21 @@ This document tracks the first implementation slice aligned to:
     - On success: append `executed` summary with executed step count
 - This slice keeps runtime generic and site-agnostic (no domain hardcoding).
 
+12. **Recovery Loop (Retry + Handoff Policy)**
+- `src/recon/runtime.py`
+  - Added `ReconRuntime.execute_with_recovery_stub(...)`
+  - Deterministic policy:
+    - retryable categories: `timing`, `selector`, `interaction`, `rendering`, `data`
+    - immediate handoff on `security`
+    - bounded retry attempts with terminal `recovery_failed`
+  - Added run-log statuses:
+    - `recovery_attempt`
+    - `recovery_retry_scheduled`
+    - `recovery_completed`
+    - `recovery_handoff`
+    - `recovery_failed`
+- This keeps failure handling generic and category-driven (no site-specific branching).
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -126,6 +141,7 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_change_detector.py`
 - `tests/unit/test_recon_runtime_change_integration.py`
 - `tests/unit/test_recon_runtime_executor_stub.py`
+- `tests/unit/test_recon_runtime_recovery.py`
 
 ## Verification commands
 
