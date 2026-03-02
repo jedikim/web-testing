@@ -286,6 +286,18 @@ This document tracks the first implementation slice aligned to:
   - In non-strict mode, unavailable browser canary is recorded but does not block.
 - This introduces a bridge toward browser-sandbox replay/canary validation while keeping CI deterministic.
 
+26. **Adaptive Strategy Escalation + Rollback Coupling**
+- `src/recon/codegen.py`
+  - Added `strategy_override` input to `generate_bundle(...)`.
+  - Supports forced deterministic strategy selection (`dom_only -> ... -> vlm_only`) when runtime requests escalation.
+- `src/recon/runtime.py`
+  - `execute_adaptive_stub(...)` now:
+    - computes next strategy override on regeneration rounds
+    - forwards override to codegen when supported
+    - runs `auto_rollback_guard_stub(...)` automatically when adaptive flow is exhausted
+  - Returns rollback guard result in final adaptive failure payload.
+- This ties regeneration policy to stability controls, reducing prolonged bad-version loops.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -330,6 +342,7 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_playwright_runner.py`
 - `tests/unit/test_recon_runtime_runner_finalize.py`
 - `tests/unit/test_recon_browser_sandbox_gate.py`
+- `tests/unit/test_recon_runtime_adaptive_loop.py` (strategy escalation + rollback assertions)
 
 ## Verification commands
 
@@ -345,4 +358,4 @@ python -m pytest tests/unit/test_recon_*.py tests/unit/test_web_agent.py tests/u
 3. Connect runtime execution logs into `runs.jsonl` with bundle/prompt versions.
 4. Extend Playwright step semantics (selector/text fallback, iframe/shadow support, stronger error codes) and integrate with runtime selection policy.
 5. Upgrade browser canary from synthetic fixture-only to target-domain sandbox replay scenarios.
-6. Expand adaptive regeneration to include strategy escalation policy + automatic rollback guard coupling.
+6. Expand strategy escalation with richer policy inputs (failure taxonomy + maturity + cost caps) and tie into promotion gate thresholds.

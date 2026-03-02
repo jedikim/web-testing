@@ -47,3 +47,17 @@ def test_codegen_selects_vlm_for_visual_intent() -> None:
 
     assert bundle.strategy in {"grid_vlm", "vlm_only"}
     assert "extract" in bundle.prompts
+
+
+def test_codegen_applies_forced_strategy_override() -> None:
+    agent = CodeGenAgent()
+    profile = _profile()
+
+    bundle = agent.generate_bundle(
+        profile=profile,
+        url="https://example.com/search?q=tv",
+        intent="find cheapest tv",
+        strategy_override="grid_vlm",
+    )
+
+    assert bundle.strategy == "grid_vlm"

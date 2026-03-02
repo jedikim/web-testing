@@ -71,6 +71,41 @@ class _BlockingGate:
         return self._Decision()
 
 
+class _AlwaysFailRunner:
+    def run_step(self, *, step: dict, context: dict) -> StepExecutionResult:
+        if str(step.get("action") or "") == "extract_candidates":
+            return StepExecutionResult(
+                ok=False,
+                error="timed out while waiting for selector",
+                verify_code="EXPECT_TIMEOUT",
+            )
+        return StepExecutionResult(ok=True, evidence={"action": step.get("action")})
+
+
+class _RecordingCodeGenAgent(CodeGenAgent):
+    def __init__(self) -> None:
+        super().__init__()
+        self.strategy_overrides: list[str | None] = []
+
+    def generate_bundle(
+        self,
+        *,
+        profile: SiteProfile,
+        url: str,
+        intent: str,
+        runtime_stats: dict[str, dict[str, float | int]] | None = None,
+        strategy_override: str | None = None,
+    ) -> GeneratedBundle:
+        self.strategy_overrides.append(strategy_override)
+        return super().generate_bundle(
+            profile=profile,
+            url=url,
+            intent=intent,
+            runtime_stats=runtime_stats,
+            strategy_override=strategy_override,
+        )
+
+
 def test_execute_adaptive_stub_direct_success_on_generated_bundle(tmp_path) -> None:
     kb = KnowledgeBase(base_dir=tmp_path)
     runtime = ReconRuntime(kb)
@@ -148,3 +183,44 @@ def test_execute_adaptive_stub_returns_blocked_when_gate_rejects_generation(tmp_
 
     assert out["status"] == "promotion_blocked"
     assert out["adaptive_status"] == "blocked"
+
+
+def test_execute_adaptive_stub_escalates_strategy_and_runs_rollback_guard(tmp_path) -> None:
+    kb = KnowledgeBase(base_dir=tmp_path)
+    runtime = ReconRuntime(kb)
+    codegen = _RecordingCodeGenAgent()
+
+    kb.save_bundle(
+        "example.com",
+        "/search?query=*",
+        _bundle(
+            [
+                {"id": "open", "action": "goto", "target": "https://example.com/search?q=tv"},
+                {"id": "extract", "action": "extract_candidates", "target": "main"},
+                {"id": "verify", "action": "verify_result", "verify": {"min_items": 1}},
+            ]
+        ),
+    )
+
+    out = runtime.execute_adaptive_stub(
+        domain="example.com",
+        url="https://example.com/search?q=tv",
+        intent="find cheapest tv",
+        profile=_profile(),
+        codegen_agent=codegen,
+        runner=_AlwaysFailRunner(),
+        max_attempts=1,
+        max_patch_rounds=0,
+        max_regenerations=1,
+        rollback_failure_threshold=1,
+    )
+
+    assert out["adaptive_status"] == "failed"
+    assert codegen.strategy_overrides
+    assert codegen.strategy_overrides[0] == "dom_with_objdet_backup"
+    assert isinstance(out.get("rollback_guard"), dict)
+    assert out["rollback_guard"]["status"] in {
+        "auto_rolled_back",
+        "auto_rollback_failed",
+        "auto_rollback_skipped",
+    }

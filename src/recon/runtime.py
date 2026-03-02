@@ -44,6 +44,7 @@ class ICodeGenAgent(Protocol):
         url: str,
         intent: str,
         runtime_stats: dict[str, dict[str, float | int]] | None = None,
+        strategy_override: str | None = None,
     ) -> Any: ...
 
 
@@ -129,6 +130,13 @@ class ReconRuntime:
     """Minimal runtime bridge: lookup bundle and append versioned run logs."""
 
     _RETRYABLE_FAILURE_CATEGORIES = {"timing", "selector", "interaction", "rendering", "data"}
+    _STRATEGY_ESCALATION_ORDER = (
+        "dom_only",
+        "dom_with_objdet_backup",
+        "objdet_dom_hybrid",
+        "grid_vlm",
+        "vlm_only",
+    )
 
     def __init__(self, kb: KnowledgeBase) -> None:
         self.kb = kb
@@ -707,6 +715,7 @@ class ReconRuntime:
         max_steps: int = 50,
         max_patch_rounds: int = 2,
         max_regenerations: int = 1,
+        rollback_failure_threshold: int = 3,
     ) -> dict[str, Any]:
         """End-to-end adaptive loop: ensure bundle -> execute -> patch/regenerate."""
         ensured = self.execute_or_generate_stub(
@@ -850,6 +859,7 @@ class ReconRuntime:
         max_regens = max(0, max_regenerations)
         while regenerations < max_regens:
             regenerations += 1
+            strategy_override = self._next_strategy(str(last.get("strategy") or ""))
             runtime_stats = self.kb.get_strategy_runtime_stats(
                 domain=domain,
                 url_pattern=str(profile.url_pattern or ""),
@@ -860,6 +870,7 @@ class ReconRuntime:
                 url=url,
                 intent=intent,
                 runtime_stats=runtime_stats,
+                strategy_override=strategy_override,
             )
             if validator is not None:
                 v = validator.validate_bundle(bundle=regenerated, profile=profile, intent=intent)
@@ -872,6 +883,7 @@ class ReconRuntime:
                             "intent": intent,
                             "round": regenerations,
                             "errors": v.errors,
+                            "strategy_override": strategy_override,
                             "strategy": regenerated.strategy,
                         },
                     )
@@ -891,6 +903,7 @@ class ReconRuntime:
                             "intent": intent,
                             "round": regenerations,
                             "issues": list(getattr(d, "issues", [])),
+                            "strategy_override": strategy_override,
                             "strategy": regenerated.strategy,
                         },
                     )
@@ -906,6 +919,7 @@ class ReconRuntime:
                     "round": regenerations,
                     "bundle_version": new_version,
                     "prompt_version": new_version,
+                    "strategy_override": strategy_override,
                     "strategy": regenerated.strategy,
                 },
             )
@@ -970,6 +984,14 @@ class ReconRuntime:
                 "strategy": last.get("strategy"),
             },
         )
+        rollback_result: dict[str, Any] | None = None
+        if rollback_failure_threshold > 0:
+            rollback_result = self.auto_rollback_guard_stub(
+                domain=domain,
+                url_pattern=str(profile.url_pattern or "/"),
+                failure_threshold=rollback_failure_threshold,
+                reason="adaptive_exhausted",
+            )
         out = dict(last)
         out.update(
             {
@@ -977,6 +999,7 @@ class ReconRuntime:
                 "path": "exhausted",
                 "patch_rounds": patch_round,
                 "regenerations": regenerations,
+                "rollback_guard": rollback_result,
             }
         )
         return out
@@ -989,17 +1012,42 @@ class ReconRuntime:
         url: str,
         intent: str,
         runtime_stats: dict[str, dict[str, float | int]],
+        strategy_override: str | None = None,
     ) -> Any:
         generate = codegen_agent.generate_bundle
         sig = inspect.signature(generate)
         if "runtime_stats" in sig.parameters:
+            kwargs: dict[str, Any] = {
+                "profile": profile,
+                "url": url,
+                "intent": intent,
+                "runtime_stats": runtime_stats,
+            }
+            if "strategy_override" in sig.parameters:
+                kwargs["strategy_override"] = strategy_override
+            return generate(**kwargs)
+        if "strategy_override" in sig.parameters:
             return generate(
                 profile=profile,
                 url=url,
                 intent=intent,
-                runtime_stats=runtime_stats,
+                strategy_override=strategy_override,
             )
         return generate(profile=profile, url=url, intent=intent)
+
+    @classmethod
+    def _next_strategy(cls, current_strategy: str) -> str | None:
+        current = current_strategy.strip()
+        if not current:
+            return None
+        try:
+            idx = cls._STRATEGY_ESCALATION_ORDER.index(current)
+        except ValueError:
+            return None
+        next_idx = idx + 1
+        if next_idx >= len(cls._STRATEGY_ESCALATION_ORDER):
+            return None
+        return cls._STRATEGY_ESCALATION_ORDER[next_idx]
 
     @staticmethod
     def _finalize_step_runner(

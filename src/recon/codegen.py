@@ -19,6 +19,14 @@ class StrategyDecision:
 class CodeGenAgent:
     """Generate lightweight DSL bundles from a site profile and intent."""
 
+    _KNOWN_STRATEGIES = {
+        "dom_only",
+        "dom_with_objdet_backup",
+        "objdet_dom_hybrid",
+        "grid_vlm",
+        "vlm_only",
+    }
+
     def generate_bundle(
         self,
         *,
@@ -26,12 +34,17 @@ class CodeGenAgent:
         url: str,
         intent: str,
         runtime_stats: dict[str, dict[str, float | int]] | None = None,
+        strategy_override: str | None = None,
     ) -> GeneratedBundle:
-        decision = self._decide_strategy(
-            profile=profile,
-            intent=intent,
-            runtime_stats=runtime_stats,
-        )
+        forced = (strategy_override or "").strip()
+        if forced in self._KNOWN_STRATEGIES:
+            decision = StrategyDecision(forced, "forced_strategy_override")
+        else:
+            decision = self._decide_strategy(
+                profile=profile,
+                intent=intent,
+                runtime_stats=runtime_stats,
+            )
         url_pattern = profile.url_pattern or self._url_pattern_from_url(url)
         workflow = self._build_workflow(
             profile=profile,
