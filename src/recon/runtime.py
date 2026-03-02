@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib.parse import urlparse
@@ -35,7 +36,14 @@ class StepExecutionResult:
 
 
 class ICodeGenAgent(Protocol):
-    def generate_bundle(self, *, profile: SiteProfile, url: str, intent: str) -> Any: ...
+    def generate_bundle(
+        self,
+        *,
+        profile: SiteProfile,
+        url: str,
+        intent: str,
+        runtime_stats: dict[str, dict[str, float | int]] | None = None,
+    ) -> Any: ...
 
 
 class IWorkflowStepRunner(Protocol):
@@ -169,12 +177,14 @@ class ReconRuntime:
                 "intent": intent,
                 "bundle_version": lookup.workflow_version,
                 "prompt_version": lookup.prompt_version,
+                "strategy": getattr(lookup.bundle, "strategy", None),
             },
         )
         return {
             "status": "ok",
             "bundle_version": lookup.workflow_version,
             "prompt_version": lookup.prompt_version,
+            "strategy": getattr(lookup.bundle, "strategy", None),
         }
 
     def execute_or_generate_stub(
@@ -193,7 +203,17 @@ class ReconRuntime:
         if lookup.bundle is not None and lookup.url_pattern is not None:
             return self.execute_stub(domain=domain, url=url, intent=intent)
 
-        generated = codegen_agent.generate_bundle(profile=profile, url=url, intent=intent)
+        runtime_stats = self.kb.get_strategy_runtime_stats(
+            domain=domain,
+            url_pattern=str(profile.url_pattern or ""),
+        )
+        generated = self._generate_bundle_with_optional_runtime_stats(
+            codegen_agent=codegen_agent,
+            profile=profile,
+            url=url,
+            intent=intent,
+            runtime_stats=runtime_stats,
+        )
         if validator is not None:
             v = validator.validate_bundle(bundle=generated, profile=profile, intent=intent)
             if not v.overall:
@@ -206,6 +226,7 @@ class ReconRuntime:
                         "bundle_version": None,
                         "prompt_version": None,
                         "errors": v.errors,
+                        "strategy": generated.strategy,
                     },
                 )
                 return {
@@ -213,6 +234,7 @@ class ReconRuntime:
                     "bundle_version": None,
                     "prompt_version": None,
                     "errors": v.errors,
+                    "strategy": generated.strategy,
                 }
 
         if promotion_gate is not None:
@@ -241,6 +263,7 @@ class ReconRuntime:
                         "replay_pass_rate": replay_pass_rate,
                         "canary_pass_rate": canary_pass_rate,
                         "issues": issues,
+                        "strategy": generated.strategy,
                     },
                 )
                 return {
@@ -252,6 +275,7 @@ class ReconRuntime:
                     "replay_pass_rate": replay_pass_rate,
                     "canary_pass_rate": canary_pass_rate,
                     "issues": issues,
+                    "strategy": generated.strategy,
                 }
 
         version = self.kb.save_bundle(domain, generated.workflow_dsl["url_pattern"], generated)
@@ -264,12 +288,14 @@ class ReconRuntime:
                 "intent": intent,
                 "bundle_version": version,
                 "prompt_version": version,
+                "strategy": generated.strategy,
             },
         )
         return {
             "status": "generated",
             "bundle_version": version,
             "prompt_version": version,
+            "strategy": generated.strategy,
         }
 
     def handle_failure_stub(
@@ -383,6 +409,7 @@ class ReconRuntime:
             }
 
         steps = lookup.bundle.workflow_dsl.get("steps", [])
+        strategy = getattr(lookup.bundle, "strategy", None)
         if not isinstance(steps, list):
             steps = []
         if len(steps) > max_steps:
@@ -398,6 +425,7 @@ class ReconRuntime:
                     "failed_step": "preflight",
                     "failure_category": "runtime",
                     "recommended_action": "full_recon",
+                    "strategy": strategy,
                 },
             )
             return {
@@ -407,6 +435,7 @@ class ReconRuntime:
                 "recommended_action": "full_recon",
                 "bundle_version": lookup.workflow_version,
                 "prompt_version": lookup.prompt_version,
+                "strategy": strategy,
             }
 
         step_runner = runner or DeterministicStepRunner()
@@ -430,6 +459,7 @@ class ReconRuntime:
                     "step_action": step_action,
                     "step_ok": result.ok,
                     "step_evidence": result.evidence or {},
+                    "strategy": strategy,
                 },
             )
 
@@ -453,6 +483,7 @@ class ReconRuntime:
                     "failure_category": cls.category,
                     "recommended_action": cls.recommended_action,
                     "requires_human": plan.requires_human,
+                    "strategy": strategy,
                 },
             )
             return {
@@ -463,6 +494,7 @@ class ReconRuntime:
                 "recommended_action": cls.recommended_action,
                 "bundle_version": lookup.workflow_version,
                 "prompt_version": lookup.prompt_version,
+                "strategy": strategy,
             }
 
         self.kb.append_run(
@@ -475,6 +507,7 @@ class ReconRuntime:
                 "prompt_version": lookup.prompt_version,
                 "executed_steps": len(steps),
                 "context_keys": sorted(context.keys()),
+                "strategy": strategy,
             },
         )
         return {
@@ -482,6 +515,7 @@ class ReconRuntime:
             "executed_steps": len(steps),
             "bundle_version": lookup.workflow_version,
             "prompt_version": lookup.prompt_version,
+            "strategy": strategy,
         }
 
     def execute_with_recovery_stub(
@@ -538,6 +572,7 @@ class ReconRuntime:
                         "recovered": recovered,
                         "bundle_version": bundle_version,
                         "prompt_version": prompt_version,
+                        "strategy": final_result.get("strategy"),
                     },
                 )
                 result = dict(out)
@@ -555,6 +590,7 @@ class ReconRuntime:
                         "reason": "bundle_not_found",
                         "bundle_version": bundle_version,
                         "prompt_version": prompt_version,
+                        "strategy": out.get("strategy"),
                     },
                 )
                 result = dict(out)
@@ -574,10 +610,17 @@ class ReconRuntime:
                         "requires_human": True,
                         "bundle_version": bundle_version,
                         "prompt_version": prompt_version,
+                        "strategy": out.get("strategy"),
                     },
                 )
                 result = dict(out)
-                result.update({"attempts": attempt, "recovered": False, "requires_human": True})
+                result.update(
+                    {
+                        "attempts": attempt,
+                        "recovered": False,
+                        "requires_human": True,
+                    }
+                )
                 return result
 
             is_retryable = category in self._RETRYABLE_FAILURE_CATEGORIES
@@ -593,10 +636,17 @@ class ReconRuntime:
                         "retryable": is_retryable,
                         "bundle_version": bundle_version,
                         "prompt_version": prompt_version,
+                        "strategy": out.get("strategy"),
                     },
                 )
                 result = dict(out)
-                result.update({"attempts": attempt, "recovered": False, "requires_human": False})
+                result.update(
+                    {
+                        "attempts": attempt,
+                        "recovered": False,
+                        "requires_human": False,
+                    }
+                )
                 return result
 
             self.kb.append_run(
@@ -611,6 +661,7 @@ class ReconRuntime:
                     "recommended_action": out.get("recommended_action"),
                     "bundle_version": bundle_version,
                     "prompt_version": prompt_version,
+                    "strategy": out.get("strategy"),
                 },
             )
 
@@ -619,3 +670,23 @@ class ReconRuntime:
         result = dict(final_result)
         result.update({"attempts": attempts, "recovered": False})
         return result
+
+    def _generate_bundle_with_optional_runtime_stats(
+        self,
+        *,
+        codegen_agent: ICodeGenAgent | CodeGenAgent,
+        profile: SiteProfile,
+        url: str,
+        intent: str,
+        runtime_stats: dict[str, dict[str, float | int]],
+    ) -> Any:
+        generate = codegen_agent.generate_bundle
+        sig = inspect.signature(generate)
+        if "runtime_stats" in sig.parameters:
+            return generate(
+                profile=profile,
+                url=url,
+                intent=intent,
+                runtime_stats=runtime_stats,
+            )
+        return generate(profile=profile, url=url, intent=intent)

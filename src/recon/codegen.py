@@ -19,8 +19,19 @@ class StrategyDecision:
 class CodeGenAgent:
     """Generate lightweight DSL bundles from a site profile and intent."""
 
-    def generate_bundle(self, *, profile: SiteProfile, url: str, intent: str) -> GeneratedBundle:
-        decision = self._decide_strategy(profile=profile, intent=intent)
+    def generate_bundle(
+        self,
+        *,
+        profile: SiteProfile,
+        url: str,
+        intent: str,
+        runtime_stats: dict[str, dict[str, float | int]] | None = None,
+    ) -> GeneratedBundle:
+        decision = self._decide_strategy(
+            profile=profile,
+            intent=intent,
+            runtime_stats=runtime_stats,
+        )
         url_pattern = profile.url_pattern or self._url_pattern_from_url(url)
         workflow = self._build_workflow(
             profile=profile,
@@ -43,9 +54,16 @@ class CodeGenAgent:
             dependencies=dependencies,
         )
 
-    def _decide_strategy(self, *, profile: SiteProfile, intent: str) -> StrategyDecision:
+    def _decide_strategy(
+        self,
+        *,
+        profile: SiteProfile,
+        intent: str,
+        runtime_stats: dict[str, dict[str, float | int]] | None = None,
+    ) -> StrategyDecision:
         intent_l = intent.lower()
         hints = {v.lower() for v in profile.interaction_hints}
+        heuristic = StrategyDecision("dom_only", "default deterministic strategy")
 
         visual_keywords = {
             "image",
@@ -61,19 +79,72 @@ class CodeGenAgent:
         }
         if any(k in intent_l for k in visual_keywords):
             if profile.content_types and "product_list" in profile.content_types:
-                return StrategyDecision("grid_vlm", "visual intent + list page")
-            return StrategyDecision("vlm_only", "visual intent")
+                heuristic = StrategyDecision("grid_vlm", "visual intent + list page")
+            else:
+                heuristic = StrategyDecision("vlm_only", "visual intent")
+            return self._apply_runtime_override(default=heuristic, runtime_stats=runtime_stats)
 
         if "drag_control" in hints:
-            return StrategyDecision("objdet_dom_hybrid", "drag interaction hints present")
+            heuristic = StrategyDecision("objdet_dom_hybrid", "drag interaction hints present")
+            return self._apply_runtime_override(default=heuristic, runtime_stats=runtime_stats)
 
         if (
             "product_list" in profile.content_types
             or len(profile.repeating_patterns) >= 1
         ):
-            return StrategyDecision("dom_with_objdet_backup", "repeating list/content signals")
+            heuristic = StrategyDecision("dom_with_objdet_backup", "repeating list/content signals")
+            return self._apply_runtime_override(default=heuristic, runtime_stats=runtime_stats)
 
-        return StrategyDecision("dom_only", "default deterministic strategy")
+        return self._apply_runtime_override(default=heuristic, runtime_stats=runtime_stats)
+
+    def _apply_runtime_override(
+        self,
+        *,
+        default: StrategyDecision,
+        runtime_stats: dict[str, dict[str, float | int]] | None,
+    ) -> StrategyDecision:
+        if not runtime_stats:
+            return default
+
+        max_runs = 0
+        for values in runtime_stats.values():
+            raw_runs = values.get("runs", 0)
+            if isinstance(raw_runs, int):
+                max_runs = max(max_runs, raw_runs)
+        if max_runs < 3:
+            return default
+
+        default_score = self._strategy_perf_score(default.strategy, runtime_stats)
+        best_strategy = default.strategy
+        best_score = default_score
+        for strategy in (
+            "dom_only",
+            "dom_with_objdet_backup",
+            "objdet_dom_hybrid",
+            "grid_vlm",
+            "vlm_only",
+        ):
+            score = self._strategy_perf_score(strategy, runtime_stats)
+            if score > best_score:
+                best_strategy = strategy
+                best_score = score
+
+        if best_strategy == default.strategy:
+            return default
+        if best_score - default_score < 0.20:
+            return default
+        return StrategyDecision(best_strategy, "runtime_stats_override")
+
+    @staticmethod
+    def _strategy_perf_score(
+        strategy: str,
+        runtime_stats: dict[str, dict[str, float | int]],
+    ) -> float:
+        stats = runtime_stats.get(strategy, {})
+        success = float(stats.get("success_rate", 0.5))
+        avg_cost = float(stats.get("avg_cost", 0.003))
+        p95_latency_ms = float(stats.get("p95_latency_ms", 3000))
+        return (success * 1.5) - (avg_cost * 40.0) - (p95_latency_ms / 10000.0)
 
     def _build_workflow(
         self,

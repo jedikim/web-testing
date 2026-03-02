@@ -134,6 +134,20 @@ This document tracks the first implementation slice aligned to:
     - writes `promotion_blocked` run log with replay/canary details
     - returns `status=promotion_blocked`
 
+14. **Strategy Feedback Loop (Runtime Stats → CodeGen)**
+- `src/recon/knowledge_base.py`
+  - Added `get_strategy_runtime_stats(domain, url_pattern, window)`:
+    - aggregates per-strategy `runs`, `success_rate`, `avg_cost`, `p95_latency_ms`
+    - reads from `history/runs.jsonl`
+    - supports pattern-scoped aggregation
+- `src/recon/codegen.py`
+  - `CodeGenAgent.generate_bundle(..., runtime_stats=...)` added
+  - Strategy selection now supports runtime-performance override when enough runs exist.
+- `src/recon/runtime.py`
+  - `execute_or_generate_stub` now collects runtime stats from KB and passes them to codegen
+  - backward-compatible fallback for legacy codegen agents without `runtime_stats` parameter
+  - runtime logs now include `strategy` field across major statuses
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -158,6 +172,9 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_recovery.py`
 - `tests/unit/test_recon_promotion_gate.py`
 - `tests/unit/test_recon_runtime_promotion_gate_integration.py`
+- `tests/unit/test_recon_runtime_stats.py`
+- `tests/unit/test_recon_codegen_runtime_stats.py`
+- `tests/unit/test_recon_runtime_codegen_stats_integration.py`
 
 ## Verification commands
 

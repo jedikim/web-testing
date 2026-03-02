@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -228,6 +229,83 @@ class KnowledgeBase:
         with (hist_dir / "runs.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
+    def get_strategy_runtime_stats(
+        self,
+        *,
+        domain: str,
+        url_pattern: str | None = None,
+        window: int = 200,
+    ) -> dict[str, dict[str, float | int]]:
+        """Aggregate per-strategy runtime metrics from runs history."""
+        runs_path = self._domain_dir(domain) / "history" / "runs.jsonl"
+        if not runs_path.exists():
+            return {}
+
+        rows = runs_path.read_text(encoding="utf-8").splitlines()
+        if window > 0:
+            rows = rows[-window:]
+
+        by_strategy: dict[str, dict[str, Any]] = {}
+        for line in rows:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if url_pattern and row.get("url_pattern") != url_pattern:
+                continue
+            strategy = str(row.get("strategy") or "").strip()
+            if not strategy:
+                continue
+            status = str(row.get("status") or "").strip()
+            if status not in {"executed", "failed", "recovery_completed", "recovery_failed"}:
+                continue
+
+            slot = by_strategy.setdefault(
+                strategy,
+                {
+                    "runs": 0,
+                    "successes": 0,
+                    "costs": [],
+                    "latencies": [],
+                },
+            )
+            slot["runs"] += 1
+            if status in {"executed", "recovery_completed"}:
+                slot["successes"] += 1
+
+            cost_raw = row.get("estimated_cost")
+            if isinstance(cost_raw, (int, float)):
+                slot["costs"].append(float(cost_raw))
+            latency_raw = row.get("latency_ms")
+            if isinstance(latency_raw, (int, float)):
+                slot["latencies"].append(float(latency_raw))
+
+        defaults = {
+            "dom_only": (0.001, 1500.0),
+            "dom_with_objdet_backup": (0.002, 2200.0),
+            "objdet_dom_hybrid": (0.003, 2600.0),
+            "grid_vlm": (0.006, 3400.0),
+            "vlm_only": (0.008, 4200.0),
+        }
+
+        out: dict[str, dict[str, float | int]] = {}
+        for strategy, slot in by_strategy.items():
+            runs = int(slot["runs"])
+            successes = int(slot["successes"])
+            costs = list(slot["costs"])
+            latencies = list(slot["latencies"])
+            default_cost, default_latency = defaults.get(strategy, (0.003, 3000.0))
+            avg_cost = sum(costs) / len(costs) if costs else default_cost
+            p95_latency_ms = (
+                self._percentile(latencies, 0.95) if latencies else default_latency
+            )
+            out[strategy] = {
+                "runs": runs,
+                "success_rate": (successes / runs) if runs else 0.0,
+                "avg_cost": float(avg_cost),
+                "p95_latency_ms": int(round(p95_latency_ms)),
+            }
+        return out
+
     @staticmethod
     def _next_pattern_version(root: Path, suffix: str) -> int:
         highest = 0
@@ -292,3 +370,12 @@ class KnowledgeBase:
         if pattern.endswith("*"):
             return path.startswith(pattern[:-1])
         return path == pattern
+
+    @staticmethod
+    def _percentile(values: list[float], q: float) -> float:
+        if not values:
+            return 0.0
+        sorted_vals = sorted(values)
+        q = min(max(q, 0.0), 1.0)
+        idx = max(0, min(len(sorted_vals) - 1, math.ceil(len(sorted_vals) * q) - 1))
+        return float(sorted_vals[idx])
