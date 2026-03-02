@@ -1,10 +1,11 @@
-"""Promotion gate for generated bundles (replay/canary stub)."""
+"""Promotion gate for generated bundles (replay/canary checks)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 from src.recon.models import GeneratedBundle, SiteProfile
+from src.recon.replay_runner import ReplayCase, WorkflowReplayRunner
 
 
 @dataclass(frozen=True)
@@ -18,20 +19,27 @@ class PromotionDecision:
 
 
 class PromotionGate:
-    """Deterministic replay/canary gate before KB promotion."""
+    """Replay/canary gate before KB promotion.
 
-    _ALLOWED_ACTIONS = {
-        "goto",
-        "capture_dom",
-        "extract_candidates",
-        "verify_result",
-        "click",
-        "type",
-        "select",
-        "wait",
-        "scroll",
-        "hover",
-    }
+    Replay runs deterministic workflow execution on synthetic cases.
+    Canary adds lightweight domain/prompt/intent sanity checks + one execution case.
+    """
+
+    def __init__(
+        self,
+        *,
+        replay_runner: WorkflowReplayRunner | None = None,
+        replay_cases: list[ReplayCase] | None = None,
+        canary_cases: list[ReplayCase] | None = None,
+    ) -> None:
+        self._replay_runner = replay_runner or WorkflowReplayRunner()
+        self._replay_cases = replay_cases or [
+            ReplayCase(name="baseline", context={"candidate_count": 3}),
+            ReplayCase(name="list-rich", context={"candidate_count": 12}),
+        ]
+        self._canary_cases = canary_cases or [
+            ReplayCase(name="canary-baseline", context={"candidate_count": 2}),
+        ]
 
     def evaluate_bundle(
         self,
@@ -42,47 +50,15 @@ class PromotionGate:
     ) -> PromotionDecision:
         issues: list[str] = []
 
-        replay_checks_total = 3
-        replay_checks_passed = 0
-        replay_ok = True
-
-        steps = bundle.workflow_dsl.get("steps")
-        if isinstance(steps, list) and steps:
-            replay_checks_passed += 1
-        else:
-            replay_ok = False
-            issues.append("replay: workflow requires non-empty steps")
-            steps = []
-
-        if len(steps) <= 60:
-            replay_checks_passed += 1
-        else:
-            replay_ok = False
-            issues.append("replay: step count exceeds guard limit (60)")
-
-        has_verify_step = any(
-            isinstance(step, dict) and step.get("action") == "verify_result"
-            for step in steps
+        replay_report = self._replay_runner.run(bundle=bundle, cases=self._replay_cases)
+        replay_ok = (
+            replay_report.total_cases > 0
+            and replay_report.passed_cases == replay_report.total_cases
         )
-        if has_verify_step:
-            replay_checks_passed += 1
-        else:
-            replay_ok = False
-            issues.append("replay: verify_result step is required")
+        replay_pass_rate = replay_report.pass_rate
+        issues.extend(replay_report.issues)
 
-        for idx, step in enumerate(steps):
-            if not isinstance(step, dict):
-                replay_ok = False
-                issues.append(f"replay: step[{idx}] must be object")
-                continue
-            action = str(step.get("action") or "").strip()
-            if action and action not in self._ALLOWED_ACTIONS:
-                replay_ok = False
-                issues.append(f"replay: unsupported action '{action}' at step[{idx}]")
-
-        replay_pass_rate = replay_checks_passed / replay_checks_total
-
-        canary_checks_total = 3
+        canary_checks_total = 4
         canary_checks_passed = 0
         canary_ok = True
 
@@ -103,6 +79,16 @@ class PromotionGate:
         else:
             canary_ok = False
             issues.append("canary: intent must not be empty")
+
+        canary_report = self._replay_runner.run(bundle=bundle, cases=self._canary_cases)
+        if (
+            canary_report.total_cases > 0
+            and canary_report.passed_cases == canary_report.total_cases
+        ):
+            canary_checks_passed += 1
+        else:
+            canary_ok = False
+            issues.extend([f"canary:{issue}" for issue in canary_report.issues])
 
         canary_pass_rate = canary_checks_passed / canary_checks_total
 

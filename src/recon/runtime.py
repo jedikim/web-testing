@@ -503,8 +503,10 @@ class ReconRuntime:
                 "status": "failed",
                 "failed_step": step_id,
                 "error": err,
+                "verify_code": result.verify_code,
                 "failure_category": cls.category,
                 "recommended_action": cls.recommended_action,
+                "requires_human": plan.requires_human,
                 "bundle_version": lookup.workflow_version,
                 "prompt_version": lookup.prompt_version,
                 "strategy": strategy,
@@ -683,6 +685,295 @@ class ReconRuntime:
         result = dict(final_result)
         result.update({"attempts": attempts, "recovered": False})
         return result
+
+    def execute_adaptive_stub(
+        self,
+        *,
+        domain: str,
+        url: str,
+        intent: str,
+        profile: SiteProfile,
+        codegen_agent: ICodeGenAgent | CodeGenAgent,
+        validator: CodeValidator | None = None,
+        promotion_gate: IPromotionGate | PromotionGate | None = None,
+        runner: IWorkflowStepRunner | None = None,
+        max_attempts: int = 2,
+        max_steps: int = 50,
+        max_patch_rounds: int = 2,
+        max_regenerations: int = 1,
+    ) -> dict[str, Any]:
+        """End-to-end adaptive loop: ensure bundle -> execute -> patch/regenerate."""
+        ensured = self.execute_or_generate_stub(
+            domain=domain,
+            url=url,
+            intent=intent,
+            profile=profile,
+            codegen_agent=codegen_agent,
+            validator=validator,
+            promotion_gate=promotion_gate,
+        )
+        if ensured.get("status") in {"generation_failed", "promotion_blocked", "miss"}:
+            out = dict(ensured)
+            out["adaptive_status"] = "blocked"
+            return out
+
+        last = self.execute_with_recovery_stub(
+            domain=domain,
+            url=url,
+            intent=intent,
+            runner=runner,
+            max_attempts=max_attempts,
+            max_steps=max_steps,
+        )
+        if last.get("status") == "executed":
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=str(profile.url_pattern or "/"),
+                payload={
+                    "status": "adaptive_completed",
+                    "intent": intent,
+                    "path": "direct",
+                    "patch_rounds": 0,
+                    "regenerations": 0,
+                    "bundle_version": last.get("bundle_version"),
+                    "prompt_version": last.get("prompt_version"),
+                    "strategy": last.get("strategy"),
+                },
+            )
+            out = dict(last)
+            out.update(
+                {
+                    "adaptive_status": "completed",
+                    "path": "direct",
+                    "patch_rounds": 0,
+                    "regenerations": 0,
+                }
+            )
+            return out
+
+        if bool(last.get("requires_human")):
+            out = dict(last)
+            out.update(
+                {
+                    "adaptive_status": "handoff",
+                    "path": "human_handoff",
+                    "patch_rounds": 0,
+                    "regenerations": 0,
+                }
+            )
+            return out
+
+        patch_round = 0
+        max_rounds = max(0, max_patch_rounds)
+        while patch_round < max_rounds:
+            patch_round += 1
+            patch_result = self.apply_failure_patch_stub(
+                domain=domain,
+                url_pattern=str(profile.url_pattern or "/"),
+                intent=intent,
+                error=str(last.get("error") or "unknown execution failure"),
+                verify_code=last.get("verify_code"),
+                failed_step_id=(
+                    str(last.get("failed_step"))
+                    if last.get("failed_step") is not None
+                    else None
+                ),
+            )
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=str(profile.url_pattern or "/"),
+                payload={
+                    "status": "adaptive_patch_round",
+                    "intent": intent,
+                    "round": patch_round,
+                    "patch_status": patch_result.get("status"),
+                    "from_version": patch_result.get("from_version"),
+                    "to_version": patch_result.get("to_version"),
+                    "failure_category": patch_result.get("failure_category"),
+                },
+            )
+            if patch_result.get("status") != "patched":
+                break
+
+            last = self.execute_with_recovery_stub(
+                domain=domain,
+                url=url,
+                intent=intent,
+                runner=runner,
+                max_attempts=max_attempts,
+                max_steps=max_steps,
+            )
+            if last.get("status") == "executed":
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=str(profile.url_pattern or "/"),
+                    payload={
+                        "status": "adaptive_completed",
+                        "intent": intent,
+                        "path": "patched",
+                        "patch_rounds": patch_round,
+                        "regenerations": 0,
+                        "bundle_version": last.get("bundle_version"),
+                        "prompt_version": last.get("prompt_version"),
+                        "strategy": last.get("strategy"),
+                    },
+                )
+                out = dict(last)
+                out.update(
+                    {
+                        "adaptive_status": "completed",
+                        "path": "patched",
+                        "patch_rounds": patch_round,
+                        "regenerations": 0,
+                    }
+                )
+                return out
+            if bool(last.get("requires_human")):
+                out = dict(last)
+                out.update(
+                    {
+                        "adaptive_status": "handoff",
+                        "path": "human_handoff",
+                        "patch_rounds": patch_round,
+                        "regenerations": 0,
+                    }
+                )
+                return out
+
+        regenerations = 0
+        max_regens = max(0, max_regenerations)
+        while regenerations < max_regens:
+            regenerations += 1
+            runtime_stats = self.kb.get_strategy_runtime_stats(
+                domain=domain,
+                url_pattern=str(profile.url_pattern or ""),
+            )
+            regenerated = self._generate_bundle_with_optional_runtime_stats(
+                codegen_agent=codegen_agent,
+                profile=profile,
+                url=url,
+                intent=intent,
+                runtime_stats=runtime_stats,
+            )
+            if validator is not None:
+                v = validator.validate_bundle(bundle=regenerated, profile=profile, intent=intent)
+                if not v.overall:
+                    self.kb.append_run(
+                        domain=domain,
+                        url_pattern=str(profile.url_pattern or "/"),
+                        payload={
+                            "status": "adaptive_regeneration_blocked",
+                            "intent": intent,
+                            "round": regenerations,
+                            "errors": v.errors,
+                            "strategy": regenerated.strategy,
+                        },
+                    )
+                    break
+            if promotion_gate is not None:
+                d = promotion_gate.evaluate_bundle(
+                    bundle=regenerated,
+                    profile=profile,
+                    intent=intent,
+                )
+                if not bool(getattr(d, "overall", False)):
+                    self.kb.append_run(
+                        domain=domain,
+                        url_pattern=str(profile.url_pattern or "/"),
+                        payload={
+                            "status": "adaptive_regeneration_blocked",
+                            "intent": intent,
+                            "round": regenerations,
+                            "issues": list(getattr(d, "issues", [])),
+                            "strategy": regenerated.strategy,
+                        },
+                    )
+                    break
+
+            new_version = self.kb.save_bundle(domain, str(profile.url_pattern or "/"), regenerated)
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=str(profile.url_pattern or "/"),
+                payload={
+                    "status": "adaptive_regenerated",
+                    "intent": intent,
+                    "round": regenerations,
+                    "bundle_version": new_version,
+                    "prompt_version": new_version,
+                    "strategy": regenerated.strategy,
+                },
+            )
+            last = self.execute_with_recovery_stub(
+                domain=domain,
+                url=url,
+                intent=intent,
+                runner=runner,
+                max_attempts=max_attempts,
+                max_steps=max_steps,
+            )
+            if last.get("status") == "executed":
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=str(profile.url_pattern or "/"),
+                    payload={
+                        "status": "adaptive_completed",
+                        "intent": intent,
+                        "path": "regenerated",
+                        "patch_rounds": patch_round,
+                        "regenerations": regenerations,
+                        "bundle_version": last.get("bundle_version"),
+                        "prompt_version": last.get("prompt_version"),
+                        "strategy": last.get("strategy"),
+                    },
+                )
+                out = dict(last)
+                out.update(
+                    {
+                        "adaptive_status": "completed",
+                        "path": "regenerated",
+                        "patch_rounds": patch_round,
+                        "regenerations": regenerations,
+                    }
+                )
+                return out
+            if bool(last.get("requires_human")):
+                out = dict(last)
+                out.update(
+                    {
+                        "adaptive_status": "handoff",
+                        "path": "human_handoff",
+                        "patch_rounds": patch_round,
+                        "regenerations": regenerations,
+                    }
+                )
+                return out
+
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=str(profile.url_pattern or "/"),
+            payload={
+                "status": "adaptive_failed",
+                "intent": intent,
+                "path": "exhausted",
+                "patch_rounds": patch_round,
+                "regenerations": regenerations,
+                "failure_category": last.get("failure_category"),
+                "error": last.get("error"),
+                "bundle_version": last.get("bundle_version"),
+                "prompt_version": last.get("prompt_version"),
+                "strategy": last.get("strategy"),
+            },
+        )
+        out = dict(last)
+        out.update(
+            {
+                "adaptive_status": "failed",
+                "path": "exhausted",
+                "patch_rounds": patch_round,
+                "regenerations": regenerations,
+            }
+        )
+        return out
 
     def _generate_bundle_with_optional_runtime_stats(
         self,

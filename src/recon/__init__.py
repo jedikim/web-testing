@@ -16,6 +16,7 @@ from src.recon.langgraph_recon import ReconWorkflow, build_recon_workflow
 from src.recon.litellm_router import ModelRegistry, ModelRole, build_model_registry
 from src.recon.models import GeneratedBundle, MaturityState, SiteProfile
 from src.recon.promotion_gate import PromotionDecision, PromotionGate
+from src.recon.replay_runner import ReplayCase, ReplayReport, WorkflowReplayRunner
 from src.recon.runtime import (
     DeterministicStepRunner,
     ReconRuntime,
@@ -46,6 +47,9 @@ __all__ = [
     "SiteProfile",
     "PromotionDecision",
     "PromotionGate",
+    "ReplayCase",
+    "ReplayReport",
+    "WorkflowReplayRunner",
     "PatchDecision",
     "WorkflowPatcher",
     "DOMScanner",

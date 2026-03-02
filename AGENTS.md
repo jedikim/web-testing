@@ -47,3 +47,4 @@ If conflicts exist: `DEV_GUIDE > RECON_CODEGEN_ARCHITECTURE > new_arch > ARCHITE
 - 2026-03-02: Added domain health summary API combining maturity, strategy stats, and rollback hints.
 - 2026-03-02: Added continuous guard-cycle API that conditionally executes auto-rollback.
 - 2026-03-02: Added persistent health snapshot storage for domain operational summaries.
+- 2026-03-02: Added executable replay/canary gate and adaptive runtime loop for patch/regenerate retries.

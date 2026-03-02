@@ -1,5 +1,6 @@
 from src.recon.models import GeneratedBundle, SiteProfile
 from src.recon.promotion_gate import PromotionGate
+from src.recon.replay_runner import ReplayCase
 
 
 def _profile() -> SiteProfile:
@@ -60,6 +61,7 @@ def test_promotion_gate_accepts_minimal_valid_bundle() -> None:
     assert decision.overall is True
     assert decision.replay_ok is True
     assert decision.canary_ok is True
+    assert decision.replay_pass_rate == 1.0
     assert decision.issues == []
 
 
@@ -74,3 +76,20 @@ def test_promotion_gate_rejects_bundle_without_verify_step() -> None:
     assert decision.overall is False
     assert decision.replay_ok is False
     assert any("verify_result" in issue for issue in decision.issues)
+
+
+def test_promotion_gate_canary_fails_when_intent_empty() -> None:
+    gate = PromotionGate(
+        replay_cases=[ReplayCase(name="baseline", context={"candidate_count": 2})],
+        canary_cases=[ReplayCase(name="canary", context={"candidate_count": 2})],
+    )
+    decision = gate.evaluate_bundle(
+        bundle=_bundle(with_verify_step=True),
+        profile=_profile(),
+        intent="",
+    )
+
+    assert decision.overall is False
+    assert decision.replay_ok is True
+    assert decision.canary_ok is False
+    assert any("intent" in issue for issue in decision.issues)

@@ -238,6 +238,33 @@ This document tracks the first implementation slice aligned to:
   - `get_domain_health_summary_stub(...)` now persists computed summary to KB health snapshot storage.
 - This enables external assistant backends to fetch last-known health without re-running analysis each time.
 
+22. **Executable Replay/Canary Promotion Gate**
+- `src/recon/replay_runner.py`
+  - Added deterministic `WorkflowReplayRunner` with typed replay cases/results/reports.
+  - Runs workflow DSL steps in-memory with strict action semantics and verify-step enforcement.
+- `src/recon/promotion_gate.py`
+  - Upgraded gate to execute replay cases (not only static shape checks).
+  - Added canary execution case in addition to domain/prompt/intent sanity checks.
+  - Decision still returns structured `replay_pass_rate`, `canary_pass_rate`, and issues.
+- This changes promotion from purely heuristic checks to deterministic executable validation.
+
+23. **Adaptive Runtime Loop (Patch + Regenerate)**
+- `src/recon/runtime.py`
+  - Added `execute_adaptive_stub(...)` as one-shot adaptive control loop:
+    1. ensure/generate bundle
+    2. execute with recovery
+    3. on failure: apply deterministic patch rounds
+    4. if still failing: regenerate bundle rounds (with optional validator/gate)
+    5. return terminal status with path metadata (`direct`, `patched`, `regenerated`, `exhausted`)
+  - Added runtime events:
+    - `adaptive_patch_round`
+    - `adaptive_regenerated`
+    - `adaptive_regeneration_blocked`
+    - `adaptive_completed`
+    - `adaptive_failed`
+  - `execute_workflow_stub(...)` failure result now returns `verify_code` + `requires_human`.
+- This binds failure handling from planning-only into deterministic execution progression.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -277,6 +304,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_guard_cycle.py`
 - `tests/unit/test_recon_kb_health_snapshot.py`
 - `tests/unit/test_recon_runtime_health_snapshot_integration.py`
+- `tests/unit/test_recon_replay_runner.py`
+- `tests/unit/test_recon_runtime_adaptive_loop.py`
 
 ## Verification commands
 
@@ -290,6 +319,6 @@ python -m pytest tests/unit/test_recon_*.py tests/unit/test_web_agent.py tests/u
 1. Replace heuristic scanners with richer typed profile fields from `RECON_CODEGEN_ARCHITECTURE.md`.
 2. Implement CodeGenAgent (DSL-first) that persists generated bundles directly into KB pattern folders.
 3. Connect runtime execution logs into `runs.jsonl` with bundle/prompt versions.
-4. Bind full runtime executor to DSL/macros (currently stub logging path).
-5. Replace heuristic validator checks with real replay/canary execution in sandbox browser contexts.
-6. Bind failure planner actions to real patch/regeneration execution paths (currently planning/logging stage).
+4. Bind full runtime executor to DSL/macros against browser contexts (replace deterministic runner on selected paths).
+5. Expand replay/canary from in-memory deterministic execution to browser sandbox execution for higher-fidelity gates.
+6. Expand adaptive regeneration to include strategy escalation policy + automatic rollback guard coupling.
