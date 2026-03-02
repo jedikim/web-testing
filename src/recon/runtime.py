@@ -1017,3 +1017,96 @@ class ReconRuntime:
             "consecutive_successes": state.consecutive_successes,
             "llm_calls_last_10": state.llm_calls_last_10,
         }
+
+    def get_domain_health_summary_stub(
+        self,
+        *,
+        domain: str,
+        url_pattern: str | None = None,
+        failure_threshold: int = 3,
+    ) -> dict[str, Any]:
+        """Build a compact domain health snapshot for operations."""
+        threshold = max(1, failure_threshold)
+        state = self.kb.get_maturity_state(domain=domain)
+        stage = state.evaluate_stage()
+        stats = self.kb.get_strategy_runtime_stats(
+            domain=domain,
+            url_pattern=url_pattern,
+        )
+
+        top_strategy = None
+        top_score = float("-inf")
+        for strategy, values in stats.items():
+            runs = int(values.get("runs", 0))
+            success_rate = float(values.get("success_rate", 0.0))
+            score = (success_rate * 2.0) + min(runs / 20.0, 1.0)
+            if score > top_score:
+                top_score = score
+                top_strategy = strategy
+
+        consecutive_failures = 0
+        current_version = None
+        has_previous_version = False
+        if url_pattern:
+            consecutive_failures = self.kb.get_consecutive_failures(
+                domain=domain,
+                url_pattern=url_pattern,
+            )
+            versions = self.kb.get_current_versions(domain, url_pattern)
+            current_version = versions.get("workflow_version")
+            available_versions = self.kb.list_bundle_versions(
+                domain=domain,
+                url_pattern=url_pattern,
+            )
+            if isinstance(current_version, int):
+                has_previous_version = any(v < current_version for v in available_versions)
+
+        needs_auto_rollback = (
+            consecutive_failures >= threshold
+            and has_previous_version
+        )
+
+        if needs_auto_rollback:
+            recommended_action = "auto_rollback"
+        elif stage == "cold":
+            recommended_action = "stabilize"
+        elif stage == "warm":
+            recommended_action = "monitor_and_optimize"
+        else:
+            recommended_action = "keep_hot"
+
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=url_pattern or "*",
+            payload={
+                "status": "health_summary",
+                "stage": stage,
+                "total_runs": state.total_runs,
+                "recent_success_rate": state.recent_success_rate,
+                "consecutive_successes": state.consecutive_successes,
+                "llm_calls_last_10": state.llm_calls_last_10,
+                "top_strategy": top_strategy,
+                "consecutive_failures": consecutive_failures,
+                "failure_threshold": threshold,
+                "current_version": current_version,
+                "has_previous_version": has_previous_version,
+                "needs_auto_rollback": needs_auto_rollback,
+                "recommended_action": recommended_action,
+            },
+        )
+        return {
+            "domain": domain,
+            "url_pattern": url_pattern,
+            "stage": stage,
+            "total_runs": state.total_runs,
+            "recent_success_rate": state.recent_success_rate,
+            "consecutive_successes": state.consecutive_successes,
+            "llm_calls_last_10": state.llm_calls_last_10,
+            "top_strategy": top_strategy,
+            "consecutive_failures": consecutive_failures,
+            "failure_threshold": threshold,
+            "current_version": current_version,
+            "has_previous_version": has_previous_version,
+            "needs_auto_rollback": needs_auto_rollback,
+            "recommended_action": recommended_action,
+        }

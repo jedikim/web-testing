@@ -205,6 +205,20 @@ This document tracks the first implementation slice aligned to:
   - All outcomes are logged with threshold/failure/version metadata.
 - This adds a deterministic safety net for unstable newly promoted bundles.
 
+19. **Domain Health Summary API**
+- `src/recon/runtime.py`
+  - Added `ReconRuntime.get_domain_health_summary_stub(...)`
+  - Combines:
+    - maturity state (`cold/warm/hot`)
+    - strategy runtime stats (top strategy signal)
+    - trailing consecutive failures
+    - version availability for rollback
+  - Computes deterministic decision hints:
+    - `needs_auto_rollback`
+    - `recommended_action` (`auto_rollback`, `stabilize`, `monitor_and_optimize`, `keep_hot`)
+  - Appends `health_summary` event to run history for observability
+- This gives a single operational snapshot API for external orchestrators.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -240,6 +254,7 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_maturity_integration.py`
 - `tests/unit/test_recon_kb_failure_guard.py`
 - `tests/unit/test_recon_runtime_auto_rollback_guard.py`
+- `tests/unit/test_recon_runtime_health_summary.py`
 
 ## Verification commands
 
