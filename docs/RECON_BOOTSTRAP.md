@@ -23,14 +23,28 @@ This document tracks the first implementation slice aligned to:
 - `src/recon/agent.py`
   - Async recon orchestration for DOM/visual/navigation scanners
   - Versioning on repeated recon runs
+- `src/recon/scanners.py`
+  - `DOMScanner`: framework/SPA/DOM+AX hash signals via Playwright+CDP
+  - `VisualScanner`: repeating-pattern/content/obstacle signal extraction
+  - `NavigationScanner`: nav/interaction/API hint extraction
+- `src/recon/langgraph_recon.py`
+  - LangGraph workflow wrapper with automatic fallback mode when dependency is absent
 
 3. **CLI bootstrap**
 - `scripts/run_recon.py`
-  - One-shot recon execution and JSON output.
+  - One-shot recon execution with real Playwright page scan and JSON output.
 
 4. **Compatibility fix**
 - `src/__init__.py` switched to lazy exports to avoid heavy import side effects.
 - Added `src/vision/visual_judge.py` lightweight fallback module used by existing v3 imports.
+
+5. **URL-pattern bundle store**
+- `KnowledgeBase.save_bundle(domain, url_pattern, bundle)` with versioned artifacts:
+  - `workflows/v{n}.dsl.json`
+  - `macros/v{n}/...`
+  - `prompts/v{n}/*.yaml`
+- `KnowledgeBase.load_current_bundle(...)` for current bundle retrieval
+- `KnowledgeBase.resolve_pattern_for_url(...)` for runtime URL→pattern lookup
 
 ## Added tests
 
@@ -38,17 +52,21 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_litellm_router.py`
 - `tests/unit/test_recon_knowledge_base.py`
 - `tests/unit/test_recon_agent.py`
+- `tests/unit/test_recon_generated_bundle.py`
+- `tests/unit/test_recon_kb_bundles.py`
+- `tests/unit/test_recon_scanners.py`
+- `tests/unit/test_recon_langgraph.py`
 
 ## Verification commands
 
 ```bash
 python -m ruff check src/recon src/__init__.py src/vision/visual_judge.py scripts/run_recon.py tests/unit/test_recon_*.py
-python -m pytest tests/unit/test_recon_models.py tests/unit/test_recon_litellm_router.py tests/unit/test_recon_knowledge_base.py tests/unit/test_recon_agent.py tests/unit/test_web_agent.py tests/unit/test_v3_factory.py -q
+python -m pytest tests/unit/test_recon_*.py tests/unit/test_web_agent.py tests/unit/test_v3_factory.py -q
 ```
 
 ## Next implementation slices
 
-1. Replace no-op scanners with Playwright/CDP-based collectors (DOM, AX tree, nav graph).
-2. Add LangGraph state machine wrapper around `ReconAgent.recon`.
-3. Introduce URL-pattern level bundle store (`workflows/`, `macros/`, `prompts/`).
-4. Connect runtime execution logs into `runs.jsonl` with bundle/prompt versions.
+1. Replace heuristic scanners with richer typed profile fields from `RECON_CODEGEN_ARCHITECTURE.md`.
+2. Implement CodeGenAgent (DSL-first) that persists generated bundles directly into KB pattern folders.
+3. Connect runtime execution logs into `runs.jsonl` with bundle/prompt versions.
+4. Add replay/canary validation gates before promoting generated bundles.

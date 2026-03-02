@@ -30,3 +30,4 @@ If conflicts exist: `DEV_GUIDE > RECON_CODEGEN_ARCHITECTURE > new_arch > ARCHITE
 
 ## Changelog
 - 2026-03-02: Added lightweight policy focused on recon/codegen architecture.
+- 2026-03-02: Extended scope to real scanners + URL-pattern bundle versioning + LangGraph-ready wrapper.

@@ -11,7 +11,7 @@ import asyncio
 import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import urlparse
 
 from src.recon.knowledge_base import KnowledgeBase
@@ -22,10 +22,18 @@ class IScanner(Protocol):
     async def scan(self, url: str) -> dict[str, object]: ...
 
 
+class IPageScanner(Protocol):
+    async def scan_page(self, page: Any) -> dict[str, object]: ...
+
+
 @dataclass
 class _NoopScanner:
     async def scan(self, url: str) -> dict[str, object]:
         del url
+        return {}
+
+    async def scan_page(self, page: Any) -> dict[str, object]:
+        del page
         return {}
 
 
@@ -52,16 +60,66 @@ class ReconAgent:
         language: str = "unknown",
         region: str = "unknown",
     ) -> SiteProfile:
-        """Run one recon pass and persist profile."""
-        parsed = urlparse(url)
-        domain = parsed.hostname or "unknown.local"
-        now = datetime.now(UTC)
-
+        """Run one recon pass and persist profile (scanner.scan path)."""
         dom_data, visual_data, nav_data = await asyncio.gather(
             self.dom_scanner.scan(url),
             self.visual_scanner.scan(url),
             self.nav_scanner.scan(url),
         )
+        return self._synthesize_and_save(
+            url=url,
+            dom_data=dom_data,
+            visual_data=visual_data,
+            nav_data=nav_data,
+            purpose=purpose,
+            language=language,
+            region=region,
+        )
+
+    async def recon_with_page(
+        self,
+        page: Any,
+        *,
+        purpose: str = "unknown",
+        language: str = "unknown",
+        region: str = "unknown",
+    ) -> SiteProfile:
+        """Run one recon pass using a shared browser page."""
+        url = str(getattr(page, "url", "") or "")
+        dom_data, visual_data, nav_data = await asyncio.gather(
+            self._scan_from_page(self.dom_scanner, page, url),
+            self._scan_from_page(self.visual_scanner, page, url),
+            self._scan_from_page(self.nav_scanner, page, url),
+        )
+        return self._synthesize_and_save(
+            url=url,
+            dom_data=dom_data,
+            visual_data=visual_data,
+            nav_data=nav_data,
+            purpose=purpose,
+            language=language,
+            region=region,
+        )
+
+    async def _scan_from_page(self, scanner: Any, page: Any, url: str) -> dict[str, object]:
+        if hasattr(scanner, "scan_page"):
+            return await scanner.scan_page(page)
+        return await scanner.scan(url)
+
+    def _synthesize_and_save(
+        self,
+        *,
+        url: str,
+        dom_data: dict[str, object],
+        visual_data: dict[str, object],
+        nav_data: dict[str, object],
+        purpose: str,
+        language: str,
+        region: str,
+    ) -> SiteProfile:
+        parsed = urlparse(url)
+        domain = parsed.hostname or "unknown.local"
+        now = datetime.now(UTC)
 
         previous = self.kb.load_profile(domain)
         version = 1 if previous is None else previous.recon_version + 1

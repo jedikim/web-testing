@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -59,6 +60,18 @@ class SiteProfile(BaseModel):
             f"- last_recon_at: {self.last_recon_at.isoformat()}",
         ]
         return "\n".join(lines)
+
+
+class GeneratedBundle(BaseModel):
+    """Generated runtime bundle for one URL pattern."""
+
+    workflow_dsl: dict[str, Any]
+    python_macro: str | None = None
+    ts_macro: str | None = None
+    prompts: dict[str, str] = Field(default_factory=dict)
+    strategy: str = "dom_only"
+    dependencies: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass(frozen=True)

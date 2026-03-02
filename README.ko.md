@@ -107,8 +107,11 @@ async with WebAgent(headless=True, stealth_level="standard") as agent:
 pip install -e ".[dev,recon]"
 
 # recon 1회 실행 (sites/<domain>/profile.json + profile.md 생성)
-python scripts/run_recon.py --url https://www.naver.com --purpose portal --language ko --region KR
+python scripts/run_recon.py --url https://www.naver.com --purpose portal --language ko --region KR --headless
 ```
+
+또한 codegen/runtime을 위한 URL 패턴별 버전 산출물 디렉토리
+`sites/<domain>/url_patterns/<pattern>/workflows|macros|prompts`를 사용합니다.
 
 ---
 

@@ -108,8 +108,11 @@ This branch includes a lightweight recon/codegen foundation based on:
 pip install -e ".[dev,recon]"
 
 # Run one recon pass (creates sites/<domain>/profile.json + profile.md)
-python scripts/run_recon.py --url https://www.naver.com --purpose portal --language ko --region KR
+python scripts/run_recon.py --url https://www.naver.com --purpose portal --language ko --region KR --headless
 ```
+
+It also lays down versioned pattern artifacts for codegen/runtime:
+`sites/<domain>/url_patterns/<pattern>/workflows|macros|prompts`.
 
 ---
 

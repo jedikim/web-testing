@@ -16,8 +16,11 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_PROJECT_ROOT))
 
+from playwright.async_api import async_playwright  # noqa: E402
+
 from src.recon.agent import ReconAgent  # noqa: E402
 from src.recon.knowledge_base import KnowledgeBase  # noqa: E402
+from src.recon.scanners import DOMScanner, NavigationScanner, VisualScanner  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -27,19 +30,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--language", default="unknown")
     parser.add_argument("--region", default="unknown")
     parser.add_argument("--sites-dir", default="sites")
+    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
     return parser.parse_args()
 
 
 async def _main() -> None:
     args = parse_args()
     kb = KnowledgeBase(base_dir=args.sites_dir)
-    agent = ReconAgent(kb=kb)
-    profile = await agent.recon(
-        args.url,
-        purpose=args.purpose,
-        language=args.language,
-        region=args.region,
+    agent = ReconAgent(
+        kb=kb,
+        dom_scanner=DOMScanner(),
+        visual_scanner=VisualScanner(),
+        nav_scanner=NavigationScanner(),
     )
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=args.headless)
+        page = await browser.new_page()
+        try:
+            await page.goto(args.url, wait_until="domcontentloaded", timeout=45_000)
+            profile = await agent.recon_with_page(
+                page,
+                purpose=args.purpose,
+                language=args.language,
+                region=args.region,
+            )
+        finally:
+            await browser.close()
     print(json.dumps(profile.model_dump(mode="json"), ensure_ascii=False, indent=2))
 
 
