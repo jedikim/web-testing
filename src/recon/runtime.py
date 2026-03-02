@@ -25,8 +25,75 @@ class RuntimeLookup:
     prompt_version: int | None
 
 
+@dataclass(frozen=True)
+class StepExecutionResult:
+    ok: bool
+    error: str | None = None
+    verify_code: str | None = None
+    evidence: dict[str, Any] | None = None
+
+
 class ICodeGenAgent(Protocol):
     def generate_bundle(self, *, profile: SiteProfile, url: str, intent: str) -> Any: ...
+
+
+class IWorkflowStepRunner(Protocol):
+    def run_step(self, *, step: dict[str, Any], context: dict[str, Any]) -> StepExecutionResult: ...
+
+
+class DeterministicStepRunner:
+    """Deterministic fallback runner for common workflow DSL actions."""
+
+    def __init__(self, default_candidate_count: int = 3) -> None:
+        self.default_candidate_count = max(0, default_candidate_count)
+
+    def run_step(self, *, step: dict[str, Any], context: dict[str, Any]) -> StepExecutionResult:
+        action = str(step.get("action") or "").strip()
+        if not action:
+            return StepExecutionResult(ok=False, error="missing action")
+
+        if action == "goto":
+            target = step.get("target")
+            if not isinstance(target, str) or not target:
+                return StepExecutionResult(ok=False, error="missing target for goto")
+            context["current_url"] = target
+            return StepExecutionResult(ok=True, evidence={"url": target})
+
+        if action == "capture_dom":
+            context["dom_captured"] = True
+            return StepExecutionResult(ok=True, evidence={"dom_captured": True})
+
+        if action == "extract_candidates":
+            count = self.default_candidate_count
+            params = step.get("params")
+            if isinstance(params, dict):
+                raw = params.get("min_candidates")
+                if isinstance(raw, int):
+                    count = max(0, raw)
+            context["candidate_count"] = count
+            return StepExecutionResult(ok=True, evidence={"candidate_count": count})
+
+        if action == "verify_result":
+            verify = step.get("verify")
+            min_items = 1
+            if isinstance(verify, dict):
+                raw = verify.get("min_items")
+                if isinstance(raw, int):
+                    min_items = max(0, raw)
+            candidate_count = int(context.get("candidate_count", 0))
+            if candidate_count < min_items:
+                return StepExecutionResult(
+                    ok=False,
+                    error="empty data: insufficient result items",
+                    verify_code="EXPECT_SELECTOR_MISSING",
+                    evidence={"candidate_count": candidate_count, "min_items": min_items},
+                )
+            return StepExecutionResult(
+                ok=True,
+                evidence={"candidate_count": candidate_count, "min_items": min_items},
+            )
+
+        return StepExecutionResult(ok=False, error=f"unknown action: {action}")
 
 
 class ReconRuntime:
@@ -234,4 +301,138 @@ class ReconRuntime:
             "changed": report.changed,
             "reason": report.reason,
             "change_score": report.change_score,
+        }
+
+    def execute_workflow_stub(
+        self,
+        *,
+        domain: str,
+        url: str,
+        intent: str,
+        runner: IWorkflowStepRunner | None = None,
+        max_steps: int = 50,
+    ) -> dict[str, Any]:
+        """Run workflow DSL steps with deterministic step-by-step tracing."""
+        lookup = self.resolve(domain=domain, url=url)
+        parsed = urlparse(url)
+        fallback_pattern = parsed.path or "/"
+
+        if lookup.bundle is None or lookup.url_pattern is None:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=fallback_pattern,
+                payload={
+                    "status": "miss",
+                    "intent": intent,
+                    "bundle_version": None,
+                    "prompt_version": None,
+                    "reason": "bundle_not_found",
+                },
+            )
+            return {
+                "status": "miss",
+                "bundle_version": None,
+                "prompt_version": None,
+            }
+
+        steps = lookup.bundle.workflow_dsl.get("steps", [])
+        if not isinstance(steps, list):
+            steps = []
+        if len(steps) > max_steps:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=lookup.url_pattern,
+                payload={
+                    "status": "failed",
+                    "intent": intent,
+                    "bundle_version": lookup.workflow_version,
+                    "prompt_version": lookup.prompt_version,
+                    "error": "workflow step limit exceeded",
+                    "failed_step": "preflight",
+                    "failure_category": "runtime",
+                    "recommended_action": "full_recon",
+                },
+            )
+            return {
+                "status": "failed",
+                "failed_step": "preflight",
+                "failure_category": "runtime",
+                "recommended_action": "full_recon",
+                "bundle_version": lookup.workflow_version,
+                "prompt_version": lookup.prompt_version,
+            }
+
+        step_runner = runner or DeterministicStepRunner()
+        context: dict[str, Any] = {}
+
+        for idx, step in enumerate(steps, start=1):
+            step_id = str(step.get("id") or f"step_{idx}")
+            step_action = str(step.get("action") or "")
+            result = step_runner.run_step(step=step, context=context)
+
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=lookup.url_pattern,
+                payload={
+                    "status": "step",
+                    "intent": intent,
+                    "bundle_version": lookup.workflow_version,
+                    "prompt_version": lookup.prompt_version,
+                    "step_index": idx,
+                    "step_id": step_id,
+                    "step_action": step_action,
+                    "step_ok": result.ok,
+                    "step_evidence": result.evidence or {},
+                },
+            )
+
+            if result.ok:
+                continue
+
+            err = result.error or "unknown step execution error"
+            cls = self.failure_analyzer.classify(error=err, verify_code=result.verify_code)
+            plan = self.self_improver.plan_remediation(classification=cls)
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=lookup.url_pattern,
+                payload={
+                    "status": "failed",
+                    "intent": intent,
+                    "bundle_version": lookup.workflow_version,
+                    "prompt_version": lookup.prompt_version,
+                    "failed_step": step_id,
+                    "error": err,
+                    "verify_code": result.verify_code,
+                    "failure_category": cls.category,
+                    "recommended_action": cls.recommended_action,
+                    "requires_human": plan.requires_human,
+                },
+            )
+            return {
+                "status": "failed",
+                "failed_step": step_id,
+                "error": err,
+                "failure_category": cls.category,
+                "recommended_action": cls.recommended_action,
+                "bundle_version": lookup.workflow_version,
+                "prompt_version": lookup.prompt_version,
+            }
+
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=lookup.url_pattern,
+            payload={
+                "status": "executed",
+                "intent": intent,
+                "bundle_version": lookup.workflow_version,
+                "prompt_version": lookup.prompt_version,
+                "executed_steps": len(steps),
+                "context_keys": sorted(context.keys()),
+            },
+        )
+        return {
+            "status": "executed",
+            "executed_steps": len(steps),
+            "bundle_version": lookup.workflow_version,
+            "prompt_version": lookup.prompt_version,
         }

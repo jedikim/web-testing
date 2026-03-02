@@ -15,7 +15,12 @@ from src.recon.knowledge_base import KnowledgeBase
 from src.recon.langgraph_recon import ReconWorkflow, build_recon_workflow
 from src.recon.litellm_router import ModelRegistry, ModelRole, build_model_registry
 from src.recon.models import GeneratedBundle, MaturityState, SiteProfile
-from src.recon.runtime import ReconRuntime, RuntimeLookup
+from src.recon.runtime import (
+    DeterministicStepRunner,
+    ReconRuntime,
+    RuntimeLookup,
+    StepExecutionResult,
+)
 from src.recon.scanners import DOMScanner, NavigationScanner, VisualScanner
 from src.recon.self_improver import RemediationPlan, SelfImprover
 from src.recon.validator import CodeValidator, ValidationResult
@@ -42,6 +47,8 @@ __all__ = [
     "NavigationScanner",
     "ReconRuntime",
     "RuntimeLookup",
+    "StepExecutionResult",
+    "DeterministicStepRunner",
     "CodeValidator",
     "ValidationResult",
     "SelfImprover",

@@ -94,6 +94,17 @@ This document tracks the first implementation slice aligned to:
   - `ReconRuntime.detect_change_stub(...)`
   - Appends `change_check` record in `runs.jsonl` with score/reason/signals/dead selectors
 
+11. **Workflow Step Executor (Deterministic Stub)**
+- `src/recon/runtime.py`
+  - Added `StepExecutionResult`, `IWorkflowStepRunner`, `DeterministicStepRunner`
+  - Added `ReconRuntime.execute_workflow_stub(...)`:
+    - Resolve current bundle by URL pattern
+    - Execute workflow DSL `steps` sequentially
+    - Log each step as trace row (`status=step`) in `runs.jsonl`
+    - On step failure: classify + remediation mapping + `failed` log
+    - On success: append `executed` summary with executed step count
+- This slice keeps runtime generic and site-agnostic (no domain hardcoding).
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -114,6 +125,7 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_failure_integration.py`
 - `tests/unit/test_recon_change_detector.py`
 - `tests/unit/test_recon_runtime_change_integration.py`
+- `tests/unit/test_recon_runtime_executor_stub.py`
 
 ## Verification commands
 
