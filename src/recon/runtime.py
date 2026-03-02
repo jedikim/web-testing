@@ -11,6 +11,7 @@ from src.recon.codegen import CodeGenAgent
 from src.recon.failure_analyzer import FailureAnalyzer
 from src.recon.knowledge_base import KnowledgeBase
 from src.recon.models import SiteProfile
+from src.recon.promotion_gate import PromotionGate
 from src.recon.self_improver import SelfImprover
 from src.recon.validator import CodeValidator
 
@@ -39,6 +40,10 @@ class ICodeGenAgent(Protocol):
 
 class IWorkflowStepRunner(Protocol):
     def run_step(self, *, step: dict[str, Any], context: dict[str, Any]) -> StepExecutionResult: ...
+
+
+class IPromotionGate(Protocol):
+    def evaluate_bundle(self, *, bundle: Any, profile: SiteProfile, intent: str) -> Any: ...
 
 
 class DeterministicStepRunner:
@@ -181,6 +186,7 @@ class ReconRuntime:
         profile: SiteProfile,
         codegen_agent: ICodeGenAgent | CodeGenAgent,
         validator: CodeValidator | None = None,
+        promotion_gate: IPromotionGate | PromotionGate | None = None,
     ) -> dict[str, Any]:
         """Execute if bundle exists; otherwise generate + save + log."""
         lookup = self.resolve(domain=domain, url=url)
@@ -207,6 +213,45 @@ class ReconRuntime:
                     "bundle_version": None,
                     "prompt_version": None,
                     "errors": v.errors,
+                }
+
+        if promotion_gate is not None:
+            decision = promotion_gate.evaluate_bundle(
+                bundle=generated,
+                profile=profile,
+                intent=intent,
+            )
+            overall = bool(getattr(decision, "overall", False))
+            if not overall:
+                replay_ok = bool(getattr(decision, "replay_ok", False))
+                canary_ok = bool(getattr(decision, "canary_ok", False))
+                issues = list(getattr(decision, "issues", []))
+                replay_pass_rate = float(getattr(decision, "replay_pass_rate", 0.0))
+                canary_pass_rate = float(getattr(decision, "canary_pass_rate", 0.0))
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=str(generated.workflow_dsl["url_pattern"]),
+                    payload={
+                        "status": "promotion_blocked",
+                        "intent": intent,
+                        "bundle_version": None,
+                        "prompt_version": None,
+                        "replay_ok": replay_ok,
+                        "canary_ok": canary_ok,
+                        "replay_pass_rate": replay_pass_rate,
+                        "canary_pass_rate": canary_pass_rate,
+                        "issues": issues,
+                    },
+                )
+                return {
+                    "status": "promotion_blocked",
+                    "bundle_version": None,
+                    "prompt_version": None,
+                    "replay_ok": replay_ok,
+                    "canary_ok": canary_ok,
+                    "replay_pass_rate": replay_pass_rate,
+                    "canary_pass_rate": canary_pass_rate,
+                    "issues": issues,
                 }
 
         version = self.kb.save_bundle(domain, generated.workflow_dsl["url_pattern"], generated)

@@ -120,6 +120,20 @@ This document tracks the first implementation slice aligned to:
     - `recovery_failed`
 - This keeps failure handling generic and category-driven (no site-specific branching).
 
+13. **Promotion Gate (Replay/Canary Stub)**
+- `src/recon/promotion_gate.py`
+  - Added `PromotionGate` + `PromotionDecision`
+  - Deterministic pre-promotion checks:
+    - replay checks (step presence, guard limit, `verify_result` existence)
+    - canary checks (domain/prompt keys/intent sanity)
+  - Returns structured pass rates and issues for observability.
+- Runtime integration:
+  - `ReconRuntime.execute_or_generate_stub(..., promotion_gate=...)`
+  - On gate failure:
+    - no bundle promotion to KB
+    - writes `promotion_blocked` run log with replay/canary details
+    - returns `status=promotion_blocked`
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -142,6 +156,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_change_integration.py`
 - `tests/unit/test_recon_runtime_executor_stub.py`
 - `tests/unit/test_recon_runtime_recovery.py`
+- `tests/unit/test_recon_promotion_gate.py`
+- `tests/unit/test_recon_runtime_promotion_gate_integration.py`
 
 ## Verification commands
 
