@@ -179,6 +179,17 @@ This document tracks the first implementation slice aligned to:
   - Includes version transition metadata in run history (`from_version`, `to_version`)
 - This provides deterministic rollback path for safe operations after bad promotions/patches.
 
+17. **Maturity State Computation and Runtime Trace**
+- `src/recon/knowledge_base.py`
+  - Added `get_maturity_state(domain, recent_window)`:
+    - computes `total_runs`, `recent_success_rate`, `consecutive_successes`, `llm_calls_last_10`
+    - derives from run-history terminal statuses (`executed/ok/recovery_completed/failed/recovery_failed`)
+- `src/recon/runtime.py`
+  - Added `ReconRuntime.get_maturity_state_stub(domain)`
+  - Appends `maturity_check` event with computed metrics and stage (`cold/warm/hot`)
+  - Returns structured maturity payload for orchestration/monitoring
+- This enables low-cost health checks for automatic mode transition decisions.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -210,6 +221,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_patch_integration.py`
 - `tests/unit/test_recon_kb_rollback.py`
 - `tests/unit/test_recon_runtime_rollback_integration.py`
+- `tests/unit/test_recon_kb_maturity.py`
+- `tests/unit/test_recon_runtime_maturity_integration.py`
 
 ## Verification commands
 

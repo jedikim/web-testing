@@ -42,3 +42,4 @@ If conflicts exist: `DEV_GUIDE > RECON_CODEGEN_ARCHITECTURE > new_arch > ARCHITE
 - 2026-03-02: Added runtime strategy-stat feedback loop from KB history into codegen decision.
 - 2026-03-02: Added failure-driven deterministic workflow patcher with versioned patch promotion.
 - 2026-03-02: Added deterministic bundle rollback path with runtime rollback logging.
+- 2026-03-02: Added maturity-state computation from run history with runtime maturity-check logging.

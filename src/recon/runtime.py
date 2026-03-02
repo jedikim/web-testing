@@ -851,3 +851,28 @@ class ReconRuntime:
             "from_version": from_version,
             "to_version": new_versions.get("workflow_version"),
         }
+
+    def get_maturity_state_stub(self, *, domain: str) -> dict[str, Any]:
+        """Return maturity state snapshot and append trace log."""
+        state = self.kb.get_maturity_state(domain=domain)
+        stage = state.evaluate_stage()
+        self.kb.append_run(
+            domain=domain,
+            url_pattern="*",
+            payload={
+                "status": "maturity_check",
+                "stage": stage,
+                "total_runs": state.total_runs,
+                "recent_success_rate": state.recent_success_rate,
+                "consecutive_successes": state.consecutive_successes,
+                "llm_calls_last_10": state.llm_calls_last_10,
+            },
+        )
+        return {
+            "domain": domain,
+            "stage": stage,
+            "total_runs": state.total_runs,
+            "recent_success_rate": state.recent_success_rate,
+            "consecutive_successes": state.consecutive_successes,
+            "llm_calls_last_10": state.llm_calls_last_10,
+        }

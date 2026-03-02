@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from src.recon.models import GeneratedBundle, SiteProfile
+from src.recon.models import GeneratedBundle, MaturityState, SiteProfile
 from src.recon.scanners import pattern_dir_from_url_pattern, serialize_prompt_map
 
 
@@ -330,6 +330,65 @@ class KnowledgeBase:
                 "p95_latency_ms": int(round(p95_latency_ms)),
             }
         return out
+
+    def get_maturity_state(self, *, domain: str, recent_window: int = 20) -> MaturityState:
+        """Compute domain maturity state from run history."""
+        runs_path = self._domain_dir(domain) / "history" / "runs.jsonl"
+        if not runs_path.exists():
+            return MaturityState(
+                domain=domain,
+                total_runs=0,
+                recent_success_rate=0.0,
+                consecutive_successes=0,
+                llm_calls_last_10=0,
+            )
+
+        success_status = {"executed", "ok", "recovery_completed"}
+        fail_status = {"failed", "recovery_failed"}
+
+        outcomes: list[bool] = []
+        llm_counts: list[int] = []
+        for raw in runs_path.read_text(encoding="utf-8").splitlines():
+            if not raw.strip():
+                continue
+            row = json.loads(raw)
+            status = str(row.get("status") or "").strip()
+            if status in success_status:
+                outcomes.append(True)
+            elif status in fail_status:
+                outcomes.append(False)
+            else:
+                continue
+            llm_raw = row.get("llm_calls", 0)
+            llm_counts.append(int(llm_raw) if isinstance(llm_raw, int) else 0)
+
+        total_runs = len(outcomes)
+        if total_runs == 0:
+            return MaturityState(
+                domain=domain,
+                total_runs=0,
+                recent_success_rate=0.0,
+                consecutive_successes=0,
+                llm_calls_last_10=0,
+            )
+
+        recent = outcomes[-recent_window:] if recent_window > 0 else outcomes
+        recent_success_rate = sum(1 for ok in recent if ok) / len(recent)
+
+        consecutive = 0
+        for ok in reversed(outcomes):
+            if not ok:
+                break
+            consecutive += 1
+
+        llm_calls_last_10 = sum(llm_counts[-10:])
+        return MaturityState(
+            domain=domain,
+            total_runs=total_runs,
+            recent_success_rate=recent_success_rate,
+            consecutive_successes=consecutive,
+            llm_calls_last_10=llm_calls_last_10,
+        )
 
     @staticmethod
     def _next_pattern_version(root: Path, suffix: str) -> int:
