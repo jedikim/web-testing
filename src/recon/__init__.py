@@ -15,6 +15,7 @@ from src.recon.litellm_router import ModelRegistry, ModelRole, build_model_regis
 from src.recon.models import GeneratedBundle, MaturityState, SiteProfile
 from src.recon.runtime import ReconRuntime, RuntimeLookup
 from src.recon.scanners import DOMScanner, NavigationScanner, VisualScanner
+from src.recon.validator import CodeValidator, ValidationResult
 
 __all__ = [
     "ReconAgent",
@@ -34,4 +35,6 @@ __all__ = [
     "NavigationScanner",
     "ReconRuntime",
     "RuntimeLookup",
+    "CodeValidator",
+    "ValidationResult",
 ]

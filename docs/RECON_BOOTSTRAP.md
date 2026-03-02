@@ -60,6 +60,14 @@ This document tracks the first implementation slice aligned to:
 - `ReconRuntime.execute_or_generate_stub(...)`
   - On KB miss, generates bundle with `CodeGenAgent`, stores versioned artifacts, logs `generated` run
 
+8. **Promotion Validation Gate**
+- `src/recon/validator.py`
+  - `CodeValidator` + `ValidationResult`
+  - Checks: DSL schema/step structure, macro syntax, replay guard, canary prompt/domain sanity
+- Runtime integration:
+  - `execute_or_generate_stub(..., validator=...)`
+  - On failed validation, does **not** promote bundle to KB and logs `generation_failed` in runs history
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -73,6 +81,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime.py`
 - `tests/unit/test_recon_codegen.py`
 - `tests/unit/test_recon_runtime_codegen_integration.py`
+- `tests/unit/test_recon_validator.py`
+- `tests/unit/test_recon_runtime_validator_integration.py`
 
 ## Verification commands
 
@@ -87,4 +97,4 @@ python -m pytest tests/unit/test_recon_*.py tests/unit/test_web_agent.py tests/u
 2. Implement CodeGenAgent (DSL-first) that persists generated bundles directly into KB pattern folders.
 3. Connect runtime execution logs into `runs.jsonl` with bundle/prompt versions.
 4. Bind full runtime executor to DSL/macros (currently stub logging path).
-5. Add replay/canary validation gates before promoting generated bundles.
+5. Replace heuristic validator checks with real replay/canary execution in sandbox browser contexts.

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlparse
 
 from src.recon.codegen import CodeGenAgent
 from src.recon.knowledge_base import KnowledgeBase
 from src.recon.models import SiteProfile
+from src.recon.validator import CodeValidator
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,10 @@ class RuntimeLookup:
     bundle: Any | None
     workflow_version: int | None
     prompt_version: int | None
+
+
+class ICodeGenAgent(Protocol):
+    def generate_bundle(self, *, profile: SiteProfile, url: str, intent: str) -> Any: ...
 
 
 class ReconRuntime:
@@ -100,7 +105,8 @@ class ReconRuntime:
         url: str,
         intent: str,
         profile: SiteProfile,
-        codegen_agent: CodeGenAgent,
+        codegen_agent: ICodeGenAgent | CodeGenAgent,
+        validator: CodeValidator | None = None,
     ) -> dict[str, Any]:
         """Execute if bundle exists; otherwise generate + save + log."""
         lookup = self.resolve(domain=domain, url=url)
@@ -108,6 +114,27 @@ class ReconRuntime:
             return self.execute_stub(domain=domain, url=url, intent=intent)
 
         generated = codegen_agent.generate_bundle(profile=profile, url=url, intent=intent)
+        if validator is not None:
+            v = validator.validate_bundle(bundle=generated, profile=profile, intent=intent)
+            if not v.overall:
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=str(profile.url_pattern or "/"),
+                    payload={
+                        "status": "generation_failed",
+                        "intent": intent,
+                        "bundle_version": None,
+                        "prompt_version": None,
+                        "errors": v.errors,
+                    },
+                )
+                return {
+                    "status": "generation_failed",
+                    "bundle_version": None,
+                    "prompt_version": None,
+                    "errors": v.errors,
+                }
+
         version = self.kb.save_bundle(domain, generated.workflow_dsl["url_pattern"], generated)
 
         self.kb.append_run(
