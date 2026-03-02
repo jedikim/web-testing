@@ -265,6 +265,16 @@ This document tracks the first implementation slice aligned to:
   - `execute_workflow_stub(...)` failure result now returns `verify_code` + `requires_human`.
 - This binds failure handling from planning-only into deterministic execution progression.
 
+24. **Playwright Step Runner Binding**
+- `src/recon/playwright_runner.py`
+  - Added `PlaywrightStepRunner` that executes DSL actions on real browser pages (sync Playwright API).
+  - Supports core actions: `goto`, `capture_dom`, `extract_candidates`, `verify_result`, `click`, `type/select`, `hover`, `scroll`, `wait`.
+  - Maintains browser/page lifecycle through shared runtime context.
+- `src/recon/runtime.py`
+  - `execute_workflow_stub(...)` now finalizes runner lifecycle via optional `close(context=...)`.
+  - This allows browser-backed runners to release resources deterministically after each run.
+- This advances runtime from in-memory-only execution toward browser-context execution while preserving deterministic interfaces.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -306,6 +316,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_health_snapshot_integration.py`
 - `tests/unit/test_recon_replay_runner.py`
 - `tests/unit/test_recon_runtime_adaptive_loop.py`
+- `tests/unit/test_recon_playwright_runner.py`
+- `tests/unit/test_recon_runtime_runner_finalize.py`
 
 ## Verification commands
 
@@ -319,6 +331,6 @@ python -m pytest tests/unit/test_recon_*.py tests/unit/test_web_agent.py tests/u
 1. Replace heuristic scanners with richer typed profile fields from `RECON_CODEGEN_ARCHITECTURE.md`.
 2. Implement CodeGenAgent (DSL-first) that persists generated bundles directly into KB pattern folders.
 3. Connect runtime execution logs into `runs.jsonl` with bundle/prompt versions.
-4. Bind full runtime executor to DSL/macros against browser contexts (replace deterministic runner on selected paths).
+4. Extend Playwright step semantics (selector/text fallback, iframe/shadow support, stronger error codes) and integrate with runtime selection policy.
 5. Expand replay/canary from in-memory deterministic execution to browser sandbox execution for higher-fidelity gates.
 6. Expand adaptive regeneration to include strategy escalation policy + automatic rollback guard coupling.

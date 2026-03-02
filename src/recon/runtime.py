@@ -51,6 +51,10 @@ class IWorkflowStepRunner(Protocol):
     def run_step(self, *, step: dict[str, Any], context: dict[str, Any]) -> StepExecutionResult: ...
 
 
+class IClosableWorkflowStepRunner(Protocol):
+    def close(self, *, context: dict[str, Any]) -> None: ...
+
+
 class IPromotionGate(Protocol):
     def evaluate_bundle(self, *, bundle: Any, profile: SiteProfile, intent: str) -> Any: ...
 
@@ -453,85 +457,87 @@ class ReconRuntime:
 
         step_runner = runner or DeterministicStepRunner()
         context: dict[str, Any] = {}
+        try:
+            for idx, step in enumerate(steps, start=1):
+                step_id = str(step.get("id") or f"step_{idx}")
+                step_action = str(step.get("action") or "")
+                result = step_runner.run_step(step=step, context=context)
 
-        for idx, step in enumerate(steps, start=1):
-            step_id = str(step.get("id") or f"step_{idx}")
-            step_action = str(step.get("action") or "")
-            result = step_runner.run_step(step=step, context=context)
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=lookup.url_pattern,
+                    payload={
+                        "status": "step",
+                        "intent": intent,
+                        "bundle_version": lookup.workflow_version,
+                        "prompt_version": lookup.prompt_version,
+                        "step_index": idx,
+                        "step_id": step_id,
+                        "step_action": step_action,
+                        "step_ok": result.ok,
+                        "step_evidence": result.evidence or {},
+                        "strategy": strategy,
+                    },
+                )
 
-            self.kb.append_run(
-                domain=domain,
-                url_pattern=lookup.url_pattern,
-                payload={
-                    "status": "step",
-                    "intent": intent,
-                    "bundle_version": lookup.workflow_version,
-                    "prompt_version": lookup.prompt_version,
-                    "step_index": idx,
-                    "step_id": step_id,
-                    "step_action": step_action,
-                    "step_ok": result.ok,
-                    "step_evidence": result.evidence or {},
-                    "strategy": strategy,
-                },
-            )
+                if result.ok:
+                    continue
 
-            if result.ok:
-                continue
-
-            err = result.error or "unknown step execution error"
-            cls = self.failure_analyzer.classify(error=err, verify_code=result.verify_code)
-            plan = self.self_improver.plan_remediation(classification=cls)
-            self.kb.append_run(
-                domain=domain,
-                url_pattern=lookup.url_pattern,
-                payload={
+                err = result.error or "unknown step execution error"
+                cls = self.failure_analyzer.classify(error=err, verify_code=result.verify_code)
+                plan = self.self_improver.plan_remediation(classification=cls)
+                self.kb.append_run(
+                    domain=domain,
+                    url_pattern=lookup.url_pattern,
+                    payload={
+                        "status": "failed",
+                        "intent": intent,
+                        "bundle_version": lookup.workflow_version,
+                        "prompt_version": lookup.prompt_version,
+                        "failed_step": step_id,
+                        "error": err,
+                        "verify_code": result.verify_code,
+                        "failure_category": cls.category,
+                        "recommended_action": cls.recommended_action,
+                        "requires_human": plan.requires_human,
+                        "strategy": strategy,
+                    },
+                )
+                return {
                     "status": "failed",
-                    "intent": intent,
-                    "bundle_version": lookup.workflow_version,
-                    "prompt_version": lookup.prompt_version,
                     "failed_step": step_id,
                     "error": err,
                     "verify_code": result.verify_code,
                     "failure_category": cls.category,
                     "recommended_action": cls.recommended_action,
                     "requires_human": plan.requires_human,
+                    "bundle_version": lookup.workflow_version,
+                    "prompt_version": lookup.prompt_version,
+                    "strategy": strategy,
+                }
+
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=lookup.url_pattern,
+                payload={
+                    "status": "executed",
+                    "intent": intent,
+                    "bundle_version": lookup.workflow_version,
+                    "prompt_version": lookup.prompt_version,
+                    "executed_steps": len(steps),
+                    "context_keys": sorted(context.keys()),
                     "strategy": strategy,
                 },
             )
             return {
-                "status": "failed",
-                "failed_step": step_id,
-                "error": err,
-                "verify_code": result.verify_code,
-                "failure_category": cls.category,
-                "recommended_action": cls.recommended_action,
-                "requires_human": plan.requires_human,
+                "status": "executed",
+                "executed_steps": len(steps),
                 "bundle_version": lookup.workflow_version,
                 "prompt_version": lookup.prompt_version,
                 "strategy": strategy,
             }
-
-        self.kb.append_run(
-            domain=domain,
-            url_pattern=lookup.url_pattern,
-            payload={
-                "status": "executed",
-                "intent": intent,
-                "bundle_version": lookup.workflow_version,
-                "prompt_version": lookup.prompt_version,
-                "executed_steps": len(steps),
-                "context_keys": sorted(context.keys()),
-                "strategy": strategy,
-            },
-        )
-        return {
-            "status": "executed",
-            "executed_steps": len(steps),
-            "bundle_version": lookup.workflow_version,
-            "prompt_version": lookup.prompt_version,
-            "strategy": strategy,
-        }
+        finally:
+            self._finalize_step_runner(step_runner=step_runner, context=context)
 
     def execute_with_recovery_stub(
         self,
@@ -994,6 +1000,20 @@ class ReconRuntime:
                 runtime_stats=runtime_stats,
             )
         return generate(profile=profile, url=url, intent=intent)
+
+    @staticmethod
+    def _finalize_step_runner(
+        *,
+        step_runner: IWorkflowStepRunner | Any,
+        context: dict[str, Any],
+    ) -> None:
+        close = getattr(step_runner, "close", None)
+        if close is None or not callable(close):
+            return
+        try:
+            close(context=context)
+        except Exception:
+            return
 
     def apply_failure_patch_stub(
         self,
