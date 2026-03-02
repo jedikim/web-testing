@@ -185,6 +185,15 @@ class KnowledgeBase:
             dependencies=dependencies,
         )
 
+    def get_current_versions(self, domain: str, url_pattern: str) -> dict[str, int | None]:
+        """Return current artifact versions for a URL pattern."""
+        pdir = self._pattern_dir(domain, url_pattern)
+        return {
+            "workflow_version": self._read_current_token(pdir / "workflows"),
+            "macro_version": self._read_current_token(pdir / "macros"),
+            "prompt_version": self._read_current_token(pdir / "prompts"),
+        }
+
     def resolve_pattern_for_url(self, domain: str, url: str) -> str | None:
         """Match URL against saved pattern rules for a domain."""
         patterns_root = self._domain_dir(domain) / "url_patterns"
@@ -252,6 +261,19 @@ class KnowledgeBase:
                 except ValueError:
                     continue
         return max(versions) if versions else None
+
+    @staticmethod
+    def _read_current_token(root: Path) -> int | None:
+        cur = root / "current"
+        if not cur.exists():
+            return None
+        raw = cur.read_text(encoding="utf-8").strip()
+        if not raw.startswith("v"):
+            return None
+        try:
+            return int(raw[1:])
+        except ValueError:
+            return None
 
     @staticmethod
     def _match_url_pattern(path: str, query: str, pattern: str) -> bool:

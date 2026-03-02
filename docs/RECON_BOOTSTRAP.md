@@ -46,6 +46,12 @@ This document tracks the first implementation slice aligned to:
 - `KnowledgeBase.load_current_bundle(...)` for current bundle retrieval
 - `KnowledgeBase.resolve_pattern_for_url(...)` for runtime URL→pattern lookup
 
+6. **Runtime log bridge**
+- `src/recon/runtime.py`
+  - Resolves URL → current bundle/pattern/version metadata
+  - Appends execution records with `bundle_version` and `prompt_version` into `runs.jsonl`
+  - Includes `execute_stub()` for integration wiring before full DSL executor binding
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -56,6 +62,7 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_kb_bundles.py`
 - `tests/unit/test_recon_scanners.py`
 - `tests/unit/test_recon_langgraph.py`
+- `tests/unit/test_recon_runtime.py`
 
 ## Verification commands
 
@@ -69,4 +76,5 @@ python -m pytest tests/unit/test_recon_*.py tests/unit/test_web_agent.py tests/u
 1. Replace heuristic scanners with richer typed profile fields from `RECON_CODEGEN_ARCHITECTURE.md`.
 2. Implement CodeGenAgent (DSL-first) that persists generated bundles directly into KB pattern folders.
 3. Connect runtime execution logs into `runs.jsonl` with bundle/prompt versions.
-4. Add replay/canary validation gates before promoting generated bundles.
+4. Bind full runtime executor to DSL/macros (currently stub logging path).
+5. Add replay/canary validation gates before promoting generated bundles.

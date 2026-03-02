@@ -1,0 +1,92 @@
+"""Runtime helper for URL-pattern bundle lookup and run logging."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+from urllib.parse import urlparse
+
+from src.recon.knowledge_base import KnowledgeBase
+
+
+@dataclass(frozen=True)
+class RuntimeLookup:
+    domain: str
+    url: str
+    url_pattern: str | None
+    bundle: Any | None
+    workflow_version: int | None
+    prompt_version: int | None
+
+
+class ReconRuntime:
+    """Minimal runtime bridge: lookup bundle and append versioned run logs."""
+
+    def __init__(self, kb: KnowledgeBase) -> None:
+        self.kb = kb
+
+    def resolve(self, *, domain: str, url: str) -> RuntimeLookup:
+        pattern = self.kb.resolve_pattern_for_url(domain, url)
+        if pattern is None:
+            return RuntimeLookup(
+                domain=domain,
+                url=url,
+                url_pattern=None,
+                bundle=None,
+                workflow_version=None,
+                prompt_version=None,
+            )
+        bundle = self.kb.load_current_bundle(domain, pattern)
+        versions = self.kb.get_current_versions(domain, pattern)
+        return RuntimeLookup(
+            domain=domain,
+            url=url,
+            url_pattern=pattern,
+            bundle=bundle,
+            workflow_version=versions.get("workflow_version"),
+            prompt_version=versions.get("prompt_version"),
+        )
+
+    def execute_stub(self, *, domain: str, url: str, intent: str) -> dict[str, Any]:
+        """Simulate one runtime execution and log versioned run metadata.
+
+        This is a stub for integration wiring until full executor binding
+        is connected to DSL/macros.
+        """
+        lookup = self.resolve(domain=domain, url=url)
+        parsed = urlparse(url)
+        fallback_pattern = parsed.path or "/"
+
+        if lookup.bundle is None or lookup.url_pattern is None:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=fallback_pattern,
+                payload={
+                    "status": "miss",
+                    "intent": intent,
+                    "bundle_version": None,
+                    "prompt_version": None,
+                    "reason": "bundle_not_found",
+                },
+            )
+            return {
+                "status": "miss",
+                "bundle_version": None,
+                "prompt_version": None,
+            }
+
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=lookup.url_pattern,
+            payload={
+                "status": "ok",
+                "intent": intent,
+                "bundle_version": lookup.workflow_version,
+                "prompt_version": lookup.prompt_version,
+            },
+        )
+        return {
+            "status": "ok",
+            "bundle_version": lookup.workflow_version,
+            "prompt_version": lookup.prompt_version,
+        }
