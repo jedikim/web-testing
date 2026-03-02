@@ -219,6 +219,15 @@ This document tracks the first implementation slice aligned to:
   - Appends `health_summary` event to run history for observability
 - This gives a single operational snapshot API for external orchestrators.
 
+20. **Continuous Guard Cycle**
+- `src/recon/runtime.py`
+  - Added `ReconRuntime.run_continuous_guard_cycle_stub(...)`
+  - One-cycle control flow:
+    1. collect domain health summary
+    2. if rollback not needed: log `guard_cycle` with `action=no_op`
+    3. if rollback needed: run auto-rollback guard and log `guard_cycle` with rollback metadata
+- This forms a deterministic periodic operation primitive for backend schedulers.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -255,6 +264,7 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_kb_failure_guard.py`
 - `tests/unit/test_recon_runtime_auto_rollback_guard.py`
 - `tests/unit/test_recon_runtime_health_summary.py`
+- `tests/unit/test_recon_runtime_guard_cycle.py`
 
 ## Verification commands
 

@@ -1110,3 +1110,58 @@ class ReconRuntime:
             "needs_auto_rollback": needs_auto_rollback,
             "recommended_action": recommended_action,
         }
+
+    def run_continuous_guard_cycle_stub(
+        self,
+        *,
+        domain: str,
+        url_pattern: str,
+        failure_threshold: int = 3,
+    ) -> dict[str, Any]:
+        """Run one health-check cycle and auto-rollback only when needed."""
+        summary = self.get_domain_health_summary_stub(
+            domain=domain,
+            url_pattern=url_pattern,
+            failure_threshold=failure_threshold,
+        )
+        if not summary.get("needs_auto_rollback"):
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=url_pattern,
+                payload={
+                    "status": "guard_cycle",
+                    "action": "no_op",
+                    "reason": "rollback_not_needed",
+                    "recommended_action": summary.get("recommended_action"),
+                    "stage": summary.get("stage"),
+                },
+            )
+            return {
+                "status": "guard_cycle_noop",
+                "summary": summary,
+            }
+
+        rollback = self.auto_rollback_guard_stub(
+            domain=domain,
+            url_pattern=url_pattern,
+            failure_threshold=failure_threshold,
+            reason="continuous_guard_cycle",
+        )
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=url_pattern,
+            payload={
+                "status": "guard_cycle",
+                "action": "auto_rollback",
+                "rollback_status": rollback.get("status"),
+                "from_version": rollback.get("from_version"),
+                "to_version": rollback.get("to_version"),
+                "consecutive_failures": rollback.get("consecutive_failures"),
+                "stage": summary.get("stage"),
+            },
+        )
+        return {
+            "status": "guard_cycle_rollback",
+            "summary": summary,
+            "rollback": rollback,
+        }
