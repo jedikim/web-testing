@@ -304,6 +304,29 @@ class KnowledgeBase:
         with (hist_dir / "runs.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
+    def save_health_snapshot(self, *, domain: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Save latest domain-health snapshot and append history line."""
+        health_dir = self._domain_dir(domain) / "health"
+        health_dir.mkdir(parents=True, exist_ok=True)
+        record = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            **payload,
+        }
+        with (health_dir / "history.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        (health_dir / "latest.json").write_text(
+            json.dumps(record, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return record
+
+    def load_latest_health_snapshot(self, *, domain: str) -> dict[str, Any] | None:
+        """Load latest domain-health snapshot if present."""
+        latest = self._domain_dir(domain) / "health" / "latest.json"
+        if not latest.exists():
+            return None
+        return json.loads(latest.read_text(encoding="utf-8"))
+
     def get_strategy_runtime_stats(
         self,
         *,

@@ -228,6 +228,16 @@ This document tracks the first implementation slice aligned to:
     3. if rollback needed: run auto-rollback guard and log `guard_cycle` with rollback metadata
 - This forms a deterministic periodic operation primitive for backend schedulers.
 
+21. **Persistent Health Snapshots**
+- `src/recon/knowledge_base.py`
+  - Added:
+    - `save_health_snapshot(domain, payload)`
+    - `load_latest_health_snapshot(domain)`
+  - Stores snapshots at `sites/{domain}/health/latest.json` and appends `health/history.jsonl`
+- `src/recon/runtime.py`
+  - `get_domain_health_summary_stub(...)` now persists computed summary to KB health snapshot storage.
+- This enables external assistant backends to fetch last-known health without re-running analysis each time.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -265,6 +275,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_auto_rollback_guard.py`
 - `tests/unit/test_recon_runtime_health_summary.py`
 - `tests/unit/test_recon_runtime_guard_cycle.py`
+- `tests/unit/test_recon_kb_health_snapshot.py`
+- `tests/unit/test_recon_runtime_health_snapshot_integration.py`
 
 ## Verification commands
 

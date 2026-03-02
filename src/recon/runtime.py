@@ -1094,7 +1094,7 @@ class ReconRuntime:
                 "recommended_action": recommended_action,
             },
         )
-        return {
+        summary = {
             "domain": domain,
             "url_pattern": url_pattern,
             "stage": stage,
@@ -1110,6 +1110,8 @@ class ReconRuntime:
             "needs_auto_rollback": needs_auto_rollback,
             "recommended_action": recommended_action,
         }
+        self.kb.save_health_snapshot(domain=domain, payload=summary)
+        return summary
 
     def run_continuous_guard_cycle_stub(
         self,
