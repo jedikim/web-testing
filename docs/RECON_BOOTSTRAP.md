@@ -68,6 +68,17 @@ This document tracks the first implementation slice aligned to:
   - `execute_or_generate_stub(..., validator=...)`
   - On failed validation, does **not** promote bundle to KB and logs `generation_failed` in runs history
 
+9. **Failure Classification + Self-Improve Planning**
+- `src/recon/failure_analyzer.py`
+  - Deterministic multi-layer failure classification
+  - Categories: `timing`, `selector`, `interaction`, `data`, `runtime`, `rendering`, `security`
+  - Action mapping: `add_wait`, `fix_selector`, `fix_obstacle`, `change_strategy`, `full_recon`, `human_handoff`
+- `src/recon/self_improver.py`
+  - Converts classification into concrete remediation steps
+- Runtime integration:
+  - `ReconRuntime.handle_failure_stub(...)`
+  - Logs `failure_category`, `recommended_action`, `requires_human` to `runs.jsonl`
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -83,6 +94,9 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_codegen_integration.py`
 - `tests/unit/test_recon_validator.py`
 - `tests/unit/test_recon_runtime_validator_integration.py`
+- `tests/unit/test_recon_failure_analyzer.py`
+- `tests/unit/test_recon_self_improver.py`
+- `tests/unit/test_recon_runtime_failure_integration.py`
 
 ## Verification commands
 
@@ -98,3 +112,4 @@ python -m pytest tests/unit/test_recon_*.py tests/unit/test_web_agent.py tests/u
 3. Connect runtime execution logs into `runs.jsonl` with bundle/prompt versions.
 4. Bind full runtime executor to DSL/macros (currently stub logging path).
 5. Replace heuristic validator checks with real replay/canary execution in sandbox browser contexts.
+6. Bind failure planner actions to real patch/regeneration execution paths (currently planning/logging stage).

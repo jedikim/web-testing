@@ -9,18 +9,22 @@ Phase-1 bootstrap for the v4.3 architecture:
 
 from src.recon.agent import ReconAgent
 from src.recon.codegen import CodeGenAgent, StrategyDecision
+from src.recon.failure_analyzer import FailureAnalyzer, FailureClassification
 from src.recon.knowledge_base import KnowledgeBase
 from src.recon.langgraph_recon import ReconWorkflow, build_recon_workflow
 from src.recon.litellm_router import ModelRegistry, ModelRole, build_model_registry
 from src.recon.models import GeneratedBundle, MaturityState, SiteProfile
 from src.recon.runtime import ReconRuntime, RuntimeLookup
 from src.recon.scanners import DOMScanner, NavigationScanner, VisualScanner
+from src.recon.self_improver import RemediationPlan, SelfImprover
 from src.recon.validator import CodeValidator, ValidationResult
 
 __all__ = [
     "ReconAgent",
     "CodeGenAgent",
     "StrategyDecision",
+    "FailureAnalyzer",
+    "FailureClassification",
     "KnowledgeBase",
     "ReconWorkflow",
     "build_recon_workflow",
@@ -37,4 +41,6 @@ __all__ = [
     "RuntimeLookup",
     "CodeValidator",
     "ValidationResult",
+    "SelfImprover",
+    "RemediationPlan",
 ]

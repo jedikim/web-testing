@@ -7,8 +7,10 @@ from typing import Any, Protocol
 from urllib.parse import urlparse
 
 from src.recon.codegen import CodeGenAgent
+from src.recon.failure_analyzer import FailureAnalyzer
 from src.recon.knowledge_base import KnowledgeBase
 from src.recon.models import SiteProfile
+from src.recon.self_improver import SelfImprover
 from src.recon.validator import CodeValidator
 
 
@@ -31,6 +33,8 @@ class ReconRuntime:
 
     def __init__(self, kb: KnowledgeBase) -> None:
         self.kb = kb
+        self.failure_analyzer = FailureAnalyzer()
+        self.self_improver = SelfImprover()
 
     def resolve(self, *, domain: str, url: str) -> RuntimeLookup:
         pattern = self.kb.resolve_pattern_for_url(domain, url)
@@ -151,4 +155,44 @@ class ReconRuntime:
             "status": "generated",
             "bundle_version": version,
             "prompt_version": version,
+        }
+
+    def handle_failure_stub(
+        self,
+        *,
+        domain: str,
+        url_pattern: str,
+        intent: str,
+        error: str,
+        verify_code: str | None,
+    ) -> dict[str, Any]:
+        """Classify failure and derive next remediation action."""
+        cls = self.failure_analyzer.classify(error=error, verify_code=verify_code)
+        plan = self.self_improver.plan_remediation(classification=cls)
+
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=url_pattern,
+            payload={
+                "status": "failed",
+                "intent": intent,
+                "error": error,
+                "verify_code": verify_code,
+                "failure_category": cls.category,
+                "recommended_action": cls.recommended_action,
+                "requires_human": plan.requires_human,
+            },
+        )
+        return {
+            "classification": {
+                "category": cls.category,
+                "reason": cls.reason,
+                "recommended_action": cls.recommended_action,
+                "confidence": cls.confidence,
+            },
+            "plan": {
+                "action": plan.action,
+                "requires_human": plan.requires_human,
+                "steps": plan.steps,
+            },
         }
