@@ -166,6 +166,19 @@ This document tracks the first implementation slice aligned to:
     - append run log (`patched` / `patch_skipped` / `patch_miss`)
 - This keeps patch behavior structured and site-agnostic (no per-domain hardcoding).
 
+16. **Version Rollback for Runtime Safety**
+- `src/recon/knowledge_base.py`
+  - Added `rollback_bundle(domain, url_pattern, target_version)`:
+    - validates target artifacts (`workflows`, `macros`, `prompts`) exist
+    - switches all `current` pointers to target version atomically in filesystem order
+- `src/recon/runtime.py`
+  - Added `ReconRuntime.rollback_bundle_stub(...)`
+  - Logs rollback outcomes with explicit status:
+    - `rolled_back`
+    - `rollback_failed`
+  - Includes version transition metadata in run history (`from_version`, `to_version`)
+- This provides deterministic rollback path for safe operations after bad promotions/patches.
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -195,6 +208,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_runtime_codegen_stats_integration.py`
 - `tests/unit/test_recon_workflow_patcher.py`
 - `tests/unit/test_recon_runtime_patch_integration.py`
+- `tests/unit/test_recon_kb_rollback.py`
+- `tests/unit/test_recon_runtime_rollback_integration.py`
 
 ## Verification commands
 

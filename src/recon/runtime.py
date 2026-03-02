@@ -797,3 +797,57 @@ class ReconRuntime:
             "patch_reason": decision.reason,
             "failure_category": cls.category,
         }
+
+    def rollback_bundle_stub(
+        self,
+        *,
+        domain: str,
+        url_pattern: str,
+        target_version: int,
+        reason: str,
+    ) -> dict[str, Any]:
+        """Rollback current bundle pointers to a target version and log result."""
+        versions = self.kb.get_current_versions(domain, url_pattern)
+        from_version = versions.get("workflow_version")
+        ok = self.kb.rollback_bundle(
+            domain=domain,
+            url_pattern=url_pattern,
+            target_version=target_version,
+        )
+        if not ok:
+            self.kb.append_run(
+                domain=domain,
+                url_pattern=url_pattern,
+                payload={
+                    "status": "rollback_failed",
+                    "reason": reason,
+                    "from_version": from_version,
+                    "to_version": target_version,
+                    "bundle_version": from_version,
+                    "prompt_version": versions.get("prompt_version"),
+                },
+            )
+            return {
+                "status": "rollback_failed",
+                "from_version": from_version,
+                "to_version": target_version,
+            }
+
+        new_versions = self.kb.get_current_versions(domain, url_pattern)
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=url_pattern,
+            payload={
+                "status": "rolled_back",
+                "reason": reason,
+                "from_version": from_version,
+                "to_version": new_versions.get("workflow_version"),
+                "bundle_version": new_versions.get("workflow_version"),
+                "prompt_version": new_versions.get("prompt_version"),
+            },
+        )
+        return {
+            "status": "rolled_back",
+            "from_version": from_version,
+            "to_version": new_versions.get("workflow_version"),
+        }

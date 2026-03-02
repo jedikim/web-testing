@@ -195,6 +195,31 @@ class KnowledgeBase:
             "prompt_version": self._read_current_token(pdir / "prompts"),
         }
 
+    def rollback_bundle(self, *, domain: str, url_pattern: str, target_version: int) -> bool:
+        """Rollback current workflow/macro/prompt pointers to a target version."""
+        if target_version <= 0:
+            return False
+        pdir = self._pattern_dir(domain, url_pattern)
+        workflows = pdir / "workflows"
+        macros = pdir / "macros"
+        prompts = pdir / "prompts"
+
+        dsl_target = workflows / f"v{target_version}.dsl.json"
+        macro_target = macros / f"v{target_version}"
+        prompt_target = prompts / f"v{target_version}"
+        if not dsl_target.exists():
+            return False
+        if not macro_target.exists():
+            return False
+        if not prompt_target.exists():
+            return False
+
+        token = f"v{target_version}"
+        (workflows / "current").write_text(token, encoding="utf-8")
+        (macros / "current").write_text(token, encoding="utf-8")
+        (prompts / "current").write_text(token, encoding="utf-8")
+        return True
+
     def resolve_pattern_for_url(self, domain: str, url: str) -> str | None:
         """Match URL against saved pattern rules for a domain."""
         patterns_root = self._domain_dir(domain) / "url_patterns"
