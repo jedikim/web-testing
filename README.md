@@ -97,6 +97,20 @@ async with WebAgent(headless=True, stealth_level="standard") as agent:
     print(f"Success: {result.success}, Cost: ${result.total_cost_usd:.4f}")
 ```
 
+### Recon Bootstrap (v4.3 docs-based)
+
+This branch includes a lightweight recon/codegen foundation based on:
+- `docs/DEV_GUIDE.md`
+- `docs/RECON_CODEGEN_ARCHITECTURE.md`
+
+```bash
+# Install recon deps
+pip install -e ".[dev,recon]"
+
+# Run one recon pass (creates sites/<domain>/profile.json + profile.md)
+python scripts/run_recon.py --url https://www.naver.com --purpose portal --language ko --region KR
+```
+
 ---
 
 ## Session API
@@ -184,6 +198,11 @@ web-agentic/
 │   │   ├── rule_promoter.py      # Cache save logic
 │   │   ├── dspy_optimizer.py     # DSPy prompt optimization
 │   │   └── memory_manager.py     # 4-tier memory system
+│   ├── recon/          # Recon/codegen foundation (v4.3 bootstrap)
+│   │   ├── agent.py              # ReconAgent (DOM/visual/nav scanner orchestration)
+│   │   ├── models.py             # SiteProfile + MaturityState
+│   │   ├── knowledge_base.py     # sites/<domain>/ profile + runs.jsonl storage
+│   │   └── litellm_router.py     # provider/model alias registry
 │   ├── workflow/       # Workflow DSL
 │   │   ├── dsl_parser.py         # YAML workflow parser
 │   │   └── step_queue.py         # FIFO step queue
@@ -270,6 +289,9 @@ The FastAPI server (port 8000) exposes the following endpoints:
 | [Testing Guide](./docs/TESTING-GUIDE.md) | Test categories, commands, and writing tests |
 | [Evolution UI](./evolution-ui/README.md) | React dashboard setup and pages |
 | [Architecture](./docs/ARCHITECTURE.md) | Module-level architecture details |
+| [DEV Guide](./docs/DEV_GUIDE.md) | v4.3 execution guide (Recon → CodeGen → Runtime) |
+| [Recon/CodeGen Architecture](./docs/RECON_CODEGEN_ARCHITECTURE.md) | Full recon-first architecture spec |
+| [Recon Bootstrap](./docs/RECON_BOOTSTRAP.md) | Implemented status and next slices |
 | [PRD](./docs/PRD.md) | Product requirements document |
 | [Technical Spec](./docs/web-automation-technical-spec-v2.md) | Full technical specification (2,268 lines) |
 

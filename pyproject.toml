@@ -51,6 +51,10 @@ observability = [
 learning = [
     "dspy>=2.5",
 ]
+recon = [
+    "langgraph>=0.3",
+    "litellm>=1.60",
+]
 server = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",

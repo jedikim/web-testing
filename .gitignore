@@ -37,6 +37,7 @@ evolution-ui/dist/
 
 # Runtime data
 data/*.db
+sites/
 
 # Egg-info
 *.egg-info/

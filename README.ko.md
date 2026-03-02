@@ -96,6 +96,20 @@ async with WebAgent(headless=True, stealth_level="standard") as agent:
     print(f"성공: {result.success}, 비용: ${result.total_cost_usd:.4f}")
 ```
 
+### Recon 부트스트랩 (v4.3 문서 기반)
+
+이 브랜치에는 아래 문서를 기준으로 한 경량 recon/codegen 기반이 포함됩니다:
+- `docs/DEV_GUIDE.md`
+- `docs/RECON_CODEGEN_ARCHITECTURE.md`
+
+```bash
+# recon 의존성 설치
+pip install -e ".[dev,recon]"
+
+# recon 1회 실행 (sites/<domain>/profile.json + profile.md 생성)
+python scripts/run_recon.py --url https://www.naver.com --purpose portal --language ko --region KR
+```
+
 ---
 
 ## 세션 API
@@ -184,6 +198,11 @@ web-agentic/
 │   │   ├── rule_promoter.py      # 캐시 저장 로직
 │   │   ├── dspy_optimizer.py     # DSPy 프롬프트 최적화
 │   │   └── memory_manager.py     # 4계층 메모리 시스템
+│   ├── recon/          # Recon/CodeGen 기반 (v4.3 부트스트랩)
+│   │   ├── agent.py              # ReconAgent (DOM/시각/네비 스캐너 오케스트레이션)
+│   │   ├── models.py             # SiteProfile + MaturityState
+│   │   ├── knowledge_base.py     # sites/<domain>/ profile + runs.jsonl 저장
+│   │   └── litellm_router.py     # provider/model alias 레지스트리
 │   ├── workflow/       # 워크플로우 DSL
 │   │   ├── dsl_parser.py         # YAML 워크플로우 파서
 │   │   └── step_queue.py         # FIFO 스텝 큐
@@ -270,6 +289,9 @@ FastAPI 서버(포트 8000)에서 제공하는 엔드포인트:
 | [테스트 가이드](./docs/TESTING-GUIDE.ko.md) | 테스트 카테고리, 명령어, 테스트 작성법 |
 | [진화 UI](./evolution-ui/README.ko.md) | React 대시보드 설정 및 페이지 |
 | [아키텍처](./docs/ARCHITECTURE.md) | 모듈별 아키텍처 상세 |
+| [개발 가이드](./docs/DEV_GUIDE.md) | v4.3 실행 가이드 (Recon → CodeGen → Runtime) |
+| [Recon/CodeGen 아키텍처](./docs/RECON_CODEGEN_ARCHITECTURE.md) | 정찰 선행 아키텍처 상세 문서 |
+| [Recon 부트스트랩](./docs/RECON_BOOTSTRAP.md) | 현재 구현 상태 및 다음 단계 |
 | [PRD](./docs/PRD.md) | 제품 요구사항 정의서 |
 | [기술 기획서](./docs/web-automation-technical-spec-v2.md) | 전체 기술 기획서 (2,268줄) |
 
