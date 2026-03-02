@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
+from src.recon.codegen import CodeGenAgent
 from src.recon.knowledge_base import KnowledgeBase
+from src.recon.models import SiteProfile
 
 
 @dataclass(frozen=True)
@@ -89,4 +91,37 @@ class ReconRuntime:
             "status": "ok",
             "bundle_version": lookup.workflow_version,
             "prompt_version": lookup.prompt_version,
+        }
+
+    def execute_or_generate_stub(
+        self,
+        *,
+        domain: str,
+        url: str,
+        intent: str,
+        profile: SiteProfile,
+        codegen_agent: CodeGenAgent,
+    ) -> dict[str, Any]:
+        """Execute if bundle exists; otherwise generate + save + log."""
+        lookup = self.resolve(domain=domain, url=url)
+        if lookup.bundle is not None and lookup.url_pattern is not None:
+            return self.execute_stub(domain=domain, url=url, intent=intent)
+
+        generated = codegen_agent.generate_bundle(profile=profile, url=url, intent=intent)
+        version = self.kb.save_bundle(domain, generated.workflow_dsl["url_pattern"], generated)
+
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=str(generated.workflow_dsl["url_pattern"]),
+            payload={
+                "status": "generated",
+                "intent": intent,
+                "bundle_version": version,
+                "prompt_version": version,
+            },
+        )
+        return {
+            "status": "generated",
+            "bundle_version": version,
+            "prompt_version": version,
         }

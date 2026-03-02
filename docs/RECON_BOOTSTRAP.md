@@ -52,6 +52,14 @@ This document tracks the first implementation slice aligned to:
   - Appends execution records with `bundle_version` and `prompt_version` into `runs.jsonl`
   - Includes `execute_stub()` for integration wiring before full DSL executor binding
 
+7. **CodeGenAgent (DSL-first)**
+- `src/recon/codegen.py`
+  - Strategy decision from profile+intent (`dom_only`, `dom_with_objdet_backup`, `objdet_dom_hybrid`, `grid_vlm`, `vlm_only`)
+  - Deterministic `workflow_dsl` generation with verify-after-act steps
+  - Prompt map and dependency list generation
+- `ReconRuntime.execute_or_generate_stub(...)`
+  - On KB miss, generates bundle with `CodeGenAgent`, stores versioned artifacts, logs `generated` run
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -63,6 +71,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_scanners.py`
 - `tests/unit/test_recon_langgraph.py`
 - `tests/unit/test_recon_runtime.py`
+- `tests/unit/test_recon_codegen.py`
+- `tests/unit/test_recon_runtime_codegen_integration.py`
 
 ## Verification commands
 
