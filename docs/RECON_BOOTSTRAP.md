@@ -79,6 +79,21 @@ This document tracks the first implementation slice aligned to:
   - `ReconRuntime.handle_failure_stub(...)`
   - Logs `failure_category`, `recommended_action`, `requires_human` to `runs.jsonl`
 
+10. **Change Detector + Runtime Change-Check Logging**
+- `src/recon/change_detector.py`
+  - 3-signal weighted detector with deterministic thresholds
+  - Signals:
+    - `selector_survival_rate`
+    - `ax_diff_ratio`
+    - `api_schema_diff_ratio`
+  - Output:
+    - `major_restructure`
+    - `content_update`
+    - unchanged
+- Runtime integration:
+  - `ReconRuntime.detect_change_stub(...)`
+  - Appends `change_check` record in `runs.jsonl` with score/reason/signals/dead selectors
+
 ## Added tests
 
 - `tests/unit/test_recon_models.py`
@@ -97,6 +112,8 @@ This document tracks the first implementation slice aligned to:
 - `tests/unit/test_recon_failure_analyzer.py`
 - `tests/unit/test_recon_self_improver.py`
 - `tests/unit/test_recon_runtime_failure_integration.py`
+- `tests/unit/test_recon_change_detector.py`
+- `tests/unit/test_recon_runtime_change_integration.py`
 
 ## Verification commands
 

@@ -8,6 +8,7 @@ Phase-1 bootstrap for the v4.3 architecture:
 """
 
 from src.recon.agent import ReconAgent
+from src.recon.change_detector import ChangeDetector, ChangeReport
 from src.recon.codegen import CodeGenAgent, StrategyDecision
 from src.recon.failure_analyzer import FailureAnalyzer, FailureClassification
 from src.recon.knowledge_base import KnowledgeBase
@@ -21,6 +22,8 @@ from src.recon.validator import CodeValidator, ValidationResult
 
 __all__ = [
     "ReconAgent",
+    "ChangeDetector",
+    "ChangeReport",
     "CodeGenAgent",
     "StrategyDecision",
     "FailureAnalyzer",

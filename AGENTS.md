@@ -35,3 +35,4 @@ If conflicts exist: `DEV_GUIDE > RECON_CODEGEN_ARCHITECTURE > new_arch > ARCHITE
 - 2026-03-02: Added DSL-first CodeGenAgent and runtime auto-generate-on-miss path.
 - 2026-03-02: Added pre-promotion validation gate for generated bundles.
 - 2026-03-02: Added failure classification + self-improve planning path for runtime failures.
+- 2026-03-02: Added weighted change detector and runtime change-check logging into runs history.

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib.parse import urlparse
 
+from src.recon.change_detector import ChangeDetector
 from src.recon.codegen import CodeGenAgent
 from src.recon.failure_analyzer import FailureAnalyzer
 from src.recon.knowledge_base import KnowledgeBase
@@ -195,4 +196,42 @@ class ReconRuntime:
                 "requires_human": plan.requires_human,
                 "steps": plan.steps,
             },
+        }
+
+    def detect_change_stub(
+        self,
+        *,
+        domain: str,
+        url_pattern: str,
+        detector: ChangeDetector,
+        selector_survival_rate: float,
+        ax_diff_ratio: float,
+        api_schema_diff_ratio: float,
+        dead_selectors: list[str],
+    ) -> dict[str, Any]:
+        """Run change detector and log result to runs history."""
+        report = detector.evaluate(
+            selector_survival_rate=selector_survival_rate,
+            ax_diff_ratio=ax_diff_ratio,
+            api_schema_diff_ratio=api_schema_diff_ratio,
+            dead_selectors=dead_selectors,
+        )
+        self.kb.append_run(
+            domain=domain,
+            url_pattern=url_pattern,
+            payload={
+                "status": "change_check",
+                "change_changed": report.changed,
+                "change_reason": report.reason,
+                "change_score": report.change_score,
+                "selector_survival_rate": report.selector_survival_rate,
+                "ax_diff_ratio": report.ax_diff_ratio,
+                "api_schema_diff_ratio": report.api_schema_diff_ratio,
+                "dead_selectors": report.dead_selectors,
+            },
+        )
+        return {
+            "changed": report.changed,
+            "reason": report.reason,
+            "change_score": report.change_score,
         }
